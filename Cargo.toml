@@ -1,4 +1,4 @@
 [workspace]
-members = ["packages/host", "apps/desktop/src-tauri"]
+members = ["packages/host", "apps/desktop/src-tauri", "packages/release-verifier"]
 default-members = ["packages/host"]
 resolver = "2"

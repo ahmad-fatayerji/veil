@@ -1,30 +1,163 @@
 name: CI
 on:
-  push:
   pull_request:
+    branches: [main, develop, 'release/**', 'hotfix/**']
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Exact source commit to validate
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      candidate:
+        default: false
+        type: boolean
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || inputs.ref || github.ref }}
+  cancel-in-progress: true
 jobs:
-  verify:
-    runs-on: windows-latest
+  policy:
+    name: Branch policy
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/gitflow.mjs verify
+      - if: ${{ !inputs.candidate }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATE_REF: ${{ inputs.ref || github.sha }}
+        run: node scripts/gitflow.mjs policy
+  javascript:
+    name: JavaScript checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --check .
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm exec vitest run
+      - run: pnpm test:release
+      - run: pnpm build
+  rust:
+    name: Windows Rust checks
+    runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: 1
+      CARGO_PROFILE_TEST_DEBUG: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: windows-rust-checks-v1
+          workspaces: . -> target
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Record build environment and cache hit
+        env:
+          NATIVE_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+          NATIVE_CACHE_NAMESPACE: windows-rust-checks-v1
+        run: node scripts/native-build-diagnostics.mjs
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked --timings -- -D warnings
+      - run: cargo test --workspace --locked --timings
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-check-timings-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/cargo-timings/
+            target/build-diagnostics/
+          retention-days: 7
+  integration:
+    name: Windows build and browser tests
+    runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: 1
+      CARGO_PROFILE_TEST_DEBUG: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - uses: dtolnay/rust-toolchain@1.99.0
-        with:
-          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: windows-desktop-debug-v1
+          workspaces: . -> target
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm --filter @veil/desktop tauri build --debug --no-bundle
-      - run: pnpm check
-      - run: pnpm test
+      - name: Record build environment and cache hit
+        env:
+          NATIVE_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+          NATIVE_CACHE_NAMESPACE: windows-desktop-debug-v1
+        run: node scripts/native-build-diagnostics.mjs
+      - run: pnpm --filter @veil/desktop exec -- tauri build --debug --no-bundle -- --locked --timings
       - run: pnpm exec playwright install chromium
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-results
-          path: test-results/
+          name: browser-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-debug-timings-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/cargo-timings/
+            target/build-diagnostics/
+          retention-days: 7
+  gate:
+    name: ${{ inputs.candidate && 'Candidate validation' || 'CI gate' }}
+    if: always()
+    needs: [policy, javascript, rust, integration]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every check to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node --input-type=module -e 'const jobs = Object.values(JSON.parse(process.env.RESULTS)); if (jobs.length !== 4 || jobs.some(job => job.result !== "success")) process.exit(1);'

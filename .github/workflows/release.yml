@@ -1,82 +1,68 @@
-name: Windows release
+name: Stable release
 on:
+  pull_request:
+    branches: [main]
+    types: [closed]
   workflow_dispatch:
-  push:
-    tags: ['v*']
+    inputs:
+      ref:
+        description: Exact merged main commit to retry after a release failure
+        required: true
+        type: string
 permissions:
-  contents: read
-concurrency:
-  group: windows-release
-  cancel-in-progress: false
+  contents: write
+  pull-requests: write
+  actions: write
 jobs:
-  release:
-    runs-on: windows-latest
+  source:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       (startsWith(github.event.pull_request.head.ref, 'release/') || startsWith(github.event.pull_request.head.ref, 'hotfix/')))
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+      - id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  validate:
+    needs: source
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.source.outputs.sha }}
+      candidate: true
+  build:
+    needs: source
+    uses: ./.github/workflows/build-release.yml
+    with:
+      ref: ${{ needs.source.outputs.sha }}
+  publish:
+    needs: [source, validate, build]
+    uses: ./.github/workflows/publish.yml
+    with:
+      ref: ${{ needs.source.outputs.sha }}
+      branch: main
+      artifact: ${{ needs.build.outputs.artifact }}
+    secrets: inherit
+  backmerge:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@1.99.0
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
       - run: pnpm install --frozen-lockfile
-      - name: Validate release credentials and tag
-        shell: pwsh
-        env:
-          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          RELEASE_EVENT: ${{ github.event_name }}
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-        run: |
-          if (!$env:RELEASES_TOKEN -or !$env:SIGNING_KEY) { throw 'Configure the release token and signing key secrets first.' }
-          $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json).version
-          if ($env:RELEASE_EVENT -eq 'push' -and $env:RELEASE_TAG -ne "v$version") { throw 'Release tag must match the app version.' }
-          $releases = gh release list --repo ahmad-fatayerji/veil --limit 100 --json tagName,isDraft
-          if ($LASTEXITCODE -ne 0) { throw 'Cannot access the public release repository with RELEASES_TOKEN.' }
-          $existing = ($releases | ConvertFrom-Json) | Where-Object tagName -EQ "v$version"
-          if ($existing -and !$existing.isDraft) { throw 'This version is already published. Bump the version; never replace published update packages.' }
-      - run: pnpm build
-      - run: pnpm check
-      - run: pnpm test
-      - run: pnpm exec playwright install chromium
-      - run: pnpm test:e2e
-      - name: Build and upload a draft to the public release repository
-        uses: tauri-apps/tauri-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          projectPath: apps/desktop
-          owner: ahmad-fatayerji
-          repo: veil
-          releaseCommitish: main
-          tagName: v__VERSION__
-          releaseName: Veil __VERSION__
-          releaseBody: |
-            Experimental Windows x64 build. Both participants install Veil and exchange peer invitation/response codes.
-            Documents are temporary. End/leave sessions before updates. Local overlay preferences are retained.
-            Windows installer has no Authenticode publisher certificate. Updater packages are signature-verified.
-            See TESTING.md for test instructions. Different-network/relay connectivity is not universally guaranteed.
-          releaseDraft: true
-          prerelease: false
-          args: --bundles nsis
-          uploadUpdaterJson: true
-          updaterJsonPreferNsis: true
-      - name: Upload tester instructions and checksums
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-        run: |
-          $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json).version
-          $installer = Get-ChildItem target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
-          node scripts/release-manifest.mjs $installer.FullName
-          gh release upload "v$version" target/release/share/TESTING.md target/release/share/SHA256SUMS.txt --repo ahmad-fatayerji/veil --clobber
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-release-assets
-          path: target/release/share/
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/gitflow.mjs backmerge

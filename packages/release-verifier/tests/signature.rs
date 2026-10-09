@@ -5,8 +5,10 @@ use minisign_verify::{PublicKey, Signature};
 #[ignore = "Requires VEIL_TEST_INSTALLER to point to a real packaged installer"]
 fn packaged_installer_rejects_tampering() {
     let installer = std::env::var("VEIL_TEST_INSTALLER").expect("Set VEIL_TEST_INSTALLER");
-    let config: serde_json::Value =
-        serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+    let config: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../apps/desktop/src-tauri/tauri.conf.json"
+    ))
+    .unwrap();
     let key = STANDARD
         .decode(config["plugins"]["updater"]["pubkey"].as_str().unwrap())
         .unwrap();

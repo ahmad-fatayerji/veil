@@ -88,12 +88,12 @@ The standalone M0 demo binds only **127.0.0.1:4444** and keeps its fixed develop
 
 ```powershell
 pnpm build
-pnpm --filter @veil/desktop tauri build --debug --no-bundle
 cargo build -p veil-host
 pnpm check
 pnpm test
 pnpm exec playwright install chromium
 pnpm test:e2e
+pnpm --filter @veil/desktop tauri build --debug --no-bundle
 pnpm test:overlay
 pnpm test:host
 pnpm test:peer
@@ -108,7 +108,9 @@ pnpm test:installer
 
 ## Layout and status
 
-Use `pnpm package:windows` to build the production NSIS installer and updater signature. Distribution/release workflow, private key backup, version changes and update safety are documented in [releasing](docs/releasing.md). Source remote now points to private `Veil-source`; public `veil` contains downloads only. The automated workflow prepares draft releases for review.
+Run the Tauri debug build **after Cargo tests and before native acceptance scripts**. Cargo integration tests can replace `target/debug/veil-desktop.exe` with a development-server build. Rebuilding with the Tauri CLI restores the embedded-assets test executable.
+
+Use `pnpm package:windows` to build the production NSIS installer and updater signature. Gitflow branches, required CI, reviewed version proposals, beta/stable publication, private key backup and update safety are documented in [releasing](docs/releasing.md). Source remote points to private `Veil-source`; public `veil` contains downloads only. Request betas explicitly; merging a finalized release PR approves stable publication. App updates offers separate stable and beta channels.
 
 `test:peer` launches three real desktop/WebView2 peers with isolated profiles. It requires a freshly built debug executable and free ports 9231–9233. It checks credential rejection, direct transport, fragmented updates, offline merge after fresh signaling, presence, P2P overlay editing and shutdown. Redacted screenshots are under `target/peer-acceptance`. This native script runs separately from hosted CI; internet and TURN checks remain manual.
 

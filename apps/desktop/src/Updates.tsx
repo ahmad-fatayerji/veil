@@ -6,6 +6,7 @@ interface UpdateInfo {
   availableVersion: string | null;
   notes: string | null;
   sessionActive: boolean;
+  channel: 'stable' | 'beta';
 }
 
 export function Updates({ onBusy }: { onBusy: (busy: boolean) => void }) {
@@ -60,12 +61,40 @@ export function Updates({ onBusy }: { onBusy: (busy: boolean) => void }) {
       onBusy(false);
     }
   }
+  async function setChannel(channel: 'stable' | 'beta') {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      setInfo(await invoke<UpdateInfo>('update_set_channel', { channel }));
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <details className="desktop-updates">
       <summary>App updates {info && `· ${info.currentVersion}`}</summary>
       <p>
         Check GitHub Releases for a newer version. Updates are signature-verified before
         installation.
+      </p>
+      <label>
+        Update channel{' '}
+        <select
+          value={info?.channel ?? 'stable'}
+          disabled={busy || !info}
+          onChange={(event) => void setChannel(event.target.value as 'stable' | 'beta')}
+        >
+          <option value="stable">Stable</option>
+          <option value="beta">Beta</option>
+        </select>
+      </label>
+      {info?.channel === 'beta' && <p>Beta updates are experimental builds for testing.</p>}
+      <p>
+        Switching to stable does not downgrade a newer beta. Updates arrive when a newer version is
+        published.
       </p>
       <button className="secondary-button" disabled={busy || !info} onClick={() => void run(false)}>
         Check for updates
