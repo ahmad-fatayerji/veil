@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+Cargo.lock
+PROJECT_SPEC.md
+target/
+node_modules/
+dist/
+test-results/
+playwright-report/
+apps/desktop/src-tauri/gen/

@@ -1,0 +1,37 @@
+{
+  "name": "veil",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.30.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev:host": "cargo run -p veil-host",
+    "dev:web": "pnpm --filter @veil/web dev",
+    "dev:desktop": "pnpm --filter @veil/desktop tauri dev",
+    "build": "pnpm --filter @veil/web build && pnpm --filter @veil/desktop build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write . && cargo fmt --all",
+    "format:check": "prettier --check . && cargo fmt --all -- --check",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && cargo check --workspace && cargo clippy --workspace --all-targets -- -D warnings",
+    "test": "vitest run && cargo test --workspace",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.58.0",
+    "@types/node": "^22.19.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.7.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vitest": "^4.0.0",
+    "vite": "^7.3.7"
+  }
+}

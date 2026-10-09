@@ -1,0 +1,22 @@
+{
+  "name": "@veil/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "build": "vite build",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@veil/ui": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "yjs": "^13.6.27"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "vite": "^7.3.7"
+  }
+}

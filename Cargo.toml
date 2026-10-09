@@ -1,0 +1,4 @@
+[workspace]
+members = ["packages/host", "apps/desktop/src-tauri"]
+default-members = ["packages/host"]
+resolver = "2"
