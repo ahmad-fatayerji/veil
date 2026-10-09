@@ -1,5 +1,13 @@
 # M0-M2 verification
 
+## M6 release build performance verification — 9 October 2026
+
+The unsigned production executable compiled successfully with locked dependencies and Cargo timing output. In a separate source copy with no frontend `dist`, compiler dependency artifacts or incremental build state, the transferred executable was packaged with `tauri bundle --bundles nsis` and signed using the existing local updater key. Bundling created no `target/release/deps` directory and did not compile the desktop. The new lightweight `veil-release-verifier` artifact test verified that real 0.1.2 installer, checked version binding and rejected a modified byte. The isolated verifier compiled in 14.84s and its test ran in 0.45s on this workstation; these are local results, not GitHub runner estimates. Evidence: `target/bundle-acceptance/ba21f2f431fd4a4eab882779a1e915f6`, `target/verifier-local/cargo-timings/` and `target/cargo-timings/`.
+
+Formatting, ESLint, typechecking, all nine TypeScript tests, all 17 release/workflow tests, Rust formatting/Clippy, all eleven Rust unit tests, the locked Windows debug build and all four browser regressions passed. `actionlint` validated the workflow syntax and expressions. The new tests cover source/version/run/attempt/checksum mismatch, missing executable, same-run retry acceptance, overlapping compilation and validation, and mandatory gates before signing/publication.
+
+Hosted cold/warm performance, same-run GitHub artifact transfer/retry and end-to-end publication through the revised workflows remain unverified. No release was published during local validation. Existing clean-VM, WebView2-bootstrap and native internet/capture limitations below still apply.
+
 ## M6 distribution verification — 9 October 2026
 
 Production Windows x64 NSIS installers and mandatory updater signatures built successfully. The public distribution repository is `ahmad-fatayerji/veil`; source remains private at `ahmad-fatayerji/Veil-source`. Version 0.1.0 and 0.1.1 have public release assets and HTTPS update metadata.

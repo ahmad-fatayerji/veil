@@ -4394,8 +4394,6 @@ dependencies = [
 name = "veil-desktop"
 version = "0.1.2"
 dependencies = [
- "base64 0.22.1",
- "minisign-verify",
  "serde",
  "serde_json",
  "tauri",
@@ -4421,6 +4419,15 @@ dependencies = [
  "tower-http",
  "uuid",
  "yrs",
+]
+
+[[package]]
+name = "veil-release-verifier"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "minisign-verify",
+ "serde_json",
 ]
 
 [[package]]

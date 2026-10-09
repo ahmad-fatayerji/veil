@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 
 const installer = resolve(process.argv[2]);
 const config = JSON.parse(readFileSync('apps/desktop/src-tauri/tauri.conf.json', 'utf8'));
@@ -20,6 +21,10 @@ copyFileSync(`${installer}.sig`, resolve(directory, `${name}.sig`));
 writeFileSync(
   resolve(directory, 'latest.json'),
   `${JSON.stringify({ version: config.version, notes, pub_date: new Date().toISOString(), platforms: { 'windows-x86_64': { signature, url: new URL(encodeURIComponent(name), baseUrl).href } } }, null, 2)}\n`,
+);
+writeFileSync(
+  resolve(directory, 'release-metadata.json'),
+  `${JSON.stringify({ version: config.version, sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceRepository: 'ahmad-fatayerji/Veil-source', workflowRun: process.env.GITHUB_RUN_ID ?? null, workflowAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null, installer: name, sha256: createHash('sha256').update(readFileSync(installer)).digest('hex') }, null, 2)}\n`,
 );
 writeFileSync(
   resolve(directory, 'SHA256SUMS.txt'),
