@@ -4,7 +4,7 @@ export const roadmap = [
     title: 'Local collaboration',
     status: 'Built',
     detail:
-      'Desktop and browser editor, live editing, reconnect, named cursors, selections, and activity. Sessions currently run on this computer only.',
+      'Desktop and browser editor, live editing, reconnect, named cursors, selections, and activity. The local development demo remains available.',
   },
   {
     id: 'M1',
@@ -16,16 +16,23 @@ export const roadmap = [
   {
     id: 'M2',
     title: 'Host and invite friends',
-    status: 'Next',
+    status: 'Built',
     detail:
       'Start and stop hosting from the app. Serve the browser editor, create invitations, and join from another device on your LAN.',
   },
   {
+    id: 'P1',
+    title: 'Desktop peer connections',
+    status: 'Built',
+    detail:
+      'Encrypted desktop peer editing with invitation/response codes and optional self-hosted STUN/TURN. Direct transport verified locally; different-network and relay checks remain manual.',
+  },
+  {
     id: 'M3',
     title: 'Permissions and saved documents',
-    status: 'Planned',
+    status: 'Next',
     detail:
-      'Viewer and editor roles, optional participant limit, desktop guests, document persistence, and recovery after host restart.',
+      'Viewer and editor roles, optional participant limit, document persistence, and recovery after host restart.',
   },
   {
     id: 'M4',
@@ -39,13 +46,13 @@ export const roadmap = [
     title: 'Secure remote access',
     status: 'Planned',
     detail:
-      'Explicit HTTPS/WSS setup, access controls, abuse protection, and reconnection tests. Direct connectivity still depends on your network.',
+      'Internet and self-hosted relay acceptance, reconnection improvements, access controls and abuse protection. Connectivity still depends on your network.',
   },
   {
     id: 'M6',
     title: 'Installer and updates',
-    status: 'Planned',
+    status: 'In progress',
     detail:
-      'Windows installer, signed updates, release workflow, and an update screen that respects active sessions.',
+      'Windows installer, signed GitHub update packages and a session-safe update screen. Clean-machine and release acceptance are tracked separately.',
   },
 ] as const;

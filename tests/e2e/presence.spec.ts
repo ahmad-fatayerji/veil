@@ -56,14 +56,14 @@ test('remote cursors, selections, and activity follow their author and clear on 
   }
 });
 
-test('roadmap states the built editor and overlay, next hosting, and remaining milestones', async ({
+test('roadmap states the built editor and overlay, built hosting, and remaining milestones', async ({
   page,
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Roadmap' }).click();
   const dialog = page.getByRole('dialog', { name: "What's left to build" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('listitem')).toHaveCount(7);
+  await expect(dialog.getByRole('listitem')).toHaveCount(8);
   await expect(
     dialog.getByRole('listitem').filter({ hasText: 'Local collaboration' }),
   ).toContainText('Built');
@@ -72,7 +72,7 @@ test('roadmap states the built editor and overlay, next hosting, and remaining m
   );
   await expect(
     dialog.getByRole('listitem').filter({ hasText: 'Host and invite friends' }),
-  ).toContainText('Next');
+  ).toContainText('Built');
   await expect(dialog).toContainText('Closing the host loses the document');
   await page.screenshot({ path: test.info().outputPath('roadmap.png'), fullPage: true });
   await page.keyboard.press('Escape');

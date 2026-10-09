@@ -1,6 +1,6 @@
 {
   "name": "@veil/desktop",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.2",
+    "@veil/protocol": "workspace:*",
     "@veil/ui": "workspace:*",
     "@veil/editor": "workspace:*",
     "@veil/collaboration": "workspace:*",

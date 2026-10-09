@@ -5,6 +5,6 @@ import '@veil/ui/styles.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <DemoApp surface="browser" />
+    <DemoApp surface="browser" allowDemo={import.meta.env.DEV} />
   </StrictMode>,
 );

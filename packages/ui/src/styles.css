@@ -583,3 +583,122 @@ input::placeholder {
     padding: 24px 20px;
   }
 }
+/* Session management belongs above the collaborative workspace. */
+.hosting-panel {
+  margin: 16px 24px 0;
+  padding: 16px;
+  border: 1px solid #dedbe7;
+  border-radius: 12px;
+  background: #fff;
+}
+.hosting-panel p {
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.hosting-heading,
+.hosting-options,
+.hosting-invitation {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.hosting-heading {
+  justify-content: space-between;
+}
+.hosting-options label {
+  display: grid;
+  gap: 6px;
+}
+.hosting-panel input:not([type='checkbox']),
+.hosting-panel select {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #d4d0dc;
+  border-radius: 6px;
+}
+.hosting-invitation input {
+  flex: 1;
+}
+.hosting-acknowledgement {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+}
+
+.connection-modes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 24px;
+  background: #f2eff8;
+}
+.connection-modes button[aria-pressed='true'] {
+  background: #e3dcf3;
+  color: #503a83;
+}
+.connection-modes span {
+  margin-left: auto;
+  font-size: 12px;
+  color: #655e70;
+}
+.peer-panel label:not(.hosting-acknowledgement) {
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.peer-panel textarea {
+  display: block;
+  width: 100%;
+  min-height: 70px;
+  padding: 10px;
+  border: 1px solid #d4d0dc;
+  border-radius: 6px;
+  resize: vertical;
+  font: 12px monospace;
+  overflow-wrap: anywhere;
+  margin-bottom: 10px;
+}
+.peer-panel input:not([type='checkbox']) {
+  width: 100%;
+}
+.peer-network {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid #dedbe7;
+  border-radius: 8px;
+}
+.peer-network summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.peer-actions {
+  margin: 12px 0;
+}
+.peer-connections {
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.peer-notice {
+  color: #287d69;
+}
+.desktop-updates {
+  padding: 12px 24px;
+  background: #fff;
+  border-bottom: 1px solid #ece8f2;
+  font-size: 13px;
+}
+.desktop-updates summary {
+  cursor: pointer;
+}
+.desktop-updates p {
+  max-width: 75ch;
+}
+.release-notes {
+  white-space: pre-wrap;
+}

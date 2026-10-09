@@ -5,9 +5,22 @@ import {
   type DemoConnection,
   type Participant,
 } from '@veil/collaboration';
+import { parseInvitation, type SessionTarget } from '@veil/protocol';
 import { SharedEditor } from '@veil/editor';
 import { roadmap } from './roadmap';
 import veilIcon from './assets/veil-icon-small.png';
+
+// Read once before React Strict Mode mounts; remove the credential from browser history.
+const initialTarget = (() => {
+  if (!window.location.hash) return undefined;
+  try {
+    return parseInvitation(window.location.href);
+  } catch {
+    return undefined;
+  } finally {
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+})();
 
 type Status = 'offline' | 'connecting' | 'connected' | 'disconnected' | 'synced';
 const activityLabels = {
@@ -33,16 +46,30 @@ export function DemoApp({
   surface,
   desktopControls,
   renderEditor,
+  sessionTarget,
+  allowDemo = false,
+  providedConnection,
+  onProvidedLeave,
 }: {
   surface: 'browser' | 'desktop';
+  allowDemo?: boolean;
+  providedConnection?: DemoConnection | null;
+  onProvidedLeave?: () => void;
+  sessionTarget?: SessionTarget | null;
   desktopControls?: ReactNode | ((connection: DemoConnection | null) => ReactNode);
   renderEditor?: (connection: DemoConnection) => ReactNode;
 }) {
   const [name, setName] = useState('');
-  const [connection, setConnection] = useState<DemoConnection | null>(null);
+  const [invitation, setInvitation] = useState('');
+  const bundledBrowser = surface === 'browser' && !allowDemo;
+  const target = sessionTarget === undefined ? initialTarget : sessionTarget;
+  const [internalConnection, setConnection] = useState<DemoConnection | null>(null);
+  const connection = providedConnection === undefined ? internalConnection : providedConnection;
   const [status, setStatus] = useState<Status>('offline');
   const [error, setError] = useState('');
-  const [joinRequest, setJoinRequest] = useState<{ name: string } | null>(null);
+  const [joinRequest, setJoinRequest] = useState<{ name: string; target?: SessionTarget } | null>(
+    null,
+  );
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [showPeople, setShowPeople] = useState(true);
   const roadmapDialog = useRef<HTMLDialogElement>(null);
@@ -52,7 +79,7 @@ export function DemoApp({
     if (!joinRequest) return;
     const abort = new AbortController();
     let active: DemoConnection | undefined;
-    connectDemo(joinRequest.name, abort.signal)
+    connectDemo(joinRequest.name, abort.signal, joinRequest.target)
       .then((session) => {
         if (abort.signal.aborted) {
           session.destroy();
@@ -73,9 +100,13 @@ export function DemoApp({
         setConnection(session);
         session.provider.connect();
       })
-      .catch(() => {
+      .catch((failure: unknown) => {
         if (!abort.signal.aborted) {
-          setError('Could not reach the local host. Start pnpm dev:host, then try again.');
+          setError(
+            failure instanceof Error
+              ? failure.message
+              : 'Could not reach the host. Check that it is running and reachable.',
+          );
           setJoinRequest(null);
           setStatus('offline');
         }
@@ -86,7 +117,33 @@ export function DemoApp({
     };
   }, [joinRequest]);
 
+  useEffect(() => {
+    if (providedConnection === undefined) return;
+    const session = providedConnection;
+    const update = () => setParticipants(session ? readParticipants(session) : []);
+    const updateStatus = ({ status }: { status: Status }) => setStatus(status);
+    const updateSync = (synced: boolean) => {
+      if (synced) setStatus('synced');
+    };
+    // External transports own their resource lifetime; this view only observes them.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStatus(session ? (session.provider.synced ? 'synced' : 'connecting') : 'offline');
+    update();
+    session?.provider.on('status', updateStatus);
+    session?.provider.on('sync', updateSync);
+    session?.provider.awareness.on('change', update);
+    return () => {
+      session?.provider.off('status', updateStatus);
+      session?.provider.off('sync', updateSync);
+      session?.provider.awareness.off('change', update);
+    };
+  }, [providedConnection]);
+
   function leave() {
+    if (providedConnection !== undefined) {
+      onProvidedLeave?.();
+      return;
+    }
     setJoinRequest(null);
     setConnection(null);
     setParticipants([]);
@@ -113,7 +170,13 @@ export function DemoApp({
           </span>
         </span>
         <span className="header-divider" />
-        <span className="session-label">Local session</span>
+        <span className="session-label">
+          {providedConnection !== undefined
+            ? 'Peer session'
+            : target
+              ? 'Hosted session'
+              : 'Local session'}
+        </span>
         <span className={`status status-${status}`} role="status">
           <span className="status-dot" />
           {statusText}
@@ -157,16 +220,37 @@ export function DemoApp({
               ) : (
                 <SharedEditor connection={connection} />
               )
+            ) : providedConnection === null ? (
+              <div className="join-screen">
+                <h2>Connect directly.</h2>
+                <p>Start a peer session or paste an invitation in the controls above.</p>
+                <p className="join-note">
+                  No domain or mandatory online service. Network options can use your own discovery
+                  or relay server.
+                </p>
+              </div>
             ) : (
               <div className="join-screen">
                 <h2>Join the document.</h2>
-                <p>Write together in a session on this computer.</p>
+                <p>
+                  {sessionTarget === null
+                    ? 'Start a session above to invite collaborators.'
+                    : 'Enter your name to write together.'}
+                </p>
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();
                     setError('');
-                    setJoinRequest({ name });
-                    setStatus('connecting');
+                    try {
+                      const selected =
+                        target ?? (invitation ? parseInvitation(invitation) : undefined);
+                      if ((bundledBrowser || sessionTarget === null) && !selected)
+                        throw new Error('Enter an invitation from the host.');
+                      setJoinRequest({ name, target: selected });
+                      setStatus('connecting');
+                    } catch (failure) {
+                      setError(failure instanceof Error ? failure.message : 'Invalid invitation.');
+                    }
                   }}
                 >
                   <label htmlFor="name">Your name</label>
@@ -179,8 +263,28 @@ export function DemoApp({
                     autoComplete="nickname"
                     onChange={(event) => setName(event.target.value)}
                   />
-                  <button className="primary-button" type="submit" disabled={joining}>
-                    {joining ? 'Connecting…' : 'Join local session'}
+                  {bundledBrowser && !target && (
+                    <>
+                      <label htmlFor="invitation">Invitation</label>
+                      <input
+                        id="invitation"
+                        type="password"
+                        value={invitation}
+                        onChange={(event) => setInvitation(event.target.value)}
+                        autoComplete="off"
+                      />
+                    </>
+                  )}
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={joining || sessionTarget === null}
+                  >
+                    {joining
+                      ? 'Connecting…'
+                      : target || bundledBrowser
+                        ? 'Join session'
+                        : 'Join local session'}
                   </button>
                   {error && (
                     <p className="error" role="alert">
@@ -188,13 +292,21 @@ export function DemoApp({
                     </p>
                   )}
                 </form>
-                <p className="join-note">Open a second window to collaborate with another name.</p>
+                <p className="join-note">
+                  Invitations give editing access. Share them only with people you trust.
+                </p>
               </div>
             )}
           </div>
           <footer className="document-footer">
             <span>Temporary document · not saved to disk</span>
-            <span>Local only</span>
+            <span>
+              {providedConnection !== undefined
+                ? 'Peer session'
+                : target
+                  ? 'Local / trusted LAN'
+                  : 'Local only'}
+            </span>
           </footer>
         </section>
 
@@ -228,21 +340,23 @@ export function DemoApp({
               ))}
             </ul>
             <div className="session-controls">
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  if (connection.provider.shouldConnect) connection.provider.disconnect();
-                  else connection.provider.connect();
-                }}
-              >
-                {status === 'disconnected' ? 'Reconnect' : 'Disconnect'}
-              </button>
+              {providedConnection === undefined && (
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    if (connection.provider.shouldConnect) connection.provider.disconnect();
+                    else connection.provider.connect();
+                  }}
+                >
+                  {status === 'disconnected' ? 'Reconnect' : 'Disconnect'}
+                </button>
+              )}
               <button className="quiet-button" onClick={leave}>
                 Leave session
               </button>
             </div>
             <p className="panel-footnote">
-              Saved documents and invitations are still in development.
+              Everyone in this session can edit. Documents are not yet saved.
             </p>
           </aside>
         )}
@@ -263,7 +377,7 @@ export function DemoApp({
           </button>
         </div>
         <p className="roadmap-intro">
-          Local collaboration and the Windows overlay are built. Hosting and invitations are next.
+          Local collaboration, the Windows overlay, and hosting with LAN invitations are built.
         </p>
         <ol className="roadmap-list">
           {roadmap.map((milestone) => (
@@ -284,8 +398,7 @@ export function DemoApp({
           ))}
         </ol>
         <p className="roadmap-note">
-          For now, start the local host in a terminal with <code>pnpm dev:host</code>. Closing the
-          host loses the document.
+          Start a session from the desktop control panel. Closing the host loses the document.
         </p>
       </dialog>
     </div>

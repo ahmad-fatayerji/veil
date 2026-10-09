@@ -1,6 +1,6 @@
 # M1 Windows overlay
 
-The desktop has two native windows: `main` is the control panel and collaborative editor; `overlay` is a compact editor for the same live document. Neither window starts the session host. The overlay has no editor toolbar or remote cursor decorations. Join in the control panel, then show the overlay. Disable click-through to write in it.
+The desktop has two native windows: `main` is the control panel and collaborative editor; `overlay` is a compact editor for the same live document. M2 adds embedded session hosting to the control panel; the overlay never starts or manages the listener. The overlay has no editor toolbar or remote cursor decorations. Start and join a session in the control panel, then show the overlay. Disable click-through to write in it.
 
 The main window owns the authenticated WebSocket connection. A desktop-only native relay sends initial Yjs state and subsequent incremental updates between the two WebViews. Independent CRDT replicas preserve simultaneous edits. Each editor keeps its own local cursor and activity; the active editor publishes through the main participant's network awareness identity. This prevents a blurred control-panel editor from clearing an overlay selection, and opening the overlay does not add a participant. Remote awareness updates reach the control-panel editor separately. Leaving clears the overlay; rejoining binds a fresh replica. No credentials pass through this relay, and documents and presence are not stored with preferences. Relay commands run off the UI thread to avoid startup IPC blocking native window creation; frontend queues preserve message order.
 
@@ -18,16 +18,15 @@ Native window-setting commands require the `main` window. The overlay can read s
 
 ```powershell
 pnpm --filter @veil/desktop tauri build --debug --no-bundle
-cargo build -p veil-host
 pnpm test:overlay
 ```
 
-Run on an interactive Windows desktop, close other Veil instances and stop the demo host, and avoid moving the mouse during the test. Ports 4444, 9223 and 9224 must be free. The debug executable honors `VEIL_TEST_SETTINGS_DIR` solely for test isolation; release builds use the normal app configuration directory. The test process uses isolated WebView2 profiles and enables loopback remote debugging through its own environment.
+Run on an interactive Windows desktop, close other Veil instances, and avoid moving the mouse during the test. Ports 4445, 9223 and 9224 must be free. The script starts an embedded session through the desktop controls and uses its bundled browser editor. The debug executable honors `VEIL_TEST_SETTINGS_DIR` solely for test isolation; release builds use the normal app configuration directory. The test process uses isolated WebView2 profiles and enables loopback remote debugging through its own environment.
 
 The test connects Playwright to actual WebView2 targets and uses OS input and Win32 inspection. It verifies continuous native mouse drags of both sliders, bidirectional control-panel/overlay/browser editing, concurrent convergence, cursor/selection presence with one desktop identity, reconnect, leave/rejoin, separate windows, keyboard-operated settings, real drag/resize, opacity, compositor blending over another process, click interception/passthrough, global recovery and hide/show, atomic settings writes, non-default preferences after restart, and shortcut-collision rejection in both UI and Rust. Screenshots and isolated settings are saved under `target/overlay-acceptance`.
 
 Unit tests cover atomic replacement, missing/corrupt files, invalid settings, and bounds fitting with removed and negative-coordinate monitors. Browser collaboration tests remain independent.
 
-Multi-monitor/DPI hardware combinations and assistive technologies need a broader manual matrix. Capture exclusion, embedded hosting, durable documents, and distribution remain deferred.
+Multi-monitor/DPI hardware combinations and assistive technologies need a broader manual matrix. Capture exclusion, durable documents, and distribution remain deferred.
 
 API references: [Tauri global shortcuts](https://v2.tauri.app/plugin/global-shortcut/), [Tauri native windows](https://docs.rs/tauri/latest/tauri/webview/struct.WebviewWindow.html), and [Windows layered alpha](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setlayeredwindowattributes).

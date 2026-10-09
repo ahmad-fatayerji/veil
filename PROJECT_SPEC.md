@@ -4,6 +4,18 @@
 
 ## 1. Product vision
 
+### Approved architecture revision: desktop P2P (P1)
+
+The user has advanced work to **M6** to distribute the P1 build for real P2P testing. Implement a per-user Windows x64 installer, signed updater, GitHub distribution, release automation and explicit update UI now. Earlier deferred milestones are not implicitly complete. Documents still live in memory, so updater installation must refuse while a document session or embedded host is active; never claim document recovery across updates. Verify local install/upgrade/preferences and report clean-VM and real internet tests separately. Windows Authenticode signing and updater signatures are distinct; do not imply that free updater signing removes SmartScreen warnings.
+
+The user's P2P decision supersedes the server-first internet architecture and URL-only desktop join flow below. The primary flow is now installed desktop peers using encrypted WebRTC data channels. One desktop coordinates a star of peer connections and forwards Yjs updates; there is no mandatory hosted signaling service, purchased domain, account, or default third-party STUN/TURN endpoint. The coordinating desktop must remain open. This is P2P transport, not a host-independent mesh.
+
+Current milestone **P1** implements one slice: manual invitation/response signaling, authenticated encrypted data channels, optional explicitly configured STUN/TURN, shared editing/presence, and the existing local overlay. Each invitation is single-use and expires after ten minutes. Host generates a code; friend answers it; host pastes that response. Repeat with a fresh invitation per friend or reconnection. Pending local edits survive reconnection while the same session remains open. Ending/leaving discards the in-memory document.
+
+An empty network configuration makes no service requests, but does not guarantee connections between unrelated NAT networks. For ordinary internet connections STUN may be needed; restrictive NAT/firewalls may require TURN. Both can be self-hosted on an internet-reachable server; no domain is inherently required. Relay operation still depends on that server and its network. Do not promise universal connectivity or zero maintenance.
+
+P1 preserves the authenticated M2 LAN/browser mode separately. Browser internet invitations, automatic signaling, durable documents, host migration, permission roles, relay deployment, installers and capture exclusion remain later work. Do not expose the LAN HTTP service publicly as a substitute for P2P. Tests must distinguish same-PC native peer verification from different-network and TURN verification.
+
 Build a **Windows-first desktop application** that displays a movable, resizable, semi-transparent, always-on-top window containing a live collaborative document. A user can host a session directly from the desktop application. Friends can join via a browser (no installation) or another desktop client. All participants can collaboratively edit the document, and each desktop user may choose to display it as an overlay.
 
 The host's computer runs the session server; **there is no permanently hosted collaboration backend**. A separate static download/update endpoint may distribute installers and updates. Keep the architecture portable so macOS/Linux desktop support can be added later, but do not promise cross-platform screen-capture exclusion.

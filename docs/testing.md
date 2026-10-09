@@ -1,4 +1,24 @@
-# M0/M1 verification
+# M0-M2 verification
+
+## M6 distribution verification — 9 October 2026
+
+Production Windows x64 NSIS installers and mandatory updater signatures built successfully. The public distribution repository is `ahmad-fatayerji/veil`; source remains private at `ahmad-fatayerji/Veil-source`. Version 0.1.0 and 0.1.1 have public release assets and HTTPS update metadata.
+
+`pnpm test:installer` verified actual per-user installation to a temporary path, installed production editor/overlay, native rejection of updater administration from the overlay, refusal to install during a peer document session, clean close, maintenance reinstall and retained opacity/font preferences. Original device preferences were restored and the temporary app uninstalled. Evidence: `target/installer-acceptance/run-2mAgB1`.
+
+`node scripts/test-installer.mjs target/release/bundle/nsis/Veil_0.1.0_x64-setup.exe 0.1.1` verified a real signed HTTPS GitHub update, installer execution, automatic relaunch at 0.1.1 and retained overlay preferences. Evidence: `target/installer-acceptance/run-5BvhYp`. The test closes visible overlay/control windows in sequence before reinstalling, so an overlay-only close cannot leave the app running.
+
+The ignored artifact test was explicitly run against both actual setup packages using `VEIL_TEST_INSTALLER`: the embedded public key verifies the real signature/version, and changing one installer byte causes signature verification failure. It requires packaged artifacts and is intentionally separate from ordinary unit tests. Native P2P acceptance passed again after updater/session tracking changes (`target/peer-acceptance/run-KALkRl`). Nine TypeScript and ten Rust unit tests passed; all four browser regressions passed. A clean Windows VM, absent-WebView2 bootstrap, Authenticode/SmartScreen trust, real different-network P2P and TURN remain unverified. No document persistence or recovery across updates is claimed.
+
+The source release workflow builds and creates drafts in the public repository, refuses overwriting published versions, and requires a token scoped to the public release repository. Signing secrets are stored in the private source repository. GitHub Actions execution is recorded separately from local validation.
+
+## P1 peer transport verification — 9 October 2026
+
+The default desktop mode is now P2P. The Windows executable builds successfully. `pnpm check` and `pnpm test` passed (nine TypeScript and nine Rust tests), and all four browser regression tests passed with the eight-item roadmap.
+
+`pnpm test:peer` passed with three actual desktop/WebView2 instances, isolated settings and profiles, and no STUN/TURN/signaling server. It verified real invitation/response exchange, rejection of a mismatched credential before joining, the selected direct candidate pair, bidirectional editing and coordinator fanout, a 70,000-character fragmented update, presence cleanup, retained offline edits merging after fresh signaling, restored guest presence, bidirectional P2P overlay editing, and host shutdown disconnecting guests. No JavaScript errors were reported. Redacted screenshots are under `target/peer-acceptance/run-zdBulS`.
+
+This is same-PC native verification, not proof of connectivity between unrelated internet networks. Two physical PCs on different networks and an authenticated self-hosted TURN server remain manual acceptance requirements. Use [P1 networking](p2p.md) for setup and scope. LAN/browser hosting and the full native overlay regression both passed again after the P2P changes (`target/host-acceptance/run-Xwlif5` and `target/overlay-acceptance/run-ecvSzC`). No public HTTP listener or default service provider was added.
 
 Run the commands in the README. Windows CI builds both frontends, checks formatting/lint/types, checks and lints both Rust crates, runs unit tests, and runs Chromium interoperability tests against the real Rust host. CI execution on GitHub is separate from local validation.
 
@@ -26,7 +46,7 @@ Browser screenshots and real native control-panel/overlay screenshots were inspe
 - A fresh third client receives the full document.
 - Departing clients disappear from awareness; unauthenticated socket upgrades fail.
 - Named remote cursors and selections follow their author. Typing activity settles after idle and remote changes do not mark a receiving client as typing. Leaving removes the participant and cursor.
-- The roadmap displays seven milestones, closes with Escape, and restores focus. The mobile join layout does not overflow horizontally.
+- The roadmap displays eight milestones, closes with Escape, and restores focus. The mobile join layout does not overflow horizontally.
 - Local overlay settings replace atomically; invalid/corrupt values are rejected. Removed-monitor and negative-coordinate bounds are covered by unit tests.
 - [Native overlay acceptance](overlay.md) checks continuous real mouse drags of both sliders, bidirectional shared-document editing, concurrent convergence, cursor/selection presence, reconnect, leave/rejoin, actual Win32 attributes, compositor pixels, mouse drag/resize, another process receiving clicks, recovery outside the WebView, all changed settings after restart, and click-through rejection when its hotkey is taken.
 
@@ -34,8 +54,33 @@ Browser screenshots and real native control-panel/overlay screenshots were inspe
 
 1. Run host and web; join in two browser windows with different names.
 2. Edit, format with bold/heading/bullets, disconnect one editor, edit both, then reconnect.
-3. Start `pnpm dev:desktop`; confirm the native WebView displays the shared editor and receives browser edits.
+3. Start `pnpm dev:desktop`; start and join an embedded session, then open its invitation in another browser. Confirm the native WebView receives that browser's edits. This session is separate from the M0 demo.
 4. Close the host: clients should show disconnection and retry. Restart it: process credentials rotate, so leave and rejoin to bootstrap a fresh connection. Restart recovery is deferred; this intentionally loses the document.
 5. Close all clients and restart the host: document should be empty; this is expected for M0.
 
-Broader multi-monitor/DPI and assistive-technology checks remain manual. Document restart persistence, capture testing, LAN joining, capacity load targets, installers and updates belong to later milestones. Local overlay preference restart is verified in M1.
+Broader multi-monitor/DPI and assistive-technology checks remain manual. Document restart persistence, capture testing, capacity load targets, installers and updates belong to later milestones. Local overlay preference restart is verified in M1. The M0 demo remains separate from embedded hosting.
+
+## M2 verification - 9 October 2026
+
+Implemented all five M2 work items: desktop start/stop, bundled browser assets, explicit trusted-LAN configuration, session invitations/authenticated join/leave/presence, and network address/participant display. Full second-device LAN acceptance remains manual; it is not claimed as verified.
+
+Verified locally on Windows x64:
+
+- `pnpm --filter @veil/desktop tauri build --debug --no-bundle`: production browser/desktop assets and the embedded-assets Windows executable built successfully.
+- `pnpm check`: Prettier, rustfmt, ESLint, TypeScript, workspace Cargo check and Clippy passed.
+- `pnpm test`: five TypeScript protocol/invitation tests and nine Rust host/desktop tests passed. Host tests cover trusted Host/Origin, malformed frames, invitation validation, asset headers/path restrictions, bounded bodies/attempts, rejected exposure settings, port release and invitation rotation.
+- `pnpm test:e2e`: four independent Chromium regression tests passed, including concurrent edits, deletes, reconnect, late joining and awareness cleanup. Concurrent insertions execute inside each page to avoid two browser keyboards racing for OS focus.
+- `pnpm test:host` with `VEIL_TEST_LAN_ADDRESS=192.168.1.4`: real Tauri/WebView2 hosting controls, occupied-port error/retry, bundled browser assets, bidirectional desktop/browser edits, participant list, rejected join credentials and WebSockets, leave cleanup, active-socket shutdown, port release, session restart and old-invite rejection passed. The same-machine private-interface browser joined and synchronized with the loopback desktop client. This does not test a second physical device or inbound firewall reachability.
+- `pnpm test:overlay`: full real Windows/WebView2 regression passed against the embedded session and bundled browser client, including shared editing, native drag/resize, opacity/compositor, cross-app click-through, shortcuts, preference restart and collision rejection. The script explicitly focuses the overlay before dragging and reopens Settings after the new-session workspace reset. WebView2 printed the known window-class cleanup diagnostic on exit; the script completed successfully without JavaScript errors.
+
+Host/browser screenshots are isolated under `target/host-acceptance` and omit the invitation field from the host screenshot. The initial browser fragment is removed from visible history. Native tests use separate preference directories; ordinary local settings are untouched. Native acceptance is separate from hosted CI. Large editor-bundle warnings remain a known optimization item.
+
+Manual acceptance for the remaining LAN criterion:
+
+1. Run `pnpm dev:desktop`, select LAN / browser, then Trusted LAN, and enter this PC's physical adapter private IPv4 address from `ipconfig`.
+2. Acknowledge the plaintext setting, start, and allow Veil through Windows Firewall on private networks if prompted.
+3. Open the copied invitation on a second device on the same trusted network. Join with a different name; join in the desktop control panel too.
+4. Edit both ways, confirm convergence and named presence, leave/rejoin, and reconnect after a temporary network interruption.
+5. End the session and verify that both clients disconnect and the address stops responding. Start again and verify that the old invitation is refused.
+
+No firewall/router changes or second-device success were fabricated. Roles, optional configured capacity, durable recovery remain M3; capture compatibility and secure internet access remain M4/M5.

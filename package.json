@@ -1,6 +1,6 @@
 {
   "name": "veil",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "packageManager": "pnpm@10.30.1",
   "engines": {
@@ -18,7 +18,11 @@
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && cargo check --workspace && cargo clippy --workspace --all-targets -- -D warnings",
     "test": "vitest run && cargo test --workspace",
     "test:e2e": "playwright test",
-    "test:overlay": "node scripts/test-overlay.mjs"
+    "test:overlay": "node scripts/test-overlay.mjs",
+    "test:host": "node scripts/test-host.mjs",
+    "test:peer": "node scripts/test-peer.mjs",
+    "package:windows": "node scripts/build-installer.mjs",
+    "test:installer": "node scripts/test-installer.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

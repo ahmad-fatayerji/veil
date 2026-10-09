@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@veil/collaboration": "workspace:*",
+    "@veil/protocol": "workspace:*",
     "@veil/editor": "workspace:*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

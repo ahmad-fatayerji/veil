@@ -7,7 +7,7 @@ import { createServer } from 'node:net';
 import { chromium } from '@playwright/test';
 
 assert.equal(process.platform, 'win32', 'Native overlay acceptance requires Windows.');
-for (const port of [4444, 9223, 9224]) {
+for (const port of [4445, 9223, 9224]) {
   await new Promise((done, reject) => {
     const server = createServer();
     server.once('error', () =>
@@ -28,8 +28,6 @@ let browser;
 let underlay;
 let conflictingApp;
 let conflictingBrowser;
-let host;
-let web;
 let guestBrowser;
 const errors = [];
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -167,40 +165,8 @@ async function dragRange(page, name) {
   assert.equal(await slider.isEnabled(), true);
 }
 try {
-  host = spawn(resolve(root, 'target/debug/veil-host.exe'), [], {
-    cwd: root,
-    windowsHide: true,
-    stdio: 'ignore',
-  });
-  await waitFor(async () => {
-    try {
-      return (await fetch('http://127.0.0.1:4444/health')).ok;
-    } catch {
-      return false;
-    }
-  }, 'isolated collaboration host');
-  if (!(await fetch('http://127.0.0.1:5173').catch(() => null))?.ok) {
-    web = spawn(
-      process.execPath,
-      [
-        resolve(root, 'node_modules/vite/bin/vite.js'),
-        '--host',
-        '127.0.0.1',
-        '--port',
-        '5173',
-        '--strictPort',
-      ],
-      { cwd: resolve(root, 'apps/web'), windowsHide: true, stdio: 'ignore' },
-    );
-    await waitFor(async () => {
-      try {
-        return (await fetch('http://127.0.0.1:5173')).ok;
-      } catch {
-        return false;
-      }
-    }, 'browser editor');
-  }
   let { main, overlay } = await launch();
+  await main.getByRole('button', { name: 'LAN / browser', exact: true }).click();
   assert.equal((await snapshot(main)).recoveryAvailable, true, 'Recovery shortcut registered.');
   await main.getByRole('button', { name: 'Settings', exact: true }).click();
   await dragRange(main, 'Opacity');
@@ -251,8 +217,9 @@ try {
   );
   console.log('PASS: separate windows, native opacity/topmost, local font size, clean overlay');
 
+  await main.getByRole('button', { name: 'Start session', exact: true }).click();
   await main.getByLabel('Your name').fill('Desktop author');
-  await main.getByRole('button', { name: 'Join local session' }).click();
+  await main.getByRole('button', { name: 'Join session', exact: true }).click();
   await waitFor(
     async () =>
       (await main.locator('.app-header [role="status"]').textContent()).trim() === 'Connected',
@@ -268,9 +235,9 @@ try {
   guestBrowser = await chromium.launch();
   const guest = await guestBrowser.newPage();
   guest.on('pageerror', (error) => errors.push(error.message));
-  await guest.goto('http://127.0.0.1:5173');
+  await guest.goto(await main.getByLabel('Invitation', { exact: true }).inputValue());
   await guest.getByLabel('Your name').fill('Browser guest');
-  await guest.getByRole('button', { name: 'Join local session' }).click();
+  await guest.getByRole('button', { name: 'Join session', exact: true }).click();
   const guestEditor = guest.getByRole('textbox', { name: 'Shared document' });
   await waitFor(
     async () => (await guestEditor.textContent()) === 'Shared overlay document.',
@@ -368,7 +335,7 @@ try {
   await overlay.screenshot({ path: resolve(directory, 'shared-document-overlay.png') });
   await main.getByRole('button', { name: 'Leave session' }).click();
   await waitFor(async () => (await overlayEditor.count()) === 0, 'leaving clears overlay');
-  await main.getByRole('button', { name: 'Join local session' }).click();
+  await main.getByRole('button', { name: 'Join session', exact: true }).click();
   await waitFor(
     async () => (await overlayEditor.textContent()) === (await guestEditor.textContent()),
     'rejoining rebinds overlay',
@@ -379,6 +346,9 @@ try {
     'PASS: shared desktop/overlay/browser editing, one identity, cursor/selection, concurrent edits, disconnect/reconnect, leave/rejoin',
   );
 
+  // Closing the foreground browser can transfer activation to another app.
+  // Focus the overlay before sending an OS mouse gesture to its header.
+  native('Focus');
   let bounds = native('Probe');
   native('Drag', { X: bounds.x + 50, Y: bounds.y + 22, ToX: bounds.x + 140, ToY: bounds.y + 92 });
   let moved = native('Probe');
@@ -457,6 +427,9 @@ try {
     '',
     'Interactive overlay intercepts the underlying click.',
   );
+  // Starting a new session resets the workspace view, while native settings persist.
+  const settingsButton = main.getByRole('button', { name: 'Settings', exact: true });
+  if ((await settingsButton.getAttribute('aria-expanded')) !== 'true') await settingsButton.click();
   await main.getByLabel('Click-through', { exact: true }).click();
   await waitFor(async () => (await snapshot(main)).settings.clickThrough, 'click-through enabled');
   assert.equal(native('Probe').clickThrough, true);
@@ -621,8 +594,6 @@ try {
   );
 } finally {
   if (guestBrowser) await guestBrowser.close();
-  if (host?.exitCode === null) host.kill();
-  if (web?.exitCode === null) web.kill();
   if (conflictingApp?.exitCode === null) conflictingApp.kill();
   if (conflictingBrowser) await conflictingBrowser.close();
   if (underlay?.exitCode === null) underlay.kill();

@@ -291,10 +291,14 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn flush(app: &AppHandle) {
-    let state = app.state::<OverlayState>();
-    if let Err(error) = settings::save(&state.path, &snapshot(app).settings) {
+    if let Err(error) = flush_checked(app) {
         eprintln!("Could not save overlay preferences: {}", error.message);
     }
+}
+
+pub fn flush_checked(app: &AppHandle) -> Result<(), OverlayError> {
+    let state = app.state::<OverlayState>();
+    settings::save(&state.path, &snapshot(app).settings)
 }
 
 fn set_visible(app: &AppHandle, visible: bool) -> Result<(), OverlayError> {

@@ -45,8 +45,19 @@ test('two independent browser clients converge after simultaneous edits, deletes
     await expect(b).toHaveText('shared seed');
 
     // Concurrent online transactions against the same paragraph, through Rust only.
-    await Promise.all([a.press('Control+End'), b.press('Control+End')]);
-    await Promise.all([first.keyboard.insertText(' ALPHA'), second.keyboard.insertText(' BETA')]);
+    const append = (editor: Locator, text: string) =>
+      editor.evaluate((element, text) => {
+        (element as HTMLElement).focus();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        range.collapse(false);
+        const selection = window.getSelection()!;
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand('insertText', false, text);
+      }, text);
+    // Each page inserts in one task, avoiding OS focus races between two keyboards.
+    await Promise.all([append(a, ' ALPHA'), append(b, ' BETA')]);
     await expect.poll(async () => (await a.textContent()) === (await b.textContent())).toBe(true);
     await expect(a).toContainText('ALPHA');
     await expect(a).toContainText('BETA');

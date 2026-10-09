@@ -1,5 +1,5 @@
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 // In-process relay only. The main window owns the authenticated network connection.
 // No document contents or credentials are written to device preferences.
@@ -21,6 +21,18 @@ pub async fn document_relay(
         > 16 * 1024 * 1024
     {
         return Err("Document relay message is too large.".into());
+    }
+    if caller.label() == "main" {
+        let updates = app.state::<crate::updates::Updates>();
+        let mut gate = updates.gate.lock().await;
+        match message.get("kind").and_then(Value::as_str) {
+            Some("session") => {
+                gate.allow_session()?;
+                gate.document_active = true;
+            }
+            Some("closed") => gate.document_active = false,
+            _ => {}
+        }
     }
     app.emit_to(target, "desktop-document", message)
         .map_err(|e| e.to_string())

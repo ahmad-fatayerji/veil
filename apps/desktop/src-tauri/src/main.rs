@@ -1,11 +1,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod hosting;
 mod overlay;
 mod session;
+mod updates;
 use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
+        .manage(hosting::Hosting::default())
+        .manage(updates::Updates::default())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(overlay::setup)
         .invoke_handler(tauri::generate_handler![
             overlay::overlay_snapshot,
@@ -15,6 +20,12 @@ fn main() {
             overlay::overlay_reset_position,
             overlay::overlay_gesture,
             session::document_relay,
+            hosting::host_start,
+            hosting::host_stop,
+            hosting::host_status,
+            updates::update_status,
+            updates::update_check,
+            updates::update_install,
         ])
         .on_window_event(|window, event| {
             if window.label() == "main"

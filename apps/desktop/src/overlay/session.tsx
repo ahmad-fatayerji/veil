@@ -116,6 +116,7 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
     return () => {
       active = false;
       connection?.doc.off('update', update);
+      if (connection) dispatch({ kind: 'closed' });
       void subscription.then((unlisten) => unlisten()).catch(() => {});
     };
   }, [connection]);
