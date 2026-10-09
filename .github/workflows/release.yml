@@ -35,8 +35,10 @@ jobs:
           if (!$env:RELEASES_TOKEN -or !$env:SIGNING_KEY) { throw 'Configure the release token and signing key secrets first.' }
           $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json).version
           if ($env:RELEASE_EVENT -eq 'push' -and $env:RELEASE_TAG -ne "v$version") { throw 'Release tag must match the app version.' }
-          $existing = gh release view "v$version" --repo ahmad-fatayerji/veil --json isDraft 2>$null
-          if ($LASTEXITCODE -eq 0 -and !($existing | ConvertFrom-Json).isDraft) { throw 'This version is already published. Bump the version; never replace published update packages.' }
+          $releases = gh release list --repo ahmad-fatayerji/veil --limit 100 --json tagName,isDraft
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot access the public release repository with RELEASES_TOKEN.' }
+          $existing = ($releases | ConvertFrom-Json) | Where-Object tagName -EQ "v$version"
+          if ($existing -and !$existing.isDraft) { throw 'This version is already published. Bump the version; never replace published update packages.' }
       - run: pnpm build
       - run: pnpm check
       - run: pnpm test
