@@ -1,0 +1,11 @@
+{
+  "version": "0.1.1",
+  "notes": "# Veil 0.1.1 — Installer and signed updates\n\nWindows x64 P2P test build with a per-user installer, public GitHub download/update feed, and an explicit **App updates** panel. Updater packages are signature-verified and bound to their release version; HTTPS is required for the feed and downloads. Installation is refused while a document session or LAN host is active, and local overlay preferences are saved before restart.\n\nBoth participants install Veil, then exchange an invitation and response privately. Includes shared editing, named presence, editable local overlay, optional configurable STUN/TURN, and authenticated LAN/browser mode. No default signaling service, discovery server, relay, accounts, purchased domain or participant cap.\n\nDocuments remain temporary: copy text you want to keep before ending/leaving/closing. Direct WebRTC sync and overlays have been verified locally, but different internet networks and self-hosted TURN still need tester validation. Installer is not Windows Authenticode-signed; unknown-publisher warnings are possible. Updater signatures do not confer Windows publisher trust. Setup downloads WebView2 if missing. Windows 10/11 x64.\n\nSee **TESTING.md** attached to this release for connection steps, known limits and useful test reports.\n",
+  "pub_date": "2026-10-09T07:49:40.723Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1THlCMHp5WmpBSHFqejhQeldKckd6Tms1blFvNjAxekNZeTFZR1YxcGN3SkpJYmZnSTBGSDZyQWczdGg0WVdOOUh1UDAwdXBNL1lpYlJsV3E1VC9JcFFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNTMyMDI0CWZpbGU6VmVpbF8wLjEuMV94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4xLjEKcUJoQ1dwSlhOVkhsclZaNTRPNmxUN2loV1kwUVBXUjloZmJaT1hub1VVMm5pTlBrY3ZsMnpkTGNnVWtHSHVQZy8zdENPQzVDeWkvUDEweTBlbGZCRHc9PQo=",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.1.1/Veil_0.1.1_x64-setup.exe"
+    }
+  }
+}
