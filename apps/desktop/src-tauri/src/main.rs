@@ -1,8 +1,31 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod overlay;
+use tauri::Manager;
+
 fn main() {
-    // M0 shares the editor UI. Embedded host lifecycle and native overlay are later milestones.
     tauri::Builder::default()
-        .run(tauri::generate_context!())
-        .expect("failed to run Veil desktop");
+        .setup(overlay::setup)
+        .invoke_handler(tauri::generate_handler![
+            overlay::overlay_snapshot,
+            overlay::overlay_update,
+            overlay::overlay_visibility,
+            overlay::overlay_recover,
+            overlay::overlay_reset_position,
+            overlay::overlay_gesture,
+        ])
+        .on_window_event(|window, event| {
+            if window.label() == "main"
+                && matches!(event, tauri::WindowEvent::CloseRequested { .. })
+            {
+                window.app_handle().exit(0);
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("failed to build Veil desktop")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                overlay::flush(app);
+            }
+        });
 }

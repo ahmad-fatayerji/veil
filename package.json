@@ -17,7 +17,8 @@
     "format:check": "prettier --check . && cargo fmt --all -- --check",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && cargo check --workspace && cargo clippy --workspace --all-targets -- -D warnings",
     "test": "vitest run && cargo test --workspace",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:overlay": "node scripts/test-overlay.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

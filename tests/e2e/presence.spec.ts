@@ -56,7 +56,7 @@ test('remote cursors, selections, and activity follow their author and clear on 
   }
 });
 
-test('roadmap states the built prototype, next overlay, and remaining milestones', async ({
+test('roadmap states the built editor and overlay, next hosting, and remaining milestones', async ({
   page,
 }) => {
   await page.goto('/');
@@ -68,8 +68,11 @@ test('roadmap states the built prototype, next overlay, and remaining milestones
     dialog.getByRole('listitem').filter({ hasText: 'Local collaboration' }),
   ).toContainText('Built');
   await expect(dialog.getByRole('listitem').filter({ hasText: 'Desktop overlay' })).toContainText(
-    'Next',
+    'Built',
   );
+  await expect(
+    dialog.getByRole('listitem').filter({ hasText: 'Host and invite friends' }),
+  ).toContainText('Next');
   await expect(dialog).toContainText('Closing the host loses the document');
   await page.screenshot({ path: test.info().outputPath('roadmap.png'), fullPage: true });
   await page.keyboard.press('Escape');

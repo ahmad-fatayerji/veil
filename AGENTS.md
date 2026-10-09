@@ -1,6 +1,6 @@
 # Veil repository rules
 
-- Follow PROJECT_SPEC.md and implement one milestone at a time. Current milestone: M0.
+- Follow PROJECT_SPEC.md and implement one milestone at a time. Current milestone: M1.
 - Keep Windows-first native code isolated from shared React packages.
 - Participant capacity defaults to no application-level cap.
 - Never expose a public unauthenticated service; M0 listens on loopback only.

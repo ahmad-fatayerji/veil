@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   connectDemo,
   readParticipants,
@@ -29,7 +29,13 @@ function Avatar({ person }: { person: Participant }) {
   );
 }
 
-export function DemoApp({ surface }: { surface: 'browser' | 'desktop' }) {
+export function DemoApp({
+  surface,
+  desktopControls,
+}: {
+  surface: 'browser' | 'desktop';
+  desktopControls?: ReactNode;
+}) {
   const [name, setName] = useState('');
   const [connection, setConnection] = useState<DemoConnection | null>(null);
   const [status, setStatus] = useState<Status>('offline');
@@ -133,6 +139,8 @@ export function DemoApp({ surface }: { surface: 'browser' | 'desktop' }) {
           </button>
         </div>
       </header>
+
+      {desktopControls}
 
       <main className={`workspace ${connection && showPeople ? 'with-sidebar' : ''}`}>
         <section className="document-workspace" aria-label="Collaborative workspace">
@@ -249,7 +257,7 @@ export function DemoApp({ surface }: { surface: 'browser' | 'desktop' }) {
           </button>
         </div>
         <p className="roadmap-intro">
-          The local collaboration prototype is built. The overlay is the next milestone.
+          Local collaboration and the Windows overlay are built. Hosting and invitations are next.
         </p>
         <ol className="roadmap-list">
           {roadmap.map((milestone) => (

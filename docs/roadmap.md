@@ -1,12 +1,12 @@
 # Development roadmap
 
-The local collaboration foundation (M0) is built, with a minimal editor, named remote cursors, colored selections, and participant activity. The Roadmap button in the app shows these milestones. This is still a development demo: sessions run on this computer and documents are held in memory.
+Local collaboration (M0) and the Windows overlay (M1) are built. The Roadmap button shows these milestones. Sessions run on this computer, documents are held in memory, and the overlay displays local preview text until M3.
 
 | Milestone                           | Status  | Remaining work                                                                                             |
 | ----------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------- |
-| M0: Local collaboration             | Built   | Native WebView visual and desktop-to-browser checks remain manual.                                         |
-| M1: Desktop overlay                 | Next    | Move/resize, opacity, always on top, click-through, recovery shortcut, and local preferences.              |
-| M2: Host and invite friends         | Planned | App-managed host lifecycle, bundled browser assets, invitations, and LAN joining.                          |
+| M0: Local collaboration             | Built   | Desktop-to-browser collaboration still needs a manual smoke check.                                         |
+| M1: Desktop overlay                 | Built   | Drag/resize, opacity, topmost, click-through, recovery shortcuts, and saved local settings.                |
+| M2: Host and invite friends         | Next    | App-managed host lifecycle, bundled browser assets, invitations, and LAN joining.                          |
 | M3: Permissions and saved documents | Planned | Roles, optional participant limits, desktop guests, and durable document storage.                          |
 | M4: Capture compatibility           | Planned | Best-effort capture exclusion and a tested compatibility matrix; universal exclusion cannot be guaranteed. |
 | M5: Secure remote access            | Planned | Explicit remote hosting, TLS, access control, abuse protection, and network reachability.                  |

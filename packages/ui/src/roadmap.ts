@@ -9,14 +9,14 @@ export const roadmap = [
   {
     id: 'M1',
     title: 'Desktop overlay',
-    status: 'Next',
+    status: 'Built',
     detail:
-      'A separate movable, resizable window. Opacity, always on top, click-through, and a recovery shortcut. Local display preferences.',
+      'A separate Windows preview window with drag/resize, opacity, always on top, click-through, recovery shortcuts, and saved local preferences. Shared-document display follows in M3.',
   },
   {
     id: 'M2',
     title: 'Host and invite friends',
-    status: 'Planned',
+    status: 'Next',
     detail:
       'Start and stop hosting from the app. Serve the browser editor, create invitations, and join from another device on your LAN.',
   },
