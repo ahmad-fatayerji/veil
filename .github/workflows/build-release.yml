@@ -20,14 +20,16 @@ jobs:
     outputs:
       artifact: ${{ steps.artifact.outputs.name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: pnpm
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
       - uses: dtolnay/rust-toolchain@1.99.0
       - uses: Swatinem/rust-cache@v2
         id: rust-cache
@@ -47,13 +49,13 @@ jobs:
       - id: artifact
         shell: pwsh
         run: '"name=windows-native-build-${{ github.run_id }}-${{ github.run_attempt }}" >> $env:GITHUB_OUTPUT'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: target/native-build/
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: release-build-timings-${{ github.run_id }}-${{ github.run_attempt }}

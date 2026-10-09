@@ -26,6 +26,7 @@ fn main() {
             updates::update_status,
             updates::update_check,
             updates::update_install,
+            updates::update_set_channel,
         ])
         .on_window_event(|window, event| {
             if window.label() == "main"

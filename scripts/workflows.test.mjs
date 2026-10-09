@@ -56,11 +56,19 @@ test('unsigned compilation and gated packaging do not repeat frontend or desktop
   assert.doesNotMatch(buildCommands, /pnpm build|tauri bundle/);
   const steps = publish.jobs.publish.steps;
   const index = (text) => steps.findIndex((step) => step.run?.includes(text));
+  for (const command of [
+    'native-build-artifact.mjs restore',
+    'publish-release.mjs preflight',
+    'tauri bundle',
+    'veil-release-verifier',
+    'publish-release.mjs publish',
+  ])
+    assert.ok(index(command) >= 0, `Missing release step: ${command}`);
   assert.ok(index('native-build-artifact.mjs restore') < index('publish-release.mjs preflight'));
   assert.ok(index('publish-release.mjs preflight') < index('tauri bundle'));
   assert.ok(index('veil-release-verifier') < index('publish-release.mjs publish'));
   assert.equal(
-    steps.find((step) => step.uses === 'actions/download-artifact@v4').with.name,
+    steps.find((step) => step.uses?.startsWith('actions/download-artifact@')).with.name,
     '${{ inputs.artifact }}',
   );
   assert.doesNotMatch(
@@ -98,7 +106,7 @@ test('Windows jobs use purpose-specific caches, reduced CI debug info and timing
     assert.ok(
       job.steps.some(
         (step) =>
-          step.uses === 'actions/upload-artifact@v4' &&
+          step.uses?.startsWith('actions/upload-artifact@') &&
           step.if === 'always()' &&
           step.with.path.includes('cargo-timings/'),
       ),
