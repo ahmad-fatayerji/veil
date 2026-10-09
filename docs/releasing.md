@@ -25,6 +25,14 @@ After checks pass, run **Actions → Merge Gitflow PR → Run workflow** on `mai
 gh workflow run merge-pr.yml --ref main -f number=123
 ```
 
+GitHub may hold the ordinary PR run for execution approval when a bot creates or updates a PR. Explicitly dispatched validation still runs, but it does not satisfy a pending check on GitHub's PR merge commit. Before merging, inspect the current PR head and workflow changes, then approve that specific PR run with the authenticated maintainer account and wait for its **CI gate**. Approval permits the checks to execute; it does not bypass the protected merge requirements.
+
+```powershell
+gh run list --repo ahmad-fatayerji/Veil-source --branch release/0.2.0
+# Use the current PR run marked action_required, after inspecting its source:
+gh api --method POST repos/ahmad-fatayerji/Veil-source/actions/runs/RUN_ID/approve
+```
+
 GitHub's native merge buttons can also be used: squash feature PRs and use **Create a merge commit** for release/hotfix/back-merge PRs. Rules restrict `main` to merge commits. `develop` allows squash and merge because GitHub cannot enforce different methods based on the source branch; the Merge Gitflow PR action selects correctly. Rebase merging is disabled. Automatic back-merges use `backmerge/<version>` branches based on `develop`, with `main` merged into them. This satisfies strict up-to-date checks without bringing unreleased features into `main`. If develop advances, update the back-merge branch before merging.
 
 CI separates JavaScript checks/unit tests/builds, Windows Rust formatting/Clippy/tests, and the Windows Tauri build/browser integration tests. Clippy checks every workspace target, so CI does not also run standalone `cargo check`. Its aggregate gate rejects failed, cancelled, skipped or missing required jobs. Superseded PR runs cancel; dependencies are cached and browser failure artifacts retained. PR checks never receive signing secrets. Interactive overlay/P2P/update acceptance runs locally.
@@ -113,6 +121,8 @@ gh workflow run release.yml --ref main -f ref=FULL_MERGED_COMMIT_SHA
 ```
 
 Retries may complete an unpublished draft. A published version must match its recorded source SHA; its installer, signature and manifest are never overwritten. A feed retry uses the original published manifest, not a rebuilt signature. Feeds never move backwards. Concurrency serializes public publication; a failed upload leaves the previous feed intact. If publication succeeds but feed/back-merge work fails, rerun to complete it. Arbitrary feature source, prerelease stable source, non-merge stable source and inconsistent versions are rejected before signing.
+
+The release-by-tag API can return 404 for a newly created draft. Publication falls back to the authenticated paginated release list and uses the draft's numeric release ID to verify uploads. It checks that the release is still a draft before replacing draft assets or proceeding to publication; authentication failures and ambiguous tag matches remain fatal.
 
 The migration baseline is source `0f008872ed112fbb339ae37dd5f950891affb154` at `0.1.2`. Public `v0.1.2` is reserved; this migration does not publish or replace it. Subsequent baselines refer to private stable source tags. The initial beta feed points to the current stable release until a beta is requested.
 

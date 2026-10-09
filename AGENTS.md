@@ -19,6 +19,8 @@ These rules apply to every agent working in this repository. `develop` is the de
 6. Check the PR's **CI gate**, fix failures, and resolve conversations. If the target branch advanced, merge the updated target into the task branch, push, and wait for fresh checks. Do not bypass protections or force-push to make a check appear current.
 7. When the task authorizes merging, use **Merge Gitflow PR** on `main` with the PR number. It selects the correct merge method and dispatches follow-up automation. Otherwise hand off the PR and its status for review; do not treat task completion as permission to publish a release.
 
+For a bot-created PR, GitHub may require execution approval for its ordinary PR run even if explicitly dispatched validation passed. If merging is authorized, inspect the exact current PR head and workflow changes, approve that specific pending run using the authenticated maintainer account, and wait for its **CI gate**. See `docs/releasing.md` for the command. Never approve unrelated runs or disable protections to unblock a merge; report missing maintainer access if it prevents approval.
+
 Ordinary task commands (replace the example name, title and file paths):
 
 ```powershell
