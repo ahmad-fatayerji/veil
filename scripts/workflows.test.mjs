@@ -68,7 +68,7 @@ test('unsigned compilation and gated packaging do not repeat frontend or desktop
   assert.ok(index('publish-release.mjs preflight') < index('tauri bundle'));
   assert.ok(index('veil-release-verifier') < index('publish-release.mjs publish'));
   assert.equal(
-    steps.find((step) => step.uses === 'actions/download-artifact@v4').with.name,
+    steps.find((step) => step.uses?.startsWith('actions/download-artifact@')).with.name,
     '${{ inputs.artifact }}',
   );
   assert.doesNotMatch(
@@ -106,7 +106,7 @@ test('Windows jobs use purpose-specific caches, reduced CI debug info and timing
     assert.ok(
       job.steps.some(
         (step) =>
-          step.uses === 'actions/upload-artifact@v4' &&
+          step.uses?.startsWith('actions/upload-artifact@') &&
           step.if === 'always()' &&
           step.with.path.includes('cargo-timings/'),
       ),
