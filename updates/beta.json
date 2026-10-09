@@ -1,15 +1,11 @@
 {
-  "version": "0.1.2",
-  "notes": "Experimental Windows x64 build. Both participants install Veil and exchange peer invitation/response codes.\nDocuments are temporary. End/leave sessions before updates. Local overlay preferences are retained.\nWindows installer has no Authenticode publisher certificate. Updater packages are signature-verified.\nSee TESTING.md for test instructions. Different-network/relay connectivity is not universally guaranteed.",
-  "pub_date": "2026-10-09T08:24:18.729Z",
+  "version": "0.2.0",
+  "notes": "# Veil 0.2.0\n\n## Other changes\n\n- ci: upgrade Actions runtimes and pin the Linux runner\n- chore: bootstrap Gitflow workflows and release governance\n\n## Features\n\n- feat: add Gitflow release proposals and updater channels\n",
+  "pub_date": "2026-10-09T11:00:07.363Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDVZY0NOSi81bzNiUmJGWmNObElYK0hnb0JBaVNUcTBQYThXWWJhSVVVYVFLZldjSGgwamFpRml2NTNNOW9oMlI0MnoyTEZEUzdtNjNhdDJlZTh5TWdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNTM0MjU2CWZpbGU6VmVpbF8wLjEuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4xLjIKVHFDOXZSbmg3U1dpZ3FUb3dBSlpJUUVoL0VYdGdXalIrWkdzb0JJdVBNdC8vS09hOVkycFNTZGcva1ZCL3ZidDNQNUt4L1VoNXZBcEdUejduRU4wRGc9PQo=",
-      "url": "https://api.github.com/repos/ahmad-fatayerji/veil/releases/assets/624361677"
-    },
-    "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDVZY0NOSi81bzNiUmJGWmNObElYK0hnb0JBaVNUcTBQYThXWWJhSVVVYVFLZldjSGgwamFpRml2NTNNOW9oMlI0MnoyTEZEUzdtNjNhdDJlZTh5TWdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNTM0MjU2CWZpbGU6VmVpbF8wLjEuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4xLjIKVHFDOXZSbmg3U1dpZ3FUb3dBSlpJUUVoL0VYdGdXalIrWkdzb0JJdVBNdC8vS09hOVkycFNTZGcva1ZCL3ZidDNQNUt4L1VoNXZBcEdUejduRU4wRGc9PQo=",
-      "url": "https://api.github.com/repos/ahmad-fatayerji/veil/releases/assets/624361677"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDVUd01QRWtBbk05cmF3V3dHVzZiVnk4ay9WTnBzTzhWeFN6dkNpeUVFVllzeU1McisvUkEwb0xpOWlRQVpZcTFtQlhaSkhqcmNpSzNQOVNpc1VYUFFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNTQzNjA2CWZpbGU6VmVpbF8wLjIuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4yLjAKTjVCNUY4YkhXTnUyemVKUmcxRDVyUmdLZ3JuOEJOVElQT2gxSWw2SDZwNkt5TFJBUlBVdEt3YkU1ZEJ2bnI0WXFYVWZvTklnQnJwOGlVYXBrbWh3Q3c9PQo=",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.2.0/Veil_0.2.0_x64-setup.exe"
     }
   }
 }
