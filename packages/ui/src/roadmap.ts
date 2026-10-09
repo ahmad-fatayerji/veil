@@ -11,7 +11,7 @@ export const roadmap = [
     title: 'Desktop overlay',
     status: 'Built',
     detail:
-      'A separate Windows preview window with drag/resize, opacity, always on top, click-through, recovery shortcuts, and saved local preferences. Shared-document display follows in M3.',
+      'Edit the live shared document in a separate Windows overlay. Drag/resize, opacity, always on top, click-through, recovery shortcuts, and saved local preferences.',
   },
   {
     id: 'M2',

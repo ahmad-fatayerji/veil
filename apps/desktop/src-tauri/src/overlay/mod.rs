@@ -381,7 +381,14 @@ pub fn overlay_update(
     next.validate()?;
     // Reapply the appearance after toolkit style changes replace the extended styles.
     let overlay = window(&app)?;
-    if let Err(error) = apply(&overlay, &next, &current.capabilities) {
+    let result = if patch.always_on_top.is_some() || patch.click_through.is_some() {
+        apply(&overlay, &next, &current.capabilities)
+    } else if patch.opacity.is_some() {
+        platform::opacity(&overlay, next.opacity)
+    } else {
+        Ok(())
+    };
+    if let Err(error) = result {
         if apply(&overlay, &current.settings, &current.capabilities).is_err() {
             let _ = platform::click_through(&overlay, false);
             modify(&app, |model| {

@@ -5,6 +5,7 @@ import '@veil/ui/styles.css';
 import { OverlayControls } from './overlay/Controls';
 import { OverlayWindow } from './overlay/OverlayWindow';
 import './overlay/styles.css';
+import { DesktopEditor, SessionBridge } from './overlay/session';
 
 const isOverlay = new URLSearchParams(window.location.search).has('overlay');
 if (isOverlay) document.documentElement.classList.add('overlay-mode');
@@ -14,7 +15,18 @@ createRoot(document.getElementById('root')!).render(
     {isOverlay ? (
       <OverlayWindow />
     ) : (
-      <DemoApp surface="desktop" desktopControls={<OverlayControls />} />
+      <DemoApp
+        surface="desktop"
+        renderEditor={(connection) => (
+          <DesktopEditor key={connection.doc.clientID} connection={connection} />
+        )}
+        desktopControls={(connection) => (
+          <>
+            <SessionBridge connection={connection} />
+            <OverlayControls />
+          </>
+        )}
+      />
     )}
   </StrictMode>,
 );

@@ -11,7 +11,17 @@ import {
   type ParticipantActivity,
 } from '@veil/collaboration';
 
-export function SharedEditor({ connection }: { connection: DemoConnection }) {
+export type EditorConnection = Pick<DemoConnection, 'doc'> & {
+  provider: Pick<DemoConnection['provider'], 'awareness'>;
+};
+
+export function SharedEditor({
+  connection,
+  compact = false,
+}: {
+  connection: EditorConnection;
+  compact?: boolean;
+}) {
   const { doc, provider } = connection;
   const editor = useEditor(
     {
@@ -24,6 +34,7 @@ export function SharedEditor({ connection }: { connection: DemoConnection }) {
           render: (user) => {
             const caret = document.createElement('span');
             caret.className = 'collaboration-carets__caret';
+            if (compact) caret.style.display = 'none';
             caret.style.borderColor = participantColor(user.color);
             caret.setAttribute('aria-hidden', 'true');
             const label = document.createElement('span');
@@ -36,7 +47,7 @@ export function SharedEditor({ connection }: { connection: DemoConnection }) {
           },
           selectionRender: (user) => ({
             class: 'collaboration-selection',
-            style: `background-color: ${participantColor(user.color)}25`,
+            style: compact ? '' : `background-color: ${participantColor(user.color)}25`,
             'data-selection-user': participantName(user.name),
           }),
         }),
@@ -51,7 +62,7 @@ export function SharedEditor({ connection }: { connection: DemoConnection }) {
         },
       },
     },
-    [doc, provider],
+    [doc, provider, compact],
   );
 
   useEffect(() => {
@@ -114,48 +125,50 @@ export function SharedEditor({ connection }: { connection: DemoConnection }) {
   });
   return (
     <>
-      <div className="editor-toolbar" role="toolbar" aria-label="Document formatting">
-        <button
-          type="button"
-          aria-label="Bold"
-          title="Bold (Ctrl+B)"
-          aria-pressed={state?.bold}
-          onClick={() => editor?.chain().focus().toggleBold().run()}
-        >
-          <strong>B</strong>
-        </button>
-        <button
-          type="button"
-          aria-label="Heading"
-          title="Heading"
-          aria-pressed={state?.heading}
-          onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-        >
-          H<span className="subscript">2</span>
-        </button>
-        <button
-          type="button"
-          aria-label="Bullet list"
-          title="Bullet list"
-          aria-pressed={state?.bullets}
-          onClick={() => editor?.chain().focus().toggleBulletList().run()}
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            aria-hidden="true"
+      {!compact && (
+        <div className="editor-toolbar" role="toolbar" aria-label="Document formatting">
+          <button
+            type="button"
+            aria-label="Bold"
+            title="Bold (Ctrl+B)"
+            aria-pressed={state?.bold}
+            onClick={() => editor?.chain().focus().toggleBold().run()}
           >
-            <path d="M9 6h11M9 12h11M9 18h11" />
-            <circle cx="4" cy="6" r="1" />
-            <circle cx="4" cy="12" r="1" />
-            <circle cx="4" cy="18" r="1" />
-          </svg>
-        </button>
-      </div>
+            <strong>B</strong>
+          </button>
+          <button
+            type="button"
+            aria-label="Heading"
+            title="Heading"
+            aria-pressed={state?.heading}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+          >
+            H<span className="subscript">2</span>
+          </button>
+          <button
+            type="button"
+            aria-label="Bullet list"
+            title="Bullet list"
+            aria-pressed={state?.bullets}
+            onClick={() => editor?.chain().focus().toggleBulletList().run()}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <path d="M9 6h11M9 12h11M9 18h11" />
+              <circle cx="4" cy="6" r="1" />
+              <circle cx="4" cy="12" r="1" />
+              <circle cx="4" cy="18" r="1" />
+            </svg>
+          </button>
+        </div>
+      )}
       <EditorContent editor={editor} />
     </>
   );

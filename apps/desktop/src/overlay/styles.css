@@ -132,20 +132,28 @@ html.overlay-mode,
   font-weight: 400;
   color: #707070;
 }
-.overlay-preview {
+.overlay-document {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 8px 24px 24px;
   line-height: 1.6;
 }
-.overlay-preview h1 {
-  font-size: 1.1em;
-  font-weight: 600;
-  margin: 0 0 14px;
+.overlay-document .document-editor {
+  font-size: inherit;
+  line-height: inherit;
+  min-height: 100%;
+  padding: 8px 24px 24px;
 }
-.overlay-preview p {
-  margin: 0 0 12px;
+.overlay-document .document-editor p {
+  margin: 0 0 0.6em;
+}
+.overlay-empty {
+  padding: 8px 24px 24px;
+  font-size: 14px;
+}
+.overlay-empty p + p {
+  color: #707070;
+  font-size: 12px;
 }
 .overlay-surface.is-click-through .overlay-drag-handle {
   cursor: default;

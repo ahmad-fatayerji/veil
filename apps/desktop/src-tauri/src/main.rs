@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod overlay;
+mod session;
 use tauri::Manager;
 
 fn main() {
@@ -13,6 +14,7 @@ fn main() {
             overlay::overlay_recover,
             overlay::overlay_reset_position,
             overlay::overlay_gesture,
+            session::document_relay,
         ])
         .on_window_event(|window, event| {
             if window.label() == "main"

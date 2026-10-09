@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Probe','Click','Drag','Move','Recover','Toggle','Capture','Pixel','Close')][string]$Action,
+  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Focus','Probe','Click','Drag','Move','Recover','Toggle','Capture','Pixel','Close')][string]$Action,
   [Parameter(Mandatory=$true)][int]$AppProcessId,
   [ValidateSet('main','overlay')][string]$Window = 'overlay',
   [int]$X = 0, [int]$Y = 0, [int]$ToX = 0, [int]$ToY = 0,
@@ -13,6 +13,8 @@ using System.Threading;
 public class VeilNativeTest {
   public delegate bool EnumProc(IntPtr window, IntPtr parameter);
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
+  [StructLayout(LayoutKind.Sequential)] public struct Point { public int X, Y; }
+  [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr window, ref Point point);
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc callback, IntPtr parameter);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr window, System.Text.StringBuilder text, int max);
@@ -86,6 +88,7 @@ if ($handle -eq [IntPtr]::Zero) { throw "Test window for process $AppProcessId i
 $bounds = New-Object VeilNativeTest+Rect
 [VeilNativeTest]::GetWindowRect($handle, [ref]$bounds) | Out-Null
 switch ($Action) {
+  'Focus' { [VeilNativeTest]::ShowWindow($handle,9) | Out-Null; [VeilNativeTest]::SetForegroundWindow($handle) | Out-Null }
   'Raise' {
     [VeilNativeTest]::ShowWindow($handle,9) | Out-Null
     [VeilNativeTest]::SetWindowPos($handle,[IntPtr](-1),0,0,0,0,0x13) | Out-Null
@@ -93,10 +96,12 @@ switch ($Action) {
     [VeilNativeTest]::SetForegroundWindow($handle) | Out-Null
   }
   'Probe' {
+    $client = New-Object VeilNativeTest+Point
+    [VeilNativeTest]::ClientToScreen($handle, [ref]$client) | Out-Null
     [uint32]$color=0; [byte]$alpha=0; [uint32]$flags=0
     $layered = [VeilNativeTest]::GetLayeredWindowAttributes($handle, [ref]$color, [ref]$alpha, [ref]$flags)
     $style = [VeilNativeTest]::GetWindowLongPtr($handle, -20).ToInt64()
-    @{ x=$bounds.Left; y=$bounds.Top; width=$bounds.Right-$bounds.Left; height=$bounds.Bottom-$bounds.Top; visible=[VeilNativeTest]::IsWindowVisible($handle); foreground=([VeilNativeTest]::GetForegroundWindow() -eq $handle); topmost=($style -band 8) -ne 0; clickThrough=($style -band 32) -ne 0; alpha=$alpha; layered=$layered } | ConvertTo-Json -Compress
+    @{ x=$bounds.Left; y=$bounds.Top; clientX=$client.X; clientY=$client.Y; width=$bounds.Right-$bounds.Left; height=$bounds.Bottom-$bounds.Top; visible=[VeilNativeTest]::IsWindowVisible($handle); foreground=([VeilNativeTest]::GetForegroundWindow() -eq $handle); topmost=($style -band 8) -ne 0; clickThrough=($style -band 32) -ne 0; alpha=$alpha; layered=$layered } | ConvertTo-Json -Compress
   }
   'Click' { [VeilNativeTest]::Click($X,$Y) }
   'Drag' { [VeilNativeTest]::Drag($X,$Y,$ToX,$ToY) }

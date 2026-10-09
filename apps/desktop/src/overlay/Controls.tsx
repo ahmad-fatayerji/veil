@@ -1,14 +1,48 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { errorMessage, invoke, useOverlay, type OverlayPatch, type OverlaySnapshot } from './api';
 
 export function OverlayControls() {
   const { state, setState, error, setError } = useOverlay();
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState<OverlayPatch>({});
+  const pending = useRef<OverlayPatch>({});
+  const saving = useRef<Promise<void> | null>(null);
+  function flushRanges(): Promise<void> {
+    if (saving.current) return saving.current;
+    saving.current = (async () => {
+      while (Object.keys(pending.current).length) {
+        const patch = pending.current;
+        pending.current = {};
+        try {
+          setState(await invoke<OverlaySnapshot>('overlay_update', { patch }));
+        } catch (failure) {
+          setError(errorMessage(failure));
+        }
+        setDraft((current) => {
+          const next = { ...current };
+          for (const key of ['opacity', 'fontSize'] as const) {
+            if (next[key] === patch[key]) delete next[key];
+          }
+          return next;
+        });
+      }
+    })().finally(() => {
+      saving.current = null;
+    });
+    return saving.current;
+  }
+  function range(patch: OverlayPatch) {
+    setError('');
+    setDraft((current) => ({ ...current, ...patch }));
+    pending.current = { ...pending.current, ...patch };
+    void flushRanges();
+  }
   async function run(command: string, args?: Record<string, unknown>) {
     setBusy(true);
     setError('');
     try {
+      await flushRanges();
       setState(await invoke<OverlaySnapshot>(command, args));
     } catch (failure) {
       setError(errorMessage(failure));
@@ -44,29 +78,29 @@ export function OverlayControls() {
         <div id="overlay-settings" className="overlay-settings">
           <div className="overlay-settings-grid">
             <label className="overlay-range" htmlFor="overlay-opacity">
-              Opacity <output>{Math.round(state.settings.opacity * 100)}%</output>
+              Opacity{' '}
+              <output>{Math.round((draft.opacity ?? state.settings.opacity) * 100)}%</output>
               <input
                 id="overlay-opacity"
                 type="range"
                 min="20"
                 max="100"
-                step="5"
-                value={Math.round(state.settings.opacity * 100)}
-                disabled={!state.capabilities.transparency || busy}
-                onChange={(event) => void update({ opacity: Number(event.target.value) / 100 })}
+                step="1"
+                value={Math.round((draft.opacity ?? state.settings.opacity) * 100)}
+                disabled={!state.capabilities.transparency}
+                onChange={(event) => range({ opacity: Number(event.target.value) / 100 })}
               />
             </label>
             <label className="overlay-range" htmlFor="overlay-font-size">
-              Font size <output>{state.settings.fontSize}px</output>
+              Font size <output>{draft.fontSize ?? state.settings.fontSize}px</output>
               <input
                 id="overlay-font-size"
                 type="range"
                 min="12"
                 max="48"
                 step="2"
-                value={state.settings.fontSize}
-                disabled={busy}
-                onChange={(event) => void update({ fontSize: Number(event.target.value) })}
+                value={draft.fontSize ?? state.settings.fontSize}
+                onChange={(event) => range({ fontSize: Number(event.target.value) })}
               />
             </label>
             <label className="overlay-check">
@@ -131,7 +165,7 @@ export function OverlayControls() {
             <p className="overlay-help">Some window controls are unavailable on this platform.</p>
           )}
           <p className="overlay-help">
-            M1 uses preview text. Live shared-document display is planned for M3.
+            The overlay edits the same document. Turn off click-through to write in it.
           </p>
         </div>
       )}

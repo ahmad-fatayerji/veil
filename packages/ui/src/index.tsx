@@ -32,9 +32,11 @@ function Avatar({ person }: { person: Participant }) {
 export function DemoApp({
   surface,
   desktopControls,
+  renderEditor,
 }: {
   surface: 'browser' | 'desktop';
-  desktopControls?: ReactNode;
+  desktopControls?: ReactNode | ((connection: DemoConnection | null) => ReactNode);
+  renderEditor?: (connection: DemoConnection) => ReactNode;
 }) {
   const [name, setName] = useState('');
   const [connection, setConnection] = useState<DemoConnection | null>(null);
@@ -140,7 +142,7 @@ export function DemoApp({
         </div>
       </header>
 
-      {desktopControls}
+      {typeof desktopControls === 'function' ? desktopControls(connection) : desktopControls}
 
       <main className={`workspace ${connection && showPeople ? 'with-sidebar' : ''}`}>
         <section className="document-workspace" aria-label="Collaborative workspace">
@@ -150,7 +152,11 @@ export function DemoApp({
           </div>
           <div className="document-panel">
             {connection ? (
-              <SharedEditor connection={connection} />
+              renderEditor ? (
+                renderEditor(connection)
+              ) : (
+                <SharedEditor connection={connection} />
+              )
             ) : (
               <div className="join-screen">
                 <h2>Join the document.</h2>

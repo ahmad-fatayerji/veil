@@ -37,16 +37,17 @@ The desktop editor joins the separately running M0 host. Host lifecycle commands
 
 ## Use the Windows overlay
 
-Start `pnpm dev:desktop` or open `target/debug/veil-desktop.exe` after building it. The overlay works without starting a session host.
+Start `pnpm dev:desktop` or open `target/debug/veil-desktop.exe` after building it. Start `pnpm dev:host`, enter your name, and join the local session in the control panel.
 
 - Click **Show overlay**, then **Settings** to adjust opacity (20–100%), font size, always on top, and click-through.
+- Write directly in the overlay or control-panel editor. Both show the same live document and share one participant identity. Browser collaborators receive edits, cursors, and selections from either window.
 - Drag the overlay header to move it. Drag an edge or corner to resize. **Reset position & size** returns it to a reachable default position.
 - **Ctrl+Alt+V** disables click-through, shows the overlay, and restores the control panel. **Ctrl+Alt+Shift+V** hides or shows the overlay globally.
 - If the recovery shortcut is already in use, click-through is disabled. The control panel can always show/hide the overlay.
 - Bounds, appearance, visibility, and click-through are saved locally in `%APPDATA%/dev.veil.desktop/overlay.json`; they never enter the shared document. Removed monitors are handled by fitting saved bounds into an available work area.
 - Closing the control panel exits both windows and saves preferences.
 
-M1 displays local **preview text** in the overlay. Rendering the shared document there belongs to M3. Capture exclusion remains M4. See [overlay architecture and verification](docs/overlay.md).
+The overlay has no formatting toolbar or remote cursor decorations. Turn off **Click-through** to edit; enable it to let clicks reach the app underneath. Before joining, it explains how to open the control panel. Capture exclusion remains M4. See [overlay architecture and verification](docs/overlay.md).
 
 The host binds only **127.0.0.1:4444**. Use these exact numeric loopback URLs: origins and Host headers are checked. There is one fixed demo room, no application-level participant cap, and no persistence. **Closing the host loses the document.** Leaving a client discards its local replica; disconnected changes are retained only while that client remains open. This is a local development demonstration, not LAN or internet hosting.
 
@@ -55,6 +56,7 @@ The host binds only **127.0.0.1:4444**. Use these exact numeric loopback URLs: o
 ```powershell
 pnpm build
 pnpm --filter @veil/desktop tauri build --debug --no-bundle
+cargo build -p veil-host
 pnpm check
 pnpm test
 pnpm exec playwright install chromium
@@ -64,7 +66,7 @@ pnpm test:overlay
 
 `test:e2e` starts missing host and browser dev servers; locally it reuses servers already running on ports 4444 and 5173. Use an expendable demo session: tests replace its document. CI always starts fresh servers. Independent Chromium contexts verify simultaneous inserts, concurrent offline edits, reconnect convergence, late joins, awareness removal, authentication, named cursors, selections, activity, and the roadmap. `pnpm format` formats the repository.
 
-`test:overlay` requires an interactive Windows desktop and the freshly built debug executable. Close other Veil instances first, leave ports 9223/9224 free, and avoid moving the mouse during the test. It uses actual WebView2 windows, OS mouse/keyboard input, and a separate test application. Preferences, browser profiles, and screenshots are isolated under `target/overlay-acceptance`; your normal settings are untouched. This native test is separate from hosted CI.
+`test:overlay` requires an interactive Windows desktop and freshly built desktop and host debug executables. Close other Veil instances and stop the demo host first; leave ports 4444/9223/9224 free, and avoid moving the mouse during the test. It starts its own host and starts the web server if needed. It uses actual WebView2 windows, OS mouse/keyboard input, a Chromium collaborator, and a separate test application. Preferences, browser profiles, and screenshots are isolated under `target/overlay-acceptance`; your normal settings are untouched. This native test is separate from hosted CI.
 
 ## Layout and status
 

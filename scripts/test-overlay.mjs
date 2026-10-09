@@ -7,7 +7,7 @@ import { createServer } from 'node:net';
 import { chromium } from '@playwright/test';
 
 assert.equal(process.platform, 'win32', 'Native overlay acceptance requires Windows.');
-for (const port of [9223, 9224]) {
+for (const port of [4444, 9223, 9224]) {
   await new Promise((done, reject) => {
     const server = createServer();
     server.once('error', () =>
@@ -28,6 +28,9 @@ let browser;
 let underlay;
 let conflictingApp;
 let conflictingBrowser;
+let host;
+let web;
+let guestBrowser;
 const errors = [];
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
 async function waitFor(check, description, timeout = 15000) {
@@ -99,7 +102,7 @@ async function launch() {
     .getByRole('button', { name: 'Show overlay' })
     .waitFor({ state: 'visible' })
     .catch(() => main.getByRole('button', { name: 'Hide overlay' }).waitFor());
-  await overlay.getByRole('article', { name: 'Overlay preview' }).waitFor({ state: 'attached' });
+  await overlay.getByRole('article', { name: 'Overlay document' }).waitFor({ state: 'attached' });
   return { main, overlay };
 }
 async function close() {
@@ -135,10 +138,82 @@ async function setRange(page, name, value) {
     );
   }
 }
+async function dragRange(page, name) {
+  const slider = page.getByRole('slider', { name: new RegExp(name) });
+  await slider.evaluate((node) => {
+    window.__rangeValues = [];
+    node.addEventListener('input', () => window.__rangeValues.push(Number(node.value)));
+  });
+  const rect = await slider.boundingBox();
+  const dpi = await page.evaluate(() => window.devicePixelRatio);
+  const origin = native('Probe', {}, 'main');
+  native('Raise', {}, 'main');
+  native(
+    'Drag',
+    {
+      X: Math.round(origin.clientX + (rect.x + 8) * dpi),
+      Y: Math.round(origin.clientY + (rect.y + rect.height / 2) * dpi),
+      ToX: Math.round(origin.clientX + (rect.x + rect.width - 8) * dpi),
+      ToY: Math.round(origin.clientY + (rect.y + rect.height / 2) * dpi),
+    },
+    'main',
+  );
+  const values = await page.evaluate(() => window.__rangeValues);
+  assert.ok(
+    values.length >= 8,
+    `${name} remains interactive throughout a continuous native drag: ${values}`,
+  );
+  assert.equal(Number(await slider.inputValue()), Number(await slider.getAttribute('max')));
+  assert.equal(await slider.isEnabled(), true);
+}
 try {
+  host = spawn(resolve(root, 'target/debug/veil-host.exe'), [], {
+    cwd: root,
+    windowsHide: true,
+    stdio: 'ignore',
+  });
+  await waitFor(async () => {
+    try {
+      return (await fetch('http://127.0.0.1:4444/health')).ok;
+    } catch {
+      return false;
+    }
+  }, 'isolated collaboration host');
+  if (!(await fetch('http://127.0.0.1:5173').catch(() => null))?.ok) {
+    web = spawn(
+      process.execPath,
+      [
+        resolve(root, 'node_modules/vite/bin/vite.js'),
+        '--host',
+        '127.0.0.1',
+        '--port',
+        '5173',
+        '--strictPort',
+      ],
+      { cwd: resolve(root, 'apps/web'), windowsHide: true, stdio: 'ignore' },
+    );
+    await waitFor(async () => {
+      try {
+        return (await fetch('http://127.0.0.1:5173')).ok;
+      } catch {
+        return false;
+      }
+    }, 'browser editor');
+  }
   let { main, overlay } = await launch();
   assert.equal((await snapshot(main)).recoveryAvailable, true, 'Recovery shortcut registered.');
   await main.getByRole('button', { name: 'Settings', exact: true }).click();
+  await dragRange(main, 'Opacity');
+  await waitFor(async () => (await snapshot(main)).settings.opacity === 1, 'drag opacity saved');
+  assert.equal(native('Probe').alpha, 255);
+  await dragRange(main, 'Font size');
+  await waitFor(
+    async () => (await snapshot(main)).settings.fontSize === 48,
+    'drag font size saved',
+  );
+  console.log(
+    'PASS: continuous real mouse drags keep both sliders enabled and save their final value',
+  );
   await main.getByRole('button', { name: 'Show overlay' }).click();
   await waitFor(async () => (await snapshot(main)).settings.visible, 'overlay shown');
   assert.equal(native('Probe').visible, true);
@@ -175,6 +250,134 @@ try {
     'local font size updates',
   );
   console.log('PASS: separate windows, native opacity/topmost, local font size, clean overlay');
+
+  await main.getByLabel('Your name').fill('Desktop author');
+  await main.getByRole('button', { name: 'Join local session' }).click();
+  await waitFor(
+    async () =>
+      (await main.locator('.app-header [role="status"]').textContent()).trim() === 'Connected',
+    'desktop joins host',
+  );
+  const controlEditor = main.getByRole('textbox', { name: 'Shared document' });
+  const overlayEditor = overlay.getByRole('textbox', { name: 'Shared document' });
+  await controlEditor.fill('Shared overlay document.');
+  await waitFor(
+    async () => (await overlayEditor.textContent()) === 'Shared overlay document.',
+    'overlay receives shared document',
+  );
+  guestBrowser = await chromium.launch();
+  const guest = await guestBrowser.newPage();
+  guest.on('pageerror', (error) => errors.push(error.message));
+  await guest.goto('http://127.0.0.1:5173');
+  await guest.getByLabel('Your name').fill('Browser guest');
+  await guest.getByRole('button', { name: 'Join local session' }).click();
+  const guestEditor = guest.getByRole('textbox', { name: 'Shared document' });
+  await waitFor(
+    async () => (await guestEditor.textContent()) === 'Shared overlay document.',
+    'browser joins desktop document',
+  );
+  const authorActivity = guest.locator(
+    '[data-participant-name="Desktop author"] .participant-activity',
+  );
+  native('Focus', {}, 'main');
+  await controlEditor.press('Control+End');
+  await main.keyboard.insertText(' Main view.');
+  await waitFor(
+    async () => (await authorActivity.textContent()).startsWith('Typing'),
+    'control-panel typing presence',
+  );
+  await waitFor(
+    async () =>
+      (await overlayEditor.textContent()) === (await guestEditor.textContent()) &&
+      (await overlayEditor.textContent()).includes('Main view.'),
+    'control-panel edits reach both views',
+  );
+  native('Focus');
+  await overlayEditor.press('Control+End');
+  await overlay.keyboard.insertText(' Written in overlay.');
+  await waitFor(
+    async () => (await authorActivity.textContent()).startsWith('Typing'),
+    'overlay typing presence',
+  );
+  await waitFor(
+    async () => (await guestEditor.textContent()).includes('Written in overlay.'),
+    'overlay edits reach browser',
+  );
+  await waitFor(
+    async () => (await controlEditor.textContent()) === (await overlayEditor.textContent()),
+    'overlay edits reach control panel',
+  );
+  assert.equal(
+    await guest.getByRole('list', { name: 'Participants' }).getByRole('listitem').count(),
+    2,
+    'Overlay shares the desktop identity, without a ghost participant.',
+  );
+  await waitFor(
+    async () =>
+      (await guest.locator('.collaboration-carets__label[data-name="Desktop author"]').count()) ===
+      1,
+    'overlay cursor reaches browser',
+  );
+  await overlayEditor.press('Control+a');
+  await waitFor(
+    async () => (await authorActivity.textContent()) === 'Selecting text',
+    'overlay selection activity',
+  );
+  await waitFor(
+    async () =>
+      (await guest
+        .locator('.collaboration-selection[data-selection-user="Desktop author"]')
+        .count()) > 0,
+    'overlay selection reaches browser',
+  );
+  await overlayEditor.press('ArrowRight');
+  await Promise.all([overlayEditor.press('Control+End'), guestEditor.press('Control+End')]);
+  await Promise.all([
+    overlay.keyboard.insertText(' OVERLAY'),
+    guest.keyboard.insertText(' BROWSER'),
+  ]);
+  await waitFor(async () => {
+    const text = await controlEditor.textContent();
+    return (
+      text === (await overlayEditor.textContent()) &&
+      text === (await guestEditor.textContent()) &&
+      text.includes('OVERLAY') &&
+      text.includes('BROWSER')
+    );
+  }, 'concurrent overlay/browser edits converge');
+  await main.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await waitFor(
+    async () =>
+      (await main.locator('.app-header [role="status"]').textContent()).trim() === 'Disconnected',
+    'desktop disconnected',
+  );
+  await overlayEditor.press('Control+End');
+  await overlay.keyboard.insertText(' OFFLINE');
+  await guestEditor.press('Control+End');
+  await guest.keyboard.insertText(' REMOTE');
+  await main.getByRole('button', { name: 'Reconnect', exact: true }).click();
+  await waitFor(async () => {
+    const text = await controlEditor.textContent();
+    return (
+      text === (await overlayEditor.textContent()) &&
+      text === (await guestEditor.textContent()) &&
+      text.includes('OFFLINE') &&
+      text.includes('REMOTE')
+    );
+  }, 'overlay reconnect retains concurrent edits');
+  await overlay.screenshot({ path: resolve(directory, 'shared-document-overlay.png') });
+  await main.getByRole('button', { name: 'Leave session' }).click();
+  await waitFor(async () => (await overlayEditor.count()) === 0, 'leaving clears overlay');
+  await main.getByRole('button', { name: 'Join local session' }).click();
+  await waitFor(
+    async () => (await overlayEditor.textContent()) === (await guestEditor.textContent()),
+    'rejoining rebinds overlay',
+  );
+  await guestBrowser.close();
+  guestBrowser = undefined;
+  console.log(
+    'PASS: shared desktop/overlay/browser editing, one identity, cursor/selection, concurrent edits, disconnect/reconnect, leave/rejoin',
+  );
 
   let bounds = native('Probe');
   native('Drag', { X: bounds.x + 50, Y: bounds.y + 22, ToX: bounds.x + 140, ToY: bounds.y + 92 });
@@ -417,6 +620,9 @@ try {
     `PASS: preferences restored after clean restart; no JavaScript errors\nEvidence: ${directory}`,
   );
 } finally {
+  if (guestBrowser) await guestBrowser.close();
+  if (host?.exitCode === null) host.kill();
+  if (web?.exitCode === null) web.kill();
   if (conflictingApp?.exitCode === null) conflictingApp.kill();
   if (conflictingBrowser) await conflictingBrowser.close();
   if (underlay?.exitCode === null) underlay.kill();

@@ -1,4 +1,6 @@
 import { invoke, useOverlay, errorMessage } from './api';
+import { SharedEditor } from '@veil/editor';
+import { useOverlayDocument } from './session';
 
 const directions = [
   'north',
@@ -13,6 +15,7 @@ const directions = [
 
 export function OverlayWindow() {
   const { state, error, setError } = useOverlay();
+  const document = useOverlayDocument();
   const gesture = (direction: string | null) => {
     void invoke('overlay_gesture', { direction }).catch((failure: unknown) =>
       setError(errorMessage(failure)),
@@ -30,20 +33,30 @@ export function OverlayWindow() {
         }}
       >
         <span>
-          veil <span className="overlay-preview-tag">preview</span>
+          veil{' '}
+          <span className="overlay-preview-tag">
+            {state?.settings.clickThrough ? 'click-through' : 'document'}
+          </span>
         </span>
         <span className="overlay-recovery-hint">Ctrl+Alt+V to restore controls</span>
       </header>
-      <article className="overlay-preview" aria-label="Overlay preview">
-        <h1>Keep your thoughts in view.</h1>
-        <p>A quiet space above your work.</p>
-        <p>
-          Move me, resize me, or let clicks pass through. Your display settings stay on this device.
-        </p>
+      <article className="overlay-document" aria-label="Overlay document">
+        {document.connection ? (
+          <SharedEditor
+            key={document.connection.doc.clientID}
+            connection={document.connection}
+            compact
+          />
+        ) : (
+          <div className="overlay-empty">
+            <p>Join the document to start writing.</p>
+            <p>Open the control panel with Ctrl+Alt+V and join a local session.</p>
+          </div>
+        )}
       </article>
-      {error && (
+      {(error || document.error) && (
         <p role="alert" className="overlay-error">
-          {error}
+          {error || document.error}
         </p>
       )}
       {!state?.settings.clickThrough &&

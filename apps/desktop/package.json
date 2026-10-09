@@ -11,6 +11,9 @@
   "dependencies": {
     "@tauri-apps/api": "^2.12.2",
     "@veil/ui": "workspace:*",
+    "@veil/editor": "workspace:*",
+    "@veil/collaboration": "workspace:*",
+    "y-protocols": "^1.0.7",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "yjs": "^13.6.27"
