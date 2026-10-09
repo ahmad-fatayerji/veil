@@ -16,20 +16,22 @@ concurrency:
 jobs:
   candidate:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.candidate.outputs.sha }}
       branch: ${{ steps.candidate.outputs.branch }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: pnpm
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
       - run: pnpm install --frozen-lockfile
       - id: candidate
         env:
