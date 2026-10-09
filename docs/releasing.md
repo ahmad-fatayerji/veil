@@ -4,7 +4,7 @@ Source stays private in `ahmad-fatayerji/Veil-source`. Installers, signed update
 
 ## Everyday work and merges
 
-`main` contains approved release source; `develop` integrates the next release. Both require PRs, a successful **CI gate**, resolved conversations and an up-to-date branch. Direct pushes, force pushes and deletion are blocked, with no administrator bypass. External approvals are zero while there is one contributor.
+`main` contains approved release source; `develop` integrates the next release and is the repository's default branch for new checkouts and PRs. Agents follow the task procedure in [AGENTS.md](../AGENTS.md). Both branches require PRs, a successful **CI gate**, resolved conversations and an up-to-date branch. Direct pushes, force pushes and deletion are blocked, with no administrator bypass. External approvals are zero while there is one contributor. Select `main` when manually running the Gitflow management Actions, even though the default branch is `develop`.
 
 ```powershell
 git switch develop
