@@ -11,8 +11,8 @@
 
 These rules apply to every agent working in this repository. `develop` is the default branch for new checkouts and ordinary PRs; `main` holds approved release source. Use the existing Gitflow automation; a completed feature does not automatically authorize a release.
 
-1. Read this file and `PROJECT_SPEC.md`. Inspect `git status --short`, the current branch, and any existing task PR before editing. Preserve other contributors' changes, including uncommitted work. Continue an existing task branch when applicable.
-2. For a new ordinary task (including fixes, documentation and CI), fetch origin and create `feature/<short-task-name>` from current `origin/develop`. Do not implement tasks directly on `main`, `develop`, or an unrelated agent's branch. If the checkout contains other work or is shared with another active task, use a separate Git worktree; do not stash, reset, or move that work to clear the checkout.
+1. Read this file and `PROJECT_SPEC.md`. Inspect `git status --short`, the current branch, and any existing task PR before editing. Preserve other contributors' changes, including uncommitted work. Inspect `git worktree list` to identify existing task worktrees. Continue an existing task branch only in its dedicated worktree when resuming the same task.
+2. For a new ordinary task (including fixes, documentation and CI), fetch origin and create `feature/<short-task-name>` from current `origin/develop`. Do not implement tasks directly on `main`, `develop`, or an unrelated agent's branch. Every AI task must use its own separate Git worktree, even when the original checkout is clean and no other task is active. This applies to fixes, documentation, CI, release stabilization and hotfixes; use the starting branch specified below for each route. Create the task branch and worktree together with `git worktree add -b <task-branch> <task-worktree-path> <starting-ref>` before editing, and run all edits, builds, tests, commits and pushes from that worktree. Keep task worktrees outside the original checkout. Never reuse a worktree belonging to a different task or implement changes in the original checkout. Do not stash, reset, or move other work to clear a checkout.
 3. Keep the branch focused on the requested task. Stage only its files. Use Conventional Commit messages and PR titles: `feat:`, `fix:`, `docs:`, `ci:`, `test:`, `build:`, `refactor:`, `perf:`, `style:`, `chore:` or `revert:`, optionally with a scope. Use `!` in the title for breaking changes, for example `feat(protocol)!: change handshake format`. The squash PR title determines the release proposal.
 4. Run checks appropriate to the change. For code changes, use `pnpm check` and relevant unit/integration tests; release tooling changes also require `pnpm test:release`. Documentation-only changes need formatting validation. Consult `docs/testing.md` for native acceptance; rebuild the debug executable after Cargo tests before running native scripts. State what was actually verified and what remains unverified.
 5. Push the task branch and open a PR into `develop`, with a Conventional Commit title, a concise behavior/change description and validation results. Use a draft if work remains. Do not open ordinary feature PRs into `main`.
@@ -25,7 +25,8 @@ Ordinary task commands (replace the example name, title and file paths):
 
 ```powershell
 git fetch origin
-git switch -c feature/reconnect origin/develop
+git worktree add -b feature/reconnect ../Veil-reconnect origin/develop
+Set-Location ../Veil-reconnect
 # Implement and validate the task.
 git add path/to/changed-file
 git commit -m "fix: reconnect after losing connection"
