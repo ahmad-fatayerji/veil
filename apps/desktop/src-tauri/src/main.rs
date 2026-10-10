@@ -22,6 +22,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             overlay::overlay_snapshot,
             overlay::overlay_update,
+            overlay::overlay_capture_check,
+            overlay::overlay_capture_test,
             overlay::overlay_visibility,
             overlay::overlay_recover,
             overlay::overlay_reset_position,

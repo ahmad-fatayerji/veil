@@ -1,6 +1,6 @@
 # Veil repository rules
 
-- Follow PROJECT_SPEC.md and implement one milestone at a time. Current milestone: M6 (installer, updater, release), advanced at the user's request for P2P testing.
+- Follow PROJECT_SPEC.md and implement one milestone at a time. Current task: M4 (Windows capture compatibility), requested by the user. M6 installer/updater acceptance remains unfinished.
 - Keep Windows-first native code isolated from shared React packages.
 - Participant capacity defaults to no application-level cap.
 - Never expose a public unauthenticated service; M0 listens on loopback only.

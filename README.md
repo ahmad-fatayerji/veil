@@ -66,8 +66,9 @@ Start `pnpm dev:desktop` or open `target/debug/veil-desktop.exe` after building 
 - If the recovery shortcut is already in use, click-through is disabled. The control panel can always show/hide the overlay.
 - Bounds, appearance, visibility, and click-through are saved locally in `%APPDATA%/dev.veil.desktop/overlay.json`; they never enter the shared document. Removed monitors are handled by fitting saved bounds into an available work area.
 - Closing the control panel exits both windows and saves preferences.
+- **Settings → Exclude overlay from compatible captures** opts into best-effort Windows capture exclusion (Windows 10 version 2004 or later). The native status confirms the setting, not every recording/sharing tool. The control panel remains capturable. Use **Capture compatibility test** to compare a local test card in your actual output with exclusion off/on; see the [compatibility matrix and procedure](docs/capture-compatibility.md).
 
-The overlay has no formatting toolbar or remote cursor decorations. Turn off **Click-through** to edit; enable it to let clicks reach the app underneath. Before joining, it explains how to open the control panel. Capture exclusion remains M4. See [overlay architecture and verification](docs/overlay.md).
+The overlay has no formatting toolbar or remote cursor decorations. Turn off **Click-through** to edit; enable it to let clicks reach the app underneath. Before joining, it explains how to open the control panel. See [overlay architecture and verification](docs/overlay.md).
 
 The standalone M0 demo binds only **127.0.0.1:4444** and keeps its fixed development room and trusted-origin credential bootstrap. The embedded M2 host uses port **4445** by default, fresh sessions, and invitation authentication. Its router never exposes the M0 bootstrap.
 
@@ -107,4 +108,4 @@ Use `pnpm package:windows` to build the production NSIS installer and updater si
 - `packages/host`: reusable Axum/Tokio/Yrs host library and loopback-only M0 demo. Browser assets are compiled into the library after `pnpm build`. A bare Cargo build can compile without assets, but embedded hosting then reports an error until browser assets are built and Rust is rebuilt.
 - `docs`: architecture, security boundaries, networking, and test notes.
 
-See [architecture](docs/architecture.md) for the protocol decision and [testing](docs/testing.md) for verification. Durable documents, permissions, capture exclusion, different-network/relay acceptance and automatic signaling remain later work. M6 installers and signed updates are available for testing; clean-VM acceptance remains manual.
+See [architecture](docs/architecture.md) for the protocol decision and [testing](docs/testing.md) for verification. Durable documents and permissions remain later work; different-network/relay and broader capture-mode acceptance are still needed. M6 installers and signed updates are available for testing; clean-VM acceptance remains manual.

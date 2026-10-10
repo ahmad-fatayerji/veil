@@ -19,6 +19,7 @@
     "test": "vitest run && cargo test --workspace",
     "test:e2e": "playwright test",
     "test:overlay": "node scripts/test-overlay.mjs",
+    "test:capture": "node scripts/test-capture.mjs",
     "test:host": "node scripts/test-host.mjs",
     "test:peer": "node scripts/test-peer.mjs",
     "test:network": "node scripts/test-network.mjs",

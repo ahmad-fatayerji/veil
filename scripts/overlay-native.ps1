@@ -22,6 +22,7 @@ public class VeilNativeTest {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window, out Rect rect);
   [DllImport("user32.dll", EntryPoint="GetWindowLongPtrW")] public static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
   [DllImport("user32.dll")] public static extern bool GetLayeredWindowAttributes(IntPtr window, out uint color, out byte alpha, out uint flags);
+  [DllImport("user32.dll", SetLastError=true)] public static extern bool GetWindowDisplayAffinity(IntPtr window, out uint affinity);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
@@ -101,7 +102,9 @@ switch ($Action) {
     [uint32]$color=0; [byte]$alpha=0; [uint32]$flags=0
     $layered = [VeilNativeTest]::GetLayeredWindowAttributes($handle, [ref]$color, [ref]$alpha, [ref]$flags)
     $style = [VeilNativeTest]::GetWindowLongPtr($handle, -20).ToInt64()
-    @{ x=$bounds.Left; y=$bounds.Top; clientX=$client.X; clientY=$client.Y; width=$bounds.Right-$bounds.Left; height=$bounds.Bottom-$bounds.Top; visible=[VeilNativeTest]::IsWindowVisible($handle); foreground=([VeilNativeTest]::GetForegroundWindow() -eq $handle); topmost=($style -band 8) -ne 0; clickThrough=($style -band 32) -ne 0; alpha=$alpha; layered=$layered } | ConvertTo-Json -Compress
+    [uint32]$affinity=0
+    $affinityRead = [VeilNativeTest]::GetWindowDisplayAffinity($handle, [ref]$affinity)
+    @{ x=$bounds.Left; y=$bounds.Top; clientX=$client.X; clientY=$client.Y; width=$bounds.Right-$bounds.Left; height=$bounds.Bottom-$bounds.Top; visible=[VeilNativeTest]::IsWindowVisible($handle); foreground=([VeilNativeTest]::GetForegroundWindow() -eq $handle); topmost=($style -band 8) -ne 0; clickThrough=($style -band 32) -ne 0; alpha=$alpha; layered=$layered; affinityRead=$affinityRead; affinity=$affinity } | ConvertTo-Json -Compress
   }
   'Click' { [VeilNativeTest]::Click($X,$Y) }
   'Drag' { [VeilNativeTest]::Drag($X,$Y,$ToX,$ToY) }
