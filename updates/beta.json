@@ -1,11 +1,11 @@
 {
-  "version": "0.3.0-beta.2",
-  "notes": "# Veil 0.3.0-beta.2\n\n## Features\n\n- feat(overlay): include capture controls in beta candidate\n\n## Breaking changes\n\n- feat(network)!: automate signaling and selective relay fallback\n\n## Fixes\n\n- fix(updater): recover interrupted downloads and confirm installation\n- fix(release): locate and verify unpublished drafts by release ID\n\n## Other changes\n\n- docs: require a separate worktree for every AI task\n- ci: upgrade Actions runtimes and pin the Linux runner\n- docs: guide agents through the Gitflow task workflow\n",
-  "pub_date": "2026-10-10T10:34:31.804Z",
+  "version": "0.3.0-beta.3",
+  "notes": "# Veil 0.3.0-beta.3\n\n## Features\n\n- feat: include create share join in beta candidate\n- feat(overlay): include capture controls in beta candidate\n\n## Breaking changes\n\n- feat(network)!: automate signaling and selective relay fallback\n\n## Fixes\n\n- fix(updater): recover interrupted downloads and confirm installation\n- fix(release): locate and verify unpublished drafts by release ID\n\n## Other changes\n\n- docs: require a separate worktree for every AI task\n- ci: upgrade Actions runtimes and pin the Linux runner\n- docs: guide agents through the Gitflow task workflow\n",
+  "pub_date": "2026-10-10T11:25:19.568Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDVTZVJOemo5NitEeHRPUHdzdEN2QVdqZU44LzZNSGxNbE9ZQjlWbTBjVUFrZlcyc3dtTVRjNDNOekY3eXlDWWJiRG5ZS0pFUTcwL2tNWjJFcFVEN1E0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjI4NDcxCWZpbGU6VmVpbF8wLjMuMC1iZXRhLjJfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMy4wLWJldGEuMgowSTlCVVptZGwyWi9RL3c2MW1KSlVXVlRWN0crQlpLdmRCTUUxM3J1Z1FLclA5b1hKRjNFaHc0anM5WHgvVmhIU3VTSFdDL1pvYVFsSmVCdG4zb1JEdz09Cg==",
-      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.3.0-beta.2/Veil_0.3.0-beta.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1THo3ZWxuMC9oeUkwN3RVeHlFZFBZbzk4aDA2dVNqSUNVNFlFNjNncmx0dW1lQllSdGFWUFNBZ1p2azZNRGNYUmxkMlpDaFBjVnNZbHdjd05HcHoxNFE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjMxNTE5CWZpbGU6VmVpbF8wLjMuMC1iZXRhLjNfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMy4wLWJldGEuMwp1RVF1dFYzOFZuaXNKTHJuRFQ3ajVxU1FPbmNPQ0NLZGMxbVR2aFlLbzVlaVhXdTNySkxHS1RtRms2bE1xY0ZEeDlVcjJPYkxvYnBucXYvVW9SL29BUT09Cg==",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.3.0-beta.3/Veil_0.3.0-beta.3_x64-setup.exe"
     }
   }
 }
