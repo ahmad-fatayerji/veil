@@ -4394,6 +4394,12 @@ dependencies = [
 name = "veil-desktop"
 version = "0.2.0"
 dependencies = [
+ "base64 0.22.1",
+ "httpdate",
+ "minisign-verify",
+ "reqwest",
+ "rustls",
+ "semver",
  "serde",
  "serde_json",
  "tauri",
