@@ -67,6 +67,7 @@ async function launch() {
     windowsHide: true,
     env: {
       ...process.env,
+      VEIL_TEST_LEGACY: '1',
       VEIL_TEST_SETTINGS_DIR: directory,
       WEBVIEW2_USER_DATA_FOLDER: resolve(directory, 'webview'),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:
@@ -540,6 +541,7 @@ try {
     windowsHide: true,
     env: {
       ...process.env,
+      VEIL_TEST_LEGACY: '1',
       VEIL_TEST_SETTINGS_DIR: conflictDirectory,
       WEBVIEW2_USER_DATA_FOLDER: resolve(conflictDirectory, 'webview'),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:

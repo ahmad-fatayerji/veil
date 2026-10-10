@@ -21,6 +21,7 @@
     "test:overlay": "node scripts/test-overlay.mjs",
     "test:host": "node scripts/test-host.mjs",
     "test:peer": "node scripts/test-peer.mjs",
+    "test:network": "node scripts/test-network.mjs",
     "package:windows": "node scripts/build-installer.mjs",
     "test:installer": "node scripts/test-installer.mjs",
     "test:release": "node --test scripts/*.test.mjs",
@@ -43,6 +44,7 @@
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.7",
     "vitest": "^4.0.0",
+    "ws": "^8.22.0",
     "yaml": "^2.9.1"
   }
 }

@@ -1,14 +1,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod hosting;
+mod networking;
 mod overlay;
 mod session;
 mod updates;
 use tauri::Manager;
 
 fn main() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     tauri::Builder::default()
         .manage(hosting::Hosting::default())
+        .manage(networking::Networking::default())
         .manage(updates::Updates::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
@@ -27,6 +30,13 @@ fn main() {
             hosting::host_start,
             hosting::host_stop,
             hosting::host_status,
+            networking::network_preferences,
+            networking::network_configure,
+            networking::network_forget,
+            networking::network_request,
+            networking::network_connect,
+            networking::network_send,
+            networking::network_disconnect,
             updates::update_status,
             updates::update_check,
             updates::update_install,

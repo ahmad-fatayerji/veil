@@ -63,7 +63,7 @@ test('roadmap states the built editor and overlay, built hosting, and remaining 
   await page.getByRole('button', { name: 'Roadmap' }).click();
   const dialog = page.getByRole('dialog', { name: "What's left to build" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('listitem')).toHaveCount(8);
+  await expect(dialog.getByRole('listitem')).toHaveCount(9);
   await expect(
     dialog.getByRole('listitem').filter({ hasText: 'Local collaboration' }),
   ).toContainText('Built');

@@ -7,7 +7,13 @@ import { parse } from 'yaml';
 const workflow = (name) => parse(readFileSync(`.github/workflows/${name}.yml`, 'utf8'));
 test('the actual aggregate workflow rejects failed, cancelled, skipped and missing jobs', () => {
   const ci = workflow('ci');
-  assert.deepEqual(ci.jobs.gate.needs.sort(), ['integration', 'javascript', 'policy', 'rust']);
+  assert.deepEqual(ci.jobs.gate.needs.sort(), [
+    'integration',
+    'javascript',
+    'networking',
+    'policy',
+    'rust',
+  ]);
   assert.equal(ci.jobs.gate.if, 'always()');
   const code = ci.jobs.gate.steps[0].run.match(/-e '([\s\S]+)'/)[1];
   const run = (results) =>
@@ -20,6 +26,7 @@ test('the actual aggregate workflow rejects failed, cancelled, skipped and missi
   assert.equal(run(success), 0);
   for (const result of ['failure', 'cancelled', 'skipped'])
     assert.equal(run({ ...success, rust: { result } }), 1);
+  assert.equal(run({ ...success, networking: { result: 'skipped' } }), 1);
   assert.equal(run({}), 1);
   assert.equal(JSON.stringify(ci).includes('secrets.'), false);
   assert.match(ci.jobs.gate.name, /Candidate validation/);

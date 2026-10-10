@@ -6,15 +6,15 @@ This is an experimental build. The installer does not have a Windows publisher c
 
 ## Connect with a friend
 
-Both people install the same version:
+For builds with automatic networking, both people install the same version. The existing stable 0.2.0 installer still uses the older manual flow until a new release is explicitly published.
 
-1. Host enters a name and clicks **Start peer session**, then **Generate invitation**.
-2. Send that code privately to the friend. The friend enters a name, pastes it into **Host invitation**, then clicks **Create response**.
-3. Friend sends the response back. Host pastes it and clicks **Connect friend**.
-4. Wait for **Connected**. Type in both editors and confirm edits appear for the other person. Test **Show overlay** on either PC and edit through it too.
-5. Generate a separate invitation for each additional friend. Codes expire in ten minutes. Don't post codes publicly or attach them to bug reports.
+1. The server operator gives the host an HTTPS address and individual host access credential. Enter these once under **Hosting server**.
+2. Host enters their name and clicks **Create session**, then **Create invitation** and **Copy invitation**.
+3. Friend enters their name, pastes the invitation and clicks **Join**. They need no server configuration or account.
+4. Confirm **Connected** and **Direct** or **Relayed**. Type in both editors and through **Show overlay**.
+5. Create a separate invitation for each friend. Invitations are single-use and expire in ten minutes; never include them in public reports.
 
-Empty network options uses no external discovery/relay service, but private addresses alone usually cannot connect different NAT networks. If connection fails, report it; host can configure their own STUN/TURN and friends configure their own settings before joining. See [networking notes](https://github.com/ahmad-fatayerji/veil). This build does not provide a default relay or guarantee internet connectivity.
+Every connection tries direct/STUN first, then independently uses the operator's TURN relay if needed. No default relay provider or universal connectivity guarantee is included. The host must remain open. See the operator's [deployment instructions](https://github.com/ahmad-fatayerji/veil-server).
 
 ## Updates and known limits
 

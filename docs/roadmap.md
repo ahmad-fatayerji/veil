@@ -1,3 +1,5 @@
+Automatic desktop signaling and selective per-link relay (P2) are implemented, with real internet acceptance still required. See [automatic networking](automatic-networking.md). Legacy LAN/manual UI is debug-only.
+
 # Development roadmap
 
 Local collaboration (M0), the Windows overlay (M1), and embedded hosting with browser invitations (M2) are implemented. Second-device LAN verification remains manual. The Roadmap button shows these milestones. Sessions can run on loopback or an explicitly selected trusted LAN interface, documents are held in memory, and the overlay edits the same live document as the control panel.
@@ -15,6 +17,6 @@ Local collaboration (M0), the Windows overlay (M1), and embedded hosting with br
 
 Milestone requirements and acceptance criteria are in [PROJECT_SPEC.md](../PROJECT_SPEC.md). Closing the current host loses the document. The activity panel describes editor interaction; it does not observe other applications.
 
-## P1 — Desktop P2P migration
+## Historical P1 — Desktop P2P migration
 
 Primary mode now uses manual invitation/response codes and encrypted WebRTC data channels, with optional self-hosted STUN/TURN. Shared editing, presence and local overlays reuse existing components. LAN/browser hosting remains available. Automatic signaling, host-independent mesh, permissions, document persistence and real different-network/relay acceptance remain later work. Installer distribution is now M6; see [releasing](releasing.md).

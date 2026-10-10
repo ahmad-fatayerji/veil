@@ -28,6 +28,13 @@ export const roadmap = [
       'Encrypted desktop peer editing with invitation/response codes and optional self-hosted STUN/TURN. Direct transport verified locally; different-network and relay checks remain manual.',
   },
   {
+    id: 'P2',
+    title: 'Automatic connections and relay',
+    status: 'Built',
+    detail:
+      'Self-hosted signaling, one-paste invitations and selective per-connection TURN fallback. Mixed direct/relay transport is verified locally; unrelated-network acceptance remains manual.',
+  },
+  {
     id: 'M3',
     title: 'Permissions and saved documents',
     status: 'Next',

@@ -46,6 +46,7 @@ try {
     stdio: ['ignore', 'ignore', 'pipe'],
     env: {
       ...process.env,
+      VEIL_TEST_LEGACY: '1',
       VEIL_TEST_SETTINGS_DIR: directory,
       WEBVIEW2_USER_DATA_FOLDER: resolve(directory, 'webview'),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:

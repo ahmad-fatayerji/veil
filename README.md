@@ -17,29 +17,16 @@ pnpm install
 pnpm dev:desktop
 ```
 
-The desktop opens in **Desktop P2P** mode. Both people install Veil:
+The desktop uses automatic P2P with self-hosted signaling and selective relay:
 
-1. Enter your name and **Start peer session**, then **Generate invitation**.
-2. Send the code privately to your friend. They enter their name, paste it into **Host invitation**, and choose **Create response**.
-3. They send their response back. Paste it into the response field and choose **Connect friend**.
-4. Edit together and open your local overlay. Generate a fresh invitation for each additional friend. There is no configured participant cap.
+1. An operator deploys [veil-server](https://github.com/ahmad-fatayerji/veil-server). The host enters the HTTPS server address and operator-issued credential once.
+2. Enter your name and choose **Create session**, then **Create invitation** and **Copy invitation**.
+3. Your friend installs Veil, enters their name, pastes the invitation and chooses **Join**. They need no server setup or account.
+4. Make a fresh invitation for each friend. Edit together and open your local overlays. The host must stay open.
 
-Codes expire after ten minutes and contain credentials and network addresses. No domain or mandatory external service is used. Empty **Network options** works only where direct connectivity permits. Across routers you may need explicitly configured STUN, or TURN for restrictive networks. You can operate both on your own reachable server; see [P2P networking](docs/p2p.md). This first slice requires a fresh code exchange to reconnect. Keep the guest session open to preserve unsent edits. **Ending/leaving loses the in-memory document.** Different-network internet and TURN acceptance remain manual.
+Every connection tries direct/STUN first for six seconds, then requests TURN only if needed. A six-user session may have three direct friends and two relayed friends; healthy links remain independent. The displayed Direct/Relayed path comes from WebRTC statistics. No default third-party service or application participant cap is configured.
 
-For browser access, select **LAN / browser**. Switching modes ends the current session. The desktop command builds browser assets before launching. Choose **This computer only** (default) and click **Start session**. Enter your name and click **Join session** to edit. Copy the invitation into another browser to join the same document. No separate host or browser dev server is needed. The People panel shows participants and activity; Disconnect/Reconnect merges pending edits, and Leave session removes presence.
-
-To join from another device on the same trusted LAN:
-
-1. Run `ipconfig` on the host PC and find its private IPv4 address, such as `192.168.1.20`.
-2. Select **Trusted LAN**, enter that address and the desired port (default **4445**), and acknowledge the unencrypted network setting.
-3. Click **Start session**. If Windows prompts, allow Veil through the firewall for **private networks only**. The app does not modify firewall rules.
-4. Send the invitation to your collaborator. They open it in a browser on the same LAN and enter a name. The host serves the bundled production editor directly.
-5. Edit in both clients and verify bidirectional changes and presence.
-6. Click **End session** to close all connections and listeners. Starting again creates a new document and invalidates the old invitation.
-
-LAN HTTP traffic, including credentials, is unencrypted. Use only a trusted network. Do not forward this port or expose it through a public proxy. M2 accepts only loopback and explicitly selected RFC1918 IPv4 addresses. Network isolation and firewall policy may block another device even when local tests pass; see [networking](docs/networking.md).
-
-There is no application-level participant cap. Invite holders can edit; permission roles remain later work. **Ending a session or closing Veil loses the document.** Reloading a browser removes its in-memory invitation and replica: reopen the original invitation or paste it into the join page. The browser removes the invitation fragment from visible history after reading it, but copies of the link remain credentials.
+Invitations are single-use and expire after ten minutes. **Leave/End discards the in-memory document.** Signaling outages keep healthy peer links running; local content remains visible if server registration ends. See [automatic networking](docs/automatic-networking.md) for security, deployment, recovery and validation boundaries. Existing manual/LAN infrastructure is debug regression tooling only; never expose its HTTP listener publicly.
 
 ## Run the local development spike
 
@@ -66,7 +53,7 @@ In a third terminal, optionally run the native shell:
 pnpm dev:desktop
 ```
 
-Select LAN / browser to start an M2 session from the control panel. Its embedded host is independent of the standalone M0 room.
+The legacy native M2/manual UI is available only in debug acceptance runs with `VEIL_TEST_LEGACY=1`. Normal desktop sessions use automatic networking.
 
 ## Use the Windows overlay
 

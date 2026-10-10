@@ -106,6 +106,7 @@ async function launch() {
     stdio: 'ignore',
     env: {
       ...process.env,
+      VEIL_TEST_LEGACY: '1',
       VEIL_TEST_SETTINGS_DIR: directory,
       VEIL_TEST_UPDATE_URL: fixtureUrl,
       VEIL_TEST_UPDATE_CA: certificate,

@@ -29,6 +29,7 @@ async function launch(index) {
     stdio: ['ignore', 'ignore', 'pipe'],
     env: {
       ...process.env,
+      VEIL_TEST_LEGACY: '1',
       VEIL_TEST_SETTINGS_DIR: resolve(directory, String(index)),
       WEBVIEW2_USER_DATA_FOLDER: resolve(directory, String(index), 'webview'),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port} --remote-debugging-address=127.0.0.1`,
@@ -45,6 +46,7 @@ async function launch(index) {
   const pages = () => instance.browser.contexts().flatMap((context) => context.pages());
   await waitFor(() => pages().some((page) => !page.url().includes('?overlay')), 'main window');
   const page = pages().find((page) => !page.url().includes('?overlay'));
+  await page.getByRole('button', { name: 'Desktop P2P', exact: true }).waitFor();
   page.on('pageerror', (error) => errors.push(error.message));
   await page
     .getByLabel('Your name', { exact: true })

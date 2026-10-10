@@ -50,11 +50,13 @@ export function DemoApp({
   allowDemo = false,
   providedConnection,
   onProvidedLeave,
+  joinIntroduction,
 }: {
   surface: 'browser' | 'desktop';
   allowDemo?: boolean;
   providedConnection?: DemoConnection | null;
   onProvidedLeave?: () => void;
+  joinIntroduction?: ReactNode;
   sessionTarget?: SessionTarget | null;
   desktopControls?: ReactNode | ((connection: DemoConnection | null) => ReactNode);
   renderEditor?: (connection: DemoConnection) => ReactNode;
@@ -222,12 +224,16 @@ export function DemoApp({
               )
             ) : providedConnection === null ? (
               <div className="join-screen">
-                <h2>Connect directly.</h2>
-                <p>Start a peer session or paste an invitation in the controls above.</p>
-                <p className="join-note">
-                  No domain or mandatory online service. Network options can use your own discovery
-                  or relay server.
-                </p>
+                {joinIntroduction ?? (
+                  <>
+                    <h2>Connect directly.</h2>
+                    <p>Start a peer session or paste an invitation in the controls above.</p>
+                    <p className="join-note">
+                      No domain or mandatory online service. Network options can use your own
+                      discovery or relay server.
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="join-screen">

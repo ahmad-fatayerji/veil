@@ -1,3 +1,15 @@
+> Normal desktop sessions now use [automatic networking](automatic-networking.md). The older LAN/manual sections below describe debug regression infrastructure.
+
+## Automatic signaling and relay boundary
+
+Production server selection requires an HTTPS origin, with no bundled service. Host credentials are saved in Windows Credential Manager scoped to that origin; main-window-only Rust commands perform allowlisted, bounded HTTPS/WSS operations. Credential reads never return to frontend JavaScript. CSP does not permit arbitrary remote WebSockets. Active document sessions prevent updater installation.
+
+Ten-minute single-use invitations derive independent admission and directional encryption keys using HKDF-SHA-256. Signaling uses AES-GCM with authenticated session, invitation, role, generation and sequence. Nonces combine a fixed random sender prefix with a monotonically increasing sequence; receivers reject replay and prefix changes. Authenticate descriptions before trusting DTLS fingerprints; authenticate expected participant identity before Yjs/awareness traffic. The server cannot silently substitute a peer, but can deny service and observe metadata.
+
+Operators approve/revoke hosts locally. Only credential hashes/configuration persist. Neither server nor desktop persists documents. TURN grants are issued lazily to admitted fallback links and renew only selected relay paths, with bounded per-host identities/rates and coturn global/per-credential quotas. Destination exclusions deny private, loopback, link-local and multicast peers. Metrics require separate operator access; TURN metrics bind to loopback. Never log secrets, decrypted signaling or document contents.
+
+Allocation expiry is distinct from credential expiry. Explicitly close old transports after authenticated synchronization and after leaving; verify coturn cleanup using allocation metrics. Capacity failures keep local edits and healthy direct connections. Public deployment/protocol/security documentation is in [veil-server](https://github.com/ahmad-fatayerji/veil-server). Real internet acceptance and an independent security audit remain separate from local automated checks.
+
 # M2 security boundary
 
 Desktop P2P now uses WebRTC DTLS, exchanged fingerprint-bound offer/answer codes and a session-bound credential check before collaboration messages. It opens no HTTP session listener. Manual codes must travel through a trusted channel. Optional STUN/TURN servers receive metadata; TURN relays encrypted traffic and must use authenticated access. Transport queues/fragments/timeouts are bounded; this is not a complete malicious-collaborator or whole-document resource policy. See [P1 security and networking](p2p.md). The remaining sections apply to retained LAN/browser hosting.

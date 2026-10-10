@@ -1,0 +1,9 @@
+{
+  "sessionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "inviteId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "secret": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "admission": "ddeef854c0ba9dd2e290cb3bdb333b817d0ba4d024a4b7a2762f9ffaed117791",
+  "admissionHash": "c3598d2613fc2edaf94863a780c883b4d20456634bcc775d5d53cbb28aae6c6a",
+  "hostKey": "10231d23454209356e68d36cb265233cba36d04a34a27edacb482cf188c53657",
+  "guestKey": "3f31d5bbbc60f48d02203149e32092063f944c9bd1ac6cc299b32665bb3521ae"
+}

@@ -54,6 +54,15 @@ interface Peer {
   stalled?: ReturnType<typeof setTimeout>;
   disconnected?: ReturnType<typeof setTimeout>;
   receiving?: ReturnType<typeof setTimeout>;
+  automatic?: AutomaticCallbacks;
+  candidates?: RTCIceCandidateInit[];
+}
+
+export interface AutomaticCallbacks {
+  candidate: (candidate: RTCIceCandidateInit) => void;
+  failed: () => void;
+  authenticated: () => void;
+  synced: () => void;
 }
 
 async function gatherIce(pc: RTCPeerConnection) {
@@ -99,6 +108,11 @@ export class PeerProvider extends ObservableV2<{
   sessionId: string | null;
   private peers = new Map<string, Peer>();
   private destroyed = false;
+  private pendingUpdates = new Map<unknown, Uint8Array[]>();
+  private pendingBytes = 0;
+  private updateTimer?: ReturnType<typeof setTimeout>;
+  private presenceTimer?: ReturnType<typeof setTimeout>;
+  private pendingPresence = new Map<unknown, Set<number>>();
 
   constructor(
     readonly doc: Y.Doc,
@@ -147,11 +161,33 @@ export class PeerProvider extends ObservableV2<{
   }
 
   private documentChanged = (update: Uint8Array, origin: unknown) => {
-    const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, 0);
-    sync.writeUpdate(encoder, update);
-    this.broadcast(encoding.toUint8Array(encoder), origin);
+    if (this.pendingBytes + update.byteLength > MAX_QUEUE) {
+      this.flushUpdates();
+    }
+    if (update.byteLength > MAX_MESSAGE) {
+      this.emit('error', [
+        'This change exceeds the transport limit. Local content is retained; split large imports before reconnecting.',
+      ]);
+      return;
+    }
+    const pending = this.pendingUpdates.get(origin) ?? [];
+    pending.push(update);
+    this.pendingBytes += update.byteLength;
+    this.pendingUpdates.set(origin, pending);
+    this.updateTimer ??= setTimeout(() => this.flushUpdates(), 30);
   };
+  private flushUpdates() {
+    clearTimeout(this.updateTimer);
+    this.updateTimer = undefined;
+    for (const [source, updates] of this.pendingUpdates) {
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, 0);
+      sync.writeUpdate(encoder, Y.mergeUpdates(updates));
+      this.broadcast(encoding.toUint8Array(encoder), source);
+    }
+    this.pendingUpdates.clear();
+    this.pendingBytes = 0;
+  }
 
   private awarenessChanged = (
     { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
@@ -159,13 +195,19 @@ export class PeerProvider extends ObservableV2<{
   ) => {
     const ids = [...added, ...updated, ...removed];
     if (this.role === 'guest' && !ids.includes(this.doc.clientID)) return;
-    const encoder = encoding.createEncoder();
-    encoding.writeVarUint(encoder, 1);
-    encoding.writeVarUint8Array(
-      encoder,
-      encodeAwarenessUpdate(this.awareness, this.role === 'guest' ? [this.doc.clientID] : ids),
-    );
-    this.broadcast(encoding.toUint8Array(encoder), origin);
+    const pending = this.pendingPresence.get(origin) ?? new Set<number>();
+    for (const id of this.role === 'guest' ? [this.doc.clientID] : ids) pending.add(id);
+    this.pendingPresence.set(origin, pending);
+    this.presenceTimer ??= setTimeout(() => {
+      this.presenceTimer = undefined;
+      for (const [source, ids] of this.pendingPresence) {
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, 1);
+        encoding.writeVarUint8Array(encoder, encodeAwarenessUpdate(this.awareness, [...ids]));
+        this.broadcast(encoding.toUint8Array(encoder), source);
+      }
+      this.pendingPresence.clear();
+    }, 100);
     this.changed();
   };
 
@@ -279,6 +321,7 @@ export class PeerProvider extends ObservableV2<{
       if (message === sync.messageYjsSyncStep2) {
         this.synced = true;
         this.emit('sync', [true]);
+        peer.automatic?.synced();
       }
     } else if (type === 1) {
       const update = decoding.readVarUint8Array(decoder);
@@ -355,7 +398,11 @@ export class PeerProvider extends ObservableV2<{
           if (
             this.role === 'host' &&
             [...this.peers.values()].some(
-              (other) => other !== peer && other.authenticated && other.clientId === hello.clientId,
+              (other) =>
+                other !== peer &&
+                other.authenticated &&
+                other.clientId === hello.clientId &&
+                !(peer.automatic && other.automatic && other.code.invite === peer.code.invite),
             )
           )
             throw new Error();
@@ -363,6 +410,7 @@ export class PeerProvider extends ObservableV2<{
           clearTimeout(peer.deadline);
           peer.deadline = undefined;
           this.status('connected');
+          peer.automatic?.authenticated();
           // Advance beyond a previous host-side awareness removal clock on rejoin.
           this.awareness.setLocalState(this.awareness.getLocalState());
           this.awareness.setLocalState(this.awareness.getLocalState());
@@ -414,9 +462,9 @@ export class PeerProvider extends ObservableV2<{
     }
   }
 
-  private newPeer(code: PeerCode): Peer {
+  private newPeer(code: PeerCode, servers = this.iceServers, automatic?: AutomaticCallbacks): Peer {
     if (this.destroyed) throw new Error('This peer session has ended.');
-    const pc = new RTCPeerConnection({ iceServers: this.iceServers, bundlePolicy: 'max-bundle' });
+    const pc = new RTCPeerConnection({ iceServers: servers, bundlePolicy: 'max-bundle' });
     const peer: Peer = {
       id: code.connectionId,
       pc,
@@ -430,6 +478,8 @@ export class PeerProvider extends ObservableV2<{
       sequence: 0,
       frames: 0,
       window: Date.now(),
+      automatic,
+      candidates: [],
     };
     this.peers.set(peer.id, peer);
     peer.deadline = setTimeout(
@@ -441,7 +491,22 @@ export class PeerProvider extends ObservableV2<{
       Math.max(0, code.expiresAt - Date.now()),
     );
     pc.ondatachannel = ({ channel }) => this.attach(peer, channel);
+    if (automatic)
+      pc.onicecandidate = ({ candidate }) => {
+        if (candidate && !peer.closed) automatic.candidate(candidate.toJSON());
+      };
     pc.onconnectionstatechange = () => {
+      if (automatic) {
+        if (pc.connectionState === 'failed') automatic.failed();
+        if (pc.connectionState === 'disconnected')
+          peer.disconnected ??= setTimeout(() => automatic.failed(), 5_000);
+        if (pc.connectionState === 'connected') {
+          clearTimeout(peer.disconnected);
+          peer.disconnected = undefined;
+          void this.measurePath(peer);
+        }
+        return;
+      }
       if (pc.connectionState === 'failed')
         this.closePeer(
           peer,
@@ -461,6 +526,64 @@ export class PeerProvider extends ObservableV2<{
     };
     this.changed();
     return peer;
+  }
+
+  async automaticOffer(
+    code: PeerCode,
+    remoteClientId: number,
+    servers: RTCIceServer[],
+    callbacks: AutomaticCallbacks,
+  ): Promise<string> {
+    const peer = this.newPeer(code, servers, callbacks);
+    peer.clientId = remoteClientId;
+    peer.answerAccepted = true;
+    this.attach(peer, peer.pc.createDataChannel('veil.v1', { ordered: true }));
+    await peer.pc.setLocalDescription(await peer.pc.createOffer());
+    return peer.pc.localDescription!.sdp;
+  }
+  async automaticAnswer(
+    code: PeerCode,
+    remoteClientId: number,
+    servers: RTCIceServer[],
+    callbacks: AutomaticCallbacks,
+  ): Promise<string> {
+    if (this.sessionId && this.sessionId !== code.sessionId)
+      throw new Error('Leave before joining another session.');
+    this.sessionId = code.sessionId;
+    const peer = this.newPeer(code, servers, callbacks);
+    peer.clientId = remoteClientId;
+    peer.answerAccepted = true;
+    await peer.pc.setRemoteDescription({ type: 'offer', sdp: code.sdp });
+    await peer.pc.setLocalDescription(await peer.pc.createAnswer());
+    return peer.pc.localDescription!.sdp;
+  }
+  async automaticAccept(connectionId: string, sdp: string) {
+    const peer = this.peers.get(connectionId);
+    if (!peer || peer.closed) return;
+    await peer.pc.setRemoteDescription({ type: 'answer', sdp });
+    for (const candidate of peer.candidates ?? []) await peer.pc.addIceCandidate(candidate);
+    peer.candidates = [];
+  }
+  async automaticCandidate(connectionId: string, candidate: RTCIceCandidateInit) {
+    const peer = this.peers.get(connectionId);
+    if (!peer || peer.closed) return;
+    if (peer.pc.remoteDescription) await peer.pc.addIceCandidate(candidate);
+    else {
+      if ((peer.candidates?.length ?? 0) >= 128) throw new Error('Too many ICE candidates.');
+      peer.candidates?.push(candidate);
+    }
+  }
+  automaticClose(connectionId: string) {
+    const peer = this.peers.get(connectionId);
+    if (peer) {
+      peer.automatic = undefined;
+      this.closePeer(peer);
+    }
+  }
+  automaticConfigure(connectionId: string, servers: RTCIceServer[]) {
+    const peer = this.peers.get(connectionId);
+    if (peer && !peer.closed)
+      peer.pc.setConfiguration({ iceServers: servers, bundlePolicy: 'max-bundle' });
   }
 
   async createInvitation(): Promise<string> {
@@ -575,9 +698,13 @@ export class PeerProvider extends ObservableV2<{
     peer.incoming = undefined;
     peer.channel?.close();
     peer.pc.close();
-    if (peer.authenticated && peer.clientId !== undefined)
+    if (
+      peer.authenticated &&
+      peer.clientId !== undefined &&
+      ![...this.peers.values()].some((p) => p.authenticated && p.clientId === peer.clientId)
+    )
       removeAwarenessStates(this.awareness, [peer.clientId], networkOrigin);
-    if (this.role === 'guest') {
+    if (this.role === 'guest' && ![...this.peers.values()].some((p) => p.authenticated)) {
       removeAwarenessStates(
         this.awareness,
         [...this.awareness.getStates().keys()].filter((id) => id !== this.doc.clientID),
@@ -586,6 +713,7 @@ export class PeerProvider extends ObservableV2<{
       this.status('disconnected');
     }
     if (message && !this.destroyed) this.emit('error', [message]);
+    if (!this.destroyed) peer.automatic?.failed();
     this.changed();
   }
 
@@ -605,6 +733,10 @@ export class PeerProvider extends ObservableV2<{
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    clearTimeout(this.updateTimer);
+    clearTimeout(this.presenceTimer);
+    this.pendingUpdates.clear();
+    this.pendingPresence.clear();
     this.disconnect();
     this.doc.off('update', this.documentChanged);
     this.awareness.off('update', this.awarenessChanged);
