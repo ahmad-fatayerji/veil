@@ -158,14 +158,58 @@ jobs:
             target/cargo-timings/
             target/build-diagnostics/
           retention-days: 7
+  networking:
+    name: Signaling and selective relay regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VEIL_SERVER_SOURCE: ${{ github.workspace }}/target/server-source
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/checkout@v7
+        with:
+          repository: ahmad-fatayerji/veil-server
+          ref: 0441fb8ea2d8ef48376d232877fd774355110e2c
+          path: target/server-source
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux-signaling-v1
+          workspaces: target/server-source -> target
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: Require identical public protocol fixture
+        run: cmp packages/protocol/fixtures/signaling-v2.json target/server-source/fixtures/signaling-v2.json
+      - run: cargo build --manifest-path target/server-source/Cargo.toml --locked
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:network
+      - run: pnpm test:network
+        env:
+          VEIL_TURN_TRANSPORT: tcp
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: network-measurements-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/network-acceptance/**/measurements.json
+            target/network-acceptance/**/cleanup-metrics.txt
+          retention-days: 7
   gate:
     name: ${{ inputs.candidate && 'Candidate validation' || 'CI gate' }}
     if: always()
-    needs: [policy, javascript, rust, integration]
+    needs: [policy, javascript, rust, integration, networking]
     runs-on: ubuntu-24.04
     steps:
       - name: Require every check to succeed
         env:
           RESULTS: ${{ toJSON(needs) }}
         run: |
-          node --input-type=module -e 'const jobs = Object.values(JSON.parse(process.env.RESULTS)); if (jobs.length !== 4 || jobs.some(job => job.result !== "success")) process.exit(1);'
+          node --input-type=module -e 'const jobs = Object.values(JSON.parse(process.env.RESULTS)); if (jobs.length !== 5 || jobs.some(job => job.result !== "success")) process.exit(1);'

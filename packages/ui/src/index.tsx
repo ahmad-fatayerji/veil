@@ -8,6 +8,8 @@ import {
 import { parseInvitation, type SessionTarget } from '@veil/protocol';
 import { SharedEditor } from '@veil/editor';
 import { roadmap } from './roadmap';
+import { Dialog, hasDocumentContent } from './workspace';
+import { useAppearance, type Appearance } from './appearance';
 import veilIcon from './assets/veil-icon-small.png';
 
 // Read once before React Strict Mode mounts; remove the credential from browser history.
@@ -50,15 +52,20 @@ export function DemoApp({
   allowDemo = false,
   providedConnection,
   onProvidedLeave,
+  joinIntroduction,
 }: {
   surface: 'browser' | 'desktop';
   allowDemo?: boolean;
   providedConnection?: DemoConnection | null;
   onProvidedLeave?: () => void;
+  joinIntroduction?: ReactNode;
   sessionTarget?: SessionTarget | null;
   desktopControls?: ReactNode | ((connection: DemoConnection | null) => ReactNode);
   renderEditor?: (connection: DemoConnection) => ReactNode;
 }) {
+  const { appearance, setAppearance } = useAppearance();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const [name, setName] = useState('');
   const [invitation, setInvitation] = useState('');
   const bundledBrowser = surface === 'browser' && !allowDemo;
@@ -160,6 +167,11 @@ export function DemoApp({
             ? 'Connecting…'
             : 'Synchronizing…';
 
+  function requestLeave() {
+    if (connection && hasDocumentContent(connection)) setConfirmLeave(true);
+    else leave();
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -199,8 +211,8 @@ export function DemoApp({
               </span>
             </button>
           )}
-          <button className="quiet-button" onClick={() => roadmapDialog.current?.showModal()}>
-            Roadmap
+          <button className="quiet-button" onClick={() => setSettingsOpen(true)}>
+            Settings
           </button>
         </div>
       </header>
@@ -209,7 +221,7 @@ export function DemoApp({
 
       <main className={`workspace ${connection && showPeople ? 'with-sidebar' : ''}`}>
         <section className="document-workspace" aria-label="Collaborative workspace">
-          <div className="document-heading">
+          <div className="document-heading" hidden={!connection}>
             <h1>Untitled document</h1>
             <span>{surface === 'desktop' ? 'Desktop' : 'Browser'}</span>
           </div>
@@ -222,12 +234,16 @@ export function DemoApp({
               )
             ) : providedConnection === null ? (
               <div className="join-screen">
-                <h2>Connect directly.</h2>
-                <p>Start a peer session or paste an invitation in the controls above.</p>
-                <p className="join-note">
-                  No domain or mandatory online service. Network options can use your own discovery
-                  or relay server.
-                </p>
+                {joinIntroduction ?? (
+                  <>
+                    <h2>Connect directly.</h2>
+                    <p>Start a peer session or paste an invitation in the controls above.</p>
+                    <p className="join-note">
+                      No domain or mandatory online service. Network options can use your own
+                      discovery or relay server.
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="join-screen">
@@ -298,7 +314,7 @@ export function DemoApp({
               </div>
             )}
           </div>
-          <footer className="document-footer">
+          <footer className="document-footer" hidden={!connection}>
             <span>Temporary document · not saved to disk</span>
             <span>
               {providedConnection !== undefined
@@ -351,7 +367,7 @@ export function DemoApp({
                   {status === 'disconnected' ? 'Reconnect' : 'Disconnect'}
                 </button>
               )}
-              <button className="quiet-button" onClick={leave}>
+              <button className="quiet-button" onClick={requestLeave}>
                 Leave session
               </button>
             </div>
@@ -362,6 +378,46 @@ export function DemoApp({
         )}
       </main>
 
+      <Dialog open={settingsOpen} title="Settings" onClose={() => setSettingsOpen(false)}>
+        <h3>Appearance</h3>
+        <label htmlFor="browser-appearance">Theme</label>
+        <select
+          id="browser-appearance"
+          value={appearance}
+          onChange={(e) => setAppearance(e.target.value as Appearance)}
+        >
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+        <h3>About Veil</h3>
+        <p>Documents are temporary. Copy anything you want to keep before leaving.</p>
+        <button
+          className="secondary-button"
+          onClick={() => {
+            roadmapDialog.current?.showModal();
+          }}
+        >
+          Roadmap
+        </button>
+      </Dialog>
+      <Dialog open={confirmLeave} title="Leave session?" onClose={() => setConfirmLeave(false)}>
+        <p>This document is temporary. Copy any text you want to keep before leaving.</p>
+        <div className="form-actions">
+          <button className="secondary-button" onClick={() => setConfirmLeave(false)}>
+            Cancel
+          </button>
+          <button
+            className="danger-button"
+            onClick={() => {
+              setConfirmLeave(false);
+              leave();
+            }}
+          >
+            Leave session
+          </button>
+        </div>
+      </Dialog>
       <dialog ref={roadmapDialog} className="roadmap-dialog" aria-labelledby="roadmap-title">
         <div className="roadmap-heading">
           <div>
@@ -404,3 +460,7 @@ export function DemoApp({
     </div>
   );
 }
+
+export * from './workspace';
+export * from './appearance';
+export { roadmap } from './roadmap';

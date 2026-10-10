@@ -28,6 +28,13 @@ export const roadmap = [
       'Encrypted desktop peer editing with invitation/response codes and optional self-hosted STUN/TURN. Direct transport verified locally; different-network and relay checks remain manual.',
   },
   {
+    id: 'P2',
+    title: 'Automatic connections and relay',
+    status: 'Built',
+    detail:
+      'Self-hosted signaling, one-paste invitations and selective per-connection TURN fallback. Mixed direct/relay transport is verified locally; unrelated-network acceptance remains manual.',
+  },
+  {
     id: 'M3',
     title: 'Permissions and saved documents',
     status: 'Next',
@@ -37,9 +44,9 @@ export const roadmap = [
   {
     id: 'M4',
     title: 'Capture compatibility',
-    status: 'Planned',
+    status: 'Built',
     detail:
-      'Best-effort Windows capture exclusion and a compatibility test. It cannot guarantee exclusion from every recording or sharing tool.',
+      'Opt-in Windows capture exclusion, native status and a local test card. GDI, DXGI and OBS display capture verified locally; other sharing/recording modes remain manual. Exclusion is never universal.',
   },
   {
     id: 'M5',

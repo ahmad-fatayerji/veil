@@ -4,7 +4,7 @@ Source stays private in `ahmad-fatayerji/Veil-source`. Installers, signed update
 
 ## Everyday work and merges
 
-`main` contains approved release source; `develop` integrates the next release. Both require PRs, a successful **CI gate**, resolved conversations and an up-to-date branch. Direct pushes, force pushes and deletion are blocked, with no administrator bypass. External approvals are zero while there is one contributor.
+`main` contains approved release source; `develop` integrates the next release and is the repository's default branch for new checkouts and PRs. Agents follow the task procedure in [AGENTS.md](../AGENTS.md). Both branches require PRs, a successful **CI gate**, resolved conversations and an up-to-date branch. Direct pushes, force pushes and deletion are blocked, with no administrator bypass. External approvals are zero while there is one contributor. Select `main` when manually running the Gitflow management Actions, even though the default branch is `develop`.
 
 ```powershell
 git switch develop
@@ -23,6 +23,14 @@ After checks pass, run **Actions → Merge Gitflow PR → Run workflow** on `mai
 
 ```powershell
 gh workflow run merge-pr.yml --ref main -f number=123
+```
+
+GitHub may hold the ordinary PR run for execution approval when a bot creates or updates a PR. Explicitly dispatched validation still runs, but it does not satisfy a pending check on GitHub's PR merge commit. Before merging, inspect the current PR head and workflow changes, then approve that specific PR run with the authenticated maintainer account and wait for its **CI gate**. Approval permits the checks to execute; it does not bypass the protected merge requirements.
+
+```powershell
+gh run list --repo ahmad-fatayerji/Veil-source --branch release/0.2.0
+# Use the current PR run marked action_required, after inspecting its source:
+gh api --method POST repos/ahmad-fatayerji/Veil-source/actions/runs/RUN_ID/approve
 ```
 
 GitHub's native merge buttons can also be used: squash feature PRs and use **Create a merge commit** for release/hotfix/back-merge PRs. Rules restrict `main` to merge commits. `develop` allows squash and merge because GitHub cannot enforce different methods based on the source branch; the Merge Gitflow PR action selects correctly. Rebase merging is disabled. Automatic back-merges use `backmerge/<version>` branches based on `develop`, with `main` merged into them. This satisfies strict up-to-date checks without bringing unreleased features into `main`. If develop advances, update the back-merge branch before merging.
@@ -114,6 +122,8 @@ gh workflow run release.yml --ref main -f ref=FULL_MERGED_COMMIT_SHA
 
 Retries may complete an unpublished draft. A published version must match its recorded source SHA; its installer, signature and manifest are never overwritten. A feed retry uses the original published manifest, not a rebuilt signature. Feeds never move backwards. Concurrency serializes public publication; a failed upload leaves the previous feed intact. If publication succeeds but feed/back-merge work fails, rerun to complete it. Arbitrary feature source, prerelease stable source, non-merge stable source and inconsistent versions are rejected before signing.
 
+The release-by-tag API can return 404 for a newly created draft. Publication falls back to the authenticated paginated release list and uses the draft's numeric release ID to verify uploads. It checks that the release is still a draft before replacing draft assets or proceeding to publication; authentication failures and ambiguous tag matches remain fatal.
+
 The migration baseline is source `0f008872ed112fbb339ae37dd5f950891affb154` at `0.1.2`. Public `v0.1.2` is reserved; this migration does not publish or replace it. Subsequent baselines refer to private stable source tags. The initial beta feed points to the current stable release until a beta is requested.
 
 ## Updater channels and signing
@@ -121,6 +131,12 @@ The migration baseline is source `0f008872ed112fbb339ae37dd5f950891affb154` at `
 **App updates → Update channel** selects stable or beta, persisted locally in `update-channel.json`. Stable is the default and retains the existing `/releases/latest/download/latest.json` endpoint for installed clients. Beta uses the public repository's `updates/beta.json` through HTTPS. Switching clears any pending candidate and makes no network request. Checks occur only on **Check for updates**, never on startup.
 
 Both channels require the embedded public key and a newer version. Switching from a newer beta to stable waits for a newer stable release; it does not downgrade. Update installation is explicit and blocked while a document or embedded host is active. The overlay cannot administer updates. Preferences are retained; documents are temporary and must be copied before ending a session. Channel settings do not enter the shared document.
+
+Downloads show transferred bytes and a percentage when the response includes `Content-Length`; unknown sizes use an indeterminate progress bar. These are full installers, not delta patches. Size reporting needs no GitHub REST API request. Downloads have a 30-second connection timeout and a 120-second idle timeout, with no total duration limit while bytes keep arriving. Interrupted transfers and HTTP 5xx failures retry at most three times, restarting at byte zero after two and four seconds. Cancel remains available through download/retry/verification, ending before preferences are saved and the installer starts. Returned failures release the native session gate. Packages are limited to 512 MiB in memory and must pass minisign verification and exact signed-semver matching before installer handoff; failed verification clears the candidate and requires another check.
+
+Download throttling uses `Retry-After` (seconds or HTTP date), and `x-ratelimit-reset` when the remaining budget is zero, to disable checks/install attempts until the deadline. A 429 without usable timing headers waits at least a minute. Cooldowns are local to the running app. Tauri still performs manifest checks with a 60-second request timeout. An HTTP 429 from a manifest check starts a conservative one-minute manual cooldown; the plugin does not expose those response headers, so this cannot use the server's precise retry deadline. Checks never retry automatically. No token, additional API request or background GitHub polling is added.
+
+Before launching the passive Windows installer, Veil atomically saves `update-receipt.json` containing the previous and intended versions. On the next launch it compares the running version to the intended version: an exact match shows a success notice above the collapsed update panel; any other version shows an incomplete-update notice. Feedback remains until dismissed, including across restarts. An installer launch error removes the pending receipt and keeps the control panel available. This confirms the version that actually launched; it does not monitor an installer after Veil exits, provide automatic rollback, or recover documents. If installation fails without relaunching, the notice appears when Veil can next be opened.
 
 Existing private source Actions secrets remain:
 

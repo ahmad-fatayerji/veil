@@ -17,29 +17,17 @@ pnpm install
 pnpm dev:desktop
 ```
 
-The desktop opens in **Desktop P2P** mode. Both people install Veil:
+The desktop uses automatic P2P with self-hosted signaling and selective relay:
 
-1. Enter your name and **Start peer session**, then **Generate invitation**.
-2. Send the code privately to your friend. They enter their name, paste it into **Host invitation**, and choose **Create response**.
-3. They send their response back. Paste it into the response field and choose **Connect friend**.
-4. Edit together and open your local overlay. Generate a fresh invitation for each additional friend. There is no configured participant cap.
+1. An operator deploys [veil-server](https://github.com/ahmad-fatayerji/veil-server). The host enters the HTTPS server address and operator-issued credential once.
+2. Choose **Create document** to start writing immediately, including offline. Configure the hosting server and credential in **Settings > Hosting server** whenever you need sharing.
+3. Choose **Share > Copy link**. Missing setup opens Settings and resumes sharing after saving. The same reusable link admits multiple friends.
+4. Your friend installs Veil, opens or pastes the link, enters their name, and chooses **Join session**. Direct and relay connections are automatic; no guest server setup is needed.
+5. **Reset link** invalidates the old link; **Stop sharing** prevents new joins. Both retain existing collaborators. The host must stay open. Appearance, overlay, updates, and About are in Settings.
 
-Codes expire after ten minutes and contain credentials and network addresses. No domain or mandatory external service is used. Empty **Network options** works only where direct connectivity permits. Across routers you may need explicitly configured STUN, or TURN for restrictive networks. You can operate both on your own reachable server; see [P2P networking](docs/p2p.md). This first slice requires a fresh code exchange to reconnect. Keep the guest session open to preserve unsent edits. **Ending/leaving loses the in-memory document.** Different-network internet and TURN acceptance remain manual.
+Every connection tries direct/STUN first for six seconds, then requests TURN only if needed. A six-user session may have three direct friends and two relayed friends; healthy links remain independent. The displayed Direct/Relayed path comes from WebRTC statistics. No default third-party service or application participant cap is configured.
 
-For browser access, select **LAN / browser**. Switching modes ends the current session. The desktop command builds browser assets before launching. Choose **This computer only** (default) and click **Start session**. Enter your name and click **Join session** to edit. Copy the invitation into another browser to join the same document. No separate host or browser dev server is needed. The People panel shows participants and activity; Disconnect/Reconnect merges pending edits, and Leave session removes presence.
-
-To join from another device on the same trusted LAN:
-
-1. Run `ipconfig` on the host PC and find its private IPv4 address, such as `192.168.1.20`.
-2. Select **Trusted LAN**, enter that address and the desired port (default **4445**), and acknowledge the unencrypted network setting.
-3. Click **Start session**. If Windows prompts, allow Veil through the firewall for **private networks only**. The app does not modify firewall rules.
-4. Send the invitation to your collaborator. They open it in a browser on the same LAN and enter a name. The host serves the bundled production editor directly.
-5. Edit in both clients and verify bidirectional changes and presence.
-6. Click **End session** to close all connections and listeners. Starting again creates a new document and invalidates the old invitation.
-
-LAN HTTP traffic, including credentials, is unencrypted. Use only a trusted network. Do not forward this port or expose it through a public proxy. M2 accepts only loopback and explicitly selected RFC1918 IPv4 addresses. Network isolation and firewall policy may block another device even when local tests pass; see [networking](docs/networking.md).
-
-There is no application-level participant cap. Invite holders can edit; permission roles remain later work. **Ending a session or closing Veil loses the document.** Reloading a browser removes its in-memory invitation and replica: reopen the original invitation or paste it into the join page. The browser removes the invitation fragment from visible history after reading it, but copies of the link remain credentials.
+Links last until sharing stops or the host session ends. **Closing/leaving discards the temporary document**, with confirmation for content. Reusable links require a server advertising `groupSharing: 1`; older single-use invitations can still be pasted into Join. Signaling outages keep healthy peer links running; local content remains visible if server registration ends. See [automatic networking](docs/automatic-networking.md) for security, deployment, recovery and validation boundaries. Existing manual/LAN infrastructure is debug regression tooling only; never expose its HTTP listener publicly.
 
 ## Run the local development spike
 
@@ -58,7 +46,7 @@ pnpm dev:web
 
 Open **http://127.0.0.1:5173** in two browser windows. Enter different names and click **Join local session** in both. Write in either editor; both receive changes. Each collaborator has a named cursor and colored text selection. The People panel shows who is typing, selecting text, in the document, or away. **Disconnect** pauses one replica; edit both independently, then **Reconnect** to merge missing updates. Browser BroadcastChannel synchronization is disabled, so all remote changes travel through the Rust host.
 
-Click **Roadmap** in the top bar to see what is built and what remains. See the [development roadmap](docs/roadmap.md) for the same milestone overview.
+Open **Settings > About > Development roadmap** to see what is built and what remains. See the [development roadmap](docs/roadmap.md) for the same milestone overview.
 
 In a third terminal, optionally run the native shell:
 
@@ -66,7 +54,7 @@ In a third terminal, optionally run the native shell:
 pnpm dev:desktop
 ```
 
-Select LAN / browser to start an M2 session from the control panel. Its embedded host is independent of the standalone M0 room.
+The legacy native M2/manual UI is available only in debug acceptance runs with `VEIL_TEST_LEGACY=1`. Normal desktop sessions use automatic networking.
 
 ## Use the Windows overlay
 
@@ -79,8 +67,9 @@ Start `pnpm dev:desktop` or open `target/debug/veil-desktop.exe` after building 
 - If the recovery shortcut is already in use, click-through is disabled. The control panel can always show/hide the overlay.
 - Bounds, appearance, visibility, and click-through are saved locally in `%APPDATA%/dev.veil.desktop/overlay.json`; they never enter the shared document. Removed monitors are handled by fitting saved bounds into an available work area.
 - Closing the control panel exits both windows and saves preferences.
+- **Settings → Exclude overlay from compatible captures** opts into best-effort Windows capture exclusion (Windows 10 version 2004 or later). The native status confirms the setting, not every recording/sharing tool. The control panel remains capturable. Use **Capture compatibility test** to compare a local test card in your actual output with exclusion off/on; see the [compatibility matrix and procedure](docs/capture-compatibility.md).
 
-The overlay has no formatting toolbar or remote cursor decorations. Turn off **Click-through** to edit; enable it to let clicks reach the app underneath. Before joining, it explains how to open the control panel. Capture exclusion remains M4. See [overlay architecture and verification](docs/overlay.md).
+The overlay has no formatting toolbar or remote cursor decorations. Turn off **Click-through** to edit; enable it to let clicks reach the app underneath. Before joining, it explains how to open the control panel. See [overlay architecture and verification](docs/overlay.md).
 
 The standalone M0 demo binds only **127.0.0.1:4444** and keeps its fixed development room and trusted-origin credential bootstrap. The embedded M2 host uses port **4445** by default, fresh sessions, and invitation authentication. Its router never exposes the M0 bootstrap.
 
@@ -120,4 +109,4 @@ Use `pnpm package:windows` to build the production NSIS installer and updater si
 - `packages/host`: reusable Axum/Tokio/Yrs host library and loopback-only M0 demo. Browser assets are compiled into the library after `pnpm build`. A bare Cargo build can compile without assets, but embedded hosting then reports an error until browser assets are built and Rust is rebuilt.
 - `docs`: architecture, security boundaries, networking, and test notes.
 
-See [architecture](docs/architecture.md) for the protocol decision and [testing](docs/testing.md) for verification. Durable documents, permissions, capture exclusion, different-network/relay acceptance and automatic signaling remain later work. M6 installers and signed updates are available for testing; clean-VM acceptance remains manual.
+See [architecture](docs/architecture.md) for the protocol decision and [testing](docs/testing.md) for verification. Durable documents and permissions remain later work; different-network/relay and broader capture-mode acceptance are still needed. M6 installers and signed updates are available for testing; clean-VM acceptance remains manual.

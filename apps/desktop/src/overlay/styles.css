@@ -13,22 +13,22 @@
   font-weight: 600;
 }
 .overlay-controls-status {
-  color: #707070;
+  color: var(--muted);
   font-size: 11px;
   margin-right: auto;
 }
 .overlay-controls .outline-button {
   padding: 7px 12px;
-  border: 1px solid #dedede;
+  border: 1px solid var(--border);
   border-radius: 5px;
-  background: #fff;
+  background: var(--surface);
 }
 .overlay-settings {
   margin-top: 16px;
   padding: 20px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--border);
   border-radius: 5px;
-  background: #fff;
+  background: var(--surface);
 }
 .overlay-settings-grid {
   display: grid;
@@ -43,13 +43,13 @@
   font-size: 12px;
 }
 .overlay-range output {
-  color: #707070;
+  color: var(--muted);
 }
 .overlay-range input {
   grid-column: 1 / -1;
   width: 100%;
   margin: 0;
-  accent-color: #292929;
+  accent-color: var(--text);
 }
 .overlay-check {
   display: flex;
@@ -59,7 +59,7 @@
   white-space: nowrap;
 }
 .overlay-check input {
-  accent-color: #292929;
+  accent-color: var(--text);
   width: auto;
   margin: 0;
   flex: 0 0 auto;
@@ -73,22 +73,61 @@
 .overlay-settings-actions span {
   margin-left: auto;
   font-size: 11px;
-  color: #707070;
+  color: var(--muted);
 }
 .overlay-help {
   font-size: 11px;
-  color: #707070;
+  color: var(--muted);
   line-height: 1.8;
   margin: 8px 0 0;
 }
 .overlay-help kbd {
   font: inherit;
-  color: #292929;
+  color: var(--text);
 }
 .overlay-error {
   font-size: 12px;
   color: #a44e40;
   line-height: 1.6;
+}
+.capture-settings {
+  border-top: 1px solid var(--border);
+  margin-top: 18px;
+  padding-top: 18px;
+}
+.capture-compatibility {
+  max-width: 720px;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.capture-compatibility h3 {
+  font-size: 13px;
+  margin: 0;
+}
+.capture-compatibility ol {
+  padding-left: 20px;
+}
+.capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.capture-test-card {
+  margin: 12px 20px;
+  padding: 24px;
+  border: 6px solid #174faf;
+  background: #fff36c;
+  color: #151515;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.capture-test-card strong {
+  font-size: 22px;
+}
+.capture-test-card span {
+  font-size: 12px;
 }
 html.overlay-mode,
 .overlay-mode body,
@@ -105,8 +144,8 @@ html.overlay-mode,
   height: 100%;
   border: 1px solid #e3e3e3;
   border-radius: 8px;
-  background: #fff;
-  color: #242424;
+  background: var(--surface);
+  color: var(--text);
   overflow: hidden;
 }
 .overlay-drag-handle {
@@ -124,13 +163,13 @@ html.overlay-mode,
 .overlay-preview-tag {
   font-size: 10px;
   font-weight: 400;
-  color: #707070;
+  color: var(--muted);
   margin-left: 6px;
 }
 .overlay-recovery-hint {
   font-size: 10px;
   font-weight: 400;
-  color: #707070;
+  color: var(--muted);
 }
 .overlay-document {
   flex: 1;
@@ -152,7 +191,7 @@ html.overlay-mode,
   font-size: 14px;
 }
 .overlay-empty p + p {
-  color: #707070;
+  color: var(--muted);
   font-size: 12px;
 }
 .overlay-surface.is-click-through .overlay-drag-handle {
@@ -227,4 +266,18 @@ html.overlay-mode,
   .overlay-settings-actions {
     flex-wrap: wrap;
   }
+}
+
+.overlay-surface {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+.overlay-drag-handle {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.overlay-document .document-editor {
+  min-height: 100%;
+  padding: 16px 24px 24px;
 }

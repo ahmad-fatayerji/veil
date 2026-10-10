@@ -4,7 +4,34 @@
 
 ## 1. Product vision
 
-### Approved architecture revision: desktop P2P (P1)
+### Approved experience revision: Create, Share, Join
+
+The current overhaul supersedes the P2 single-use invitation journey below. Opening Veil offers Create document, Join session, and Settings. Creating is offline and immediate; Share attaches networking to the existing Yjs document without replacing its identity, content, selection, or overlay bridge. Appearance (System/light/dark), hosting server/credential, overlay preferences, updates, and About live in Settings. Sharing resumes after missing hosting configuration is saved; failed activation retains the editable local document for retry. Local documents also block updater installation.
+
+Share issues one reusable `veil://join/...` version-4 link. Anyone holding it can explicitly join and edit while the host remains available. Stop/reset revoke new admissions only; admitted participants retain authenticated recovery and relay renewal. Ending the session disconnects everyone. Documents and invitation secrets remain temporary; no persistence, logo redesign, host migration, permission roles, or application participant cap is added.
+
+Guests enter their name and Join, with automatic direct-then-relay negotiation. People uses actual ICE statistics for Direct/Relayed/Connecting. Sharing-service availability is separate from document connectivity; technical details and manual Reconnect are expandable. Windows installation registers the URL scheme, single-instance delivery brings Veil forward, malformed links are rejected, and opening another invitation requires explicit leave confirmation when the current document contains content.
+
+Coordinated public server changes advertise `groupSharing: 1` and add authenticated link create/replace/revoke plus isolated participant tickets. The invitation pins a host ECDSA P-256 public key. Signed transcripts bind identities and ephemeral ECDH keys; each admitted host-guest link derives independent directional AES-GCM/replay state. The server receives neither document content nor invitation root secrets. Legacy invitations remain supported; unsupported servers require an upgrade rather than a single-use substitution. See [automatic networking](docs/automatic-networking.md) and the public server protocol for compatibility and security details.
+
+This work produces feature PRs into both repositories' `develop` branches. It does not authorize merging, deployment, version changes, installer publication, or release.
+
+### Approved architecture revision: self-hosted signaling and selective relay (P2)
+
+This revision supersedes the manual P1 flow and the historical LAN/browser journeys below. Current implementation work adds a public MIT `ahmad-fatayerji/veil-server` deployment while desktop source remains private. M6 release automation and signing remain unchanged; this task does not authorize a desktop version bump or release.
+
+- Users install only Veil. Operators configure Rust/Axum, coturn and Caddy through one Linux Compose stack with a public hostname. No default network service, cloud account, Tailscale or Cloudflare dependency. Hosts save an HTTPS origin and operator-issued individual credential in Windows Credential Manager. Guests paste a ten-minute, single-use `veil-invite:v2:` invitation.
+- Every host-guest link starts with direct/STUN candidates only, with no TURN grant or allocation. After six seconds from negotiation, or a definitive failure, that link requests temporary TURN credentials and retries for twenty seconds. Six users form five independent links: three friends may be direct and two relayed. The host forwards all relevant Yjs/presence changes down each affected relay link.
+- Negotiation generations cancel obsolete messages. Signaling uses invitation-derived HKDF-SHA-256 admission and directional AES-GCM keys; the server never receives the root secret or encryption keys. Authenticated signaling binds DTLS fingerprints and participant IDs. Domain separation, monotonically increasing sequences and unique sequence-derived nonces prevent replay/cross-session substitution.
+- Actual selected ICE candidate statistics determine Direct/Relayed/Checking. A temporary disconnection has a five-second grace period, then bounded retries with staged direct/relay recovery. Relay-to-direct handover occurs only after network change or explicit reconnect, with a five-minute cooldown; the old transport remains until replacement authentication and state-vector synchronization. Active relay credentials renew through authenticated replacement without restarting unrelated links.
+- Signaling and credential access use scoped native commands; frontend CSP permits no arbitrary remote WebSocket endpoint. Operator host hashes/config persist; registrations/invitations/ciphertext forwarding remain temporary. No documents persist on the server or desktop. Host migration, durable recovery and new permission roles remain out of scope. Healthy document transports survive signaling outages; server restart ends admission, with local content visible for copying.
+- Relay resource profile: 32 coturn allocations, four per credential, 256 KiB/s per allocation per direction, 8 MiB/s aggregate per direction. Stable logical grants and issuance/renewal rate limits bound per-host/participant/connection resource use. Private/loopback/link-local/multicast destinations are denied. Credential expiry does not instantly terminate existing allocations. Metrics require operator access and never contain document contents, decrypted signaling or secrets.
+- Batch incremental Yjs updates over 30 ms, awareness over 100 ms, enforce bounded transport queues, and use state-vector resynchronization. Capacity failure retains local edits and healthy direct links. No application-level participant cap is introduced.
+- Normal desktop UI offers Create session, Copy invitation, Join and Leave/End. Legacy manual/LAN browser infrastructure is available only to explicitly enabled debug regression runs. Preserve overlay behavior and native active-session updater guards.
+
+Deployment and protocol are documented in the public server repository. Private [automatic networking documentation](docs/automatic-networking.md) records state transitions, tests and remaining real-internet acceptance. Public server CI and required desktop connection regressions validate protocol compatibility. Local Windows/container automation is distinct from unrelated-network Windows acceptance; no universal connectivity claim is permitted.
+
+### Historical architecture revision: desktop P2P (P1)
 
 The user has advanced work to **M6** to distribute the P1 build for real P2P testing. Implement a per-user Windows x64 installer, signed updater, GitHub distribution, release automation and explicit update UI now. Earlier deferred milestones are not implicitly complete. Documents still live in memory, so updater installation must refuse while a document session or embedded host is active; never claim document recovery across updates. Verify local install/upgrade/preferences and report clean-VM and real internet tests separately. Windows Authenticode signing and updater signatures are distinct; do not imply that free updater signing removes SmartScreen warnings.
 
@@ -321,11 +348,13 @@ Yjs binary sync/awareness messages should use their established protocol and fra
 
 ### M4 — Windows capture compatibility
 
-- [ ] Implement Windows capture-exclusion adapter.
-- [ ] Surface supported/unsupported/error state in UI.
-- [ ] Build manual capture compatibility test procedure.
-- [ ] Verify overlay behavior with supported recording/sharing modes.
-- [ ] Document limitations and failure cases.
+- [x] Implement Windows capture-exclusion adapter.
+- [x] Surface supported/unsupported/error state in UI.
+- [x] Build manual capture compatibility test procedure.
+- [x] Verify overlay behavior with supported recording/sharing modes (local GDI, DXGI and OBS display capture; see the per-mode matrix for unverified tools).
+- [x] Document limitations and failure cases.
+
+M4 implementation and the per-mode acceptance matrix are documented in [capture compatibility](docs/capture-compatibility.md). A confirmed Windows display-affinity setting is separate from observing exclusion in a specific recorder or remote viewer.
 
 **Done when:** behavior is verified for a documented test matrix; no universal guarantee is claimed.
 

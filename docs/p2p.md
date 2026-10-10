@@ -1,3 +1,5 @@
+> Historical development documentation. Normal desktop networking now uses [automatic signaling and selective relay](automatic-networking.md). Legacy modes are debug regression tools only.
+
 # Desktop peer connections (P1)
 
 The default desktop mode uses WebRTC data channels, not the embedded HTTP service. All participants install the desktop application. One peer coordinates the document and forwards changes to its connected friends; this is a star, not a mesh. The host must stay running. Yjs state-vector synchronization, live incremental updates and awareness use the same editor and native overlay bridge as LAN mode. Participant count defaults to no application-level cap.

@@ -1,3 +1,5 @@
+> Historical development documentation. Normal desktop networking now uses [automatic signaling and selective relay](automatic-networking.md). Legacy modes are debug regression tools only.
+
 # M2 networking
 
 Desktop P2P is now the primary mode; see [P1 networking](p2p.md). The remainder describes the separately retained **LAN / browser** mode, whose listener restrictions remain unchanged.

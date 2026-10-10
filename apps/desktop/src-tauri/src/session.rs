@@ -37,3 +37,27 @@ pub async fn document_relay(
     app.emit_to(target, "desktop-document", message)
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn document_open(app: AppHandle, caller: WebviewWindow) -> Result<(), String> {
+    if caller.label() != "main" {
+        return Err("Only the control panel can create documents.".into());
+    }
+    let updates = app.state::<crate::updates::Updates>();
+    let mut gate = updates.gate.lock().await;
+    gate.allow_session()?;
+    gate.document_active = true;
+    Ok(())
+}
+#[tauri::command]
+pub async fn document_closed(app: AppHandle, caller: WebviewWindow) -> Result<(), String> {
+    if caller.label() != "main" {
+        return Err("Only the control panel can close documents.".into());
+    }
+    app.state::<crate::updates::Updates>()
+        .gate
+        .lock()
+        .await
+        .document_active = false;
+    Ok(())
+}

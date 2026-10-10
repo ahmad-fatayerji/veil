@@ -122,3 +122,4 @@ export function readParticipants(connection: DemoConnection): Participant[] {
     }))
     .sort((a, b) => Number(b.local) - Number(a.local) || a.id - b.id);
 }
+export * from './automatic';

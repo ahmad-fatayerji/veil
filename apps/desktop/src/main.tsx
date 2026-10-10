@@ -3,8 +3,10 @@ import { createRoot } from 'react-dom/client';
 import '@veil/ui/styles.css';
 import { OverlayWindow } from './overlay/OverlayWindow';
 import './overlay/styles.css';
+import { applyAppearance } from '@veil/ui';
 import { DesktopApp } from './DesktopApp';
 
+applyAppearance();
 const isOverlay = new URLSearchParams(window.location.search).has('overlay');
 if (isOverlay) document.documentElement.classList.add('overlay-mode');
 

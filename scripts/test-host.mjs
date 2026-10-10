@@ -46,6 +46,7 @@ try {
     stdio: ['ignore', 'ignore', 'pipe'],
     env: {
       ...process.env,
+      VEIL_TEST_LEGACY: '1',
       VEIL_TEST_SETTINGS_DIR: directory,
       WEBVIEW2_USER_DATA_FOLDER: resolve(directory, 'webview'),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:
@@ -170,6 +171,10 @@ try {
     'Unauthenticated WebSockets rejected.',
   );
   await second.getByRole('button', { name: 'Leave session' }).click();
+  await second
+    .getByRole('dialog', { name: 'Leave session?' })
+    .getByRole('button', { name: 'Leave session', exact: true })
+    .click();
   await waitFor(
     async () =>
       (await main.getByRole('list', { name: 'Participants' }).getByRole('listitem').count()) === 2,

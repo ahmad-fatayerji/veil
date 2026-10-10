@@ -1,6 +1,6 @@
 [package]
 name = "veil-desktop"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [features]
@@ -17,8 +17,19 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tempfile = "3"
 veil-host = { path = "../../../packages/host" }
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["sync", "time", "macros"] }
 tauri-plugin-updater = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+reqwest = { version = "0.13", default-features = false, features = ["stream", "json", "rustls-no-provider"] }
+base64 = "0.22"
+minisign-verify = "0.2.5"
+semver = "1"
+httpdate = "1"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+keyring = { version = "4.2", features = ["v1"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Dwm", "Win32_System_SystemInformation", "Wdk_System_SystemServices"] }

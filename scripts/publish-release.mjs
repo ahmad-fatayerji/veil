@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import semver from 'semver';
 import { assertPublication, shouldAdvanceFeed } from './release-lib.mjs';
 import { readJson, verifyVersions } from './release-files.mjs';
+import { findReleaseByTag } from './github-release.mjs';
 import {
   assertPublishedIdentity,
   assertReleaseManifest,
@@ -50,7 +51,13 @@ if (!semver.prerelease(version)) {
     throw new Error('Stable merge did not introduce a new release.');
 }
 if (!existsSync(`docs/releases/${version}.md`)) throw new Error('Missing reviewed release notes.');
-const existing = optionalApi(`repos/${repo}/releases/tags/${tag}`);
+const findRelease = () =>
+  findReleaseByTag(
+    tag,
+    () => optionalApi(`repos/${repo}/releases/tags/${tag}`),
+    () => api(`repos/${repo}/releases?per_page=100`, '--paginate', '--slurp'),
+  );
+const existing = findRelease();
 if (existing && !existing.draft) {
   const directory = mkdtempSync(join(tmpdir(), 'veil-published-'));
   gh(
@@ -134,6 +141,8 @@ if (process.argv[2] === 'preflight') {
         '--notes-file',
         notes,
       );
+    const draft = findRelease();
+    if (!draft?.draft) throw new Error('Asset upload requires an unpublished release draft.');
     // Replacing assets is allowed only while this version remains an unpublished draft.
     gh(
       'release',
@@ -144,7 +153,9 @@ if (process.argv[2] === 'preflight') {
       '--clobber',
       ...expected.map((name) => `${directory}/${name}`),
     );
-    const uploaded = api(`repos/${repo}/releases/tags/${tag}`);
+    const uploaded = api(`repos/${repo}/releases/${draft.id}`);
+    if (!uploaded.draft)
+      throw new Error('Release was published before draft verification finished.');
     assertUploadedAssets(expected, uploaded.assets, (name) => readFileSync(`${directory}/${name}`));
     // Download the uploaded assets and verify exact bytes before making the release discoverable.
     const downloaded = mkdtempSync(join(tmpdir(), 'veil-upload-'));

@@ -6,22 +6,22 @@ This is an experimental build. The installer does not have a Windows publisher c
 
 ## Connect with a friend
 
-Both people install the same version:
+For builds with automatic networking, both people install the same version. The existing stable 0.2.0 installer still uses the older manual flow until a new release is explicitly published.
 
-1. Host enters a name and clicks **Start peer session**, then **Generate invitation**.
-2. Send that code privately to the friend. The friend enters a name, pastes it into **Host invitation**, then clicks **Create response**.
-3. Friend sends the response back. Host pastes it and clicks **Connect friend**.
-4. Wait for **Connected**. Type in both editors and confirm edits appear for the other person. Test **Show overlay** on either PC and edit through it too.
-5. Generate a separate invitation for each additional friend. Codes expire in ten minutes. Don't post codes publicly or attach them to bug reports.
+1. Choose **Create document** and start writing, including offline. Your name is optional until joining someone else.
+2. The server operator gives the host an HTTPS address and individual host access credential. Save these under **Settings > Hosting server**, or choose **Share** to open missing setup and resume sharing after saving. Reusable sharing requires a compatible server advertising `groupSharing: 1`.
+3. Choose **Share > Copy link** and send the same link to friends. They open or paste it, enter their name, and choose **Join session**. No guest server configuration or account is needed. Opening a link never joins automatically or silently replaces another document.
+4. Confirm **Connected**, then open **People** for measured **Direct** or **Relayed** paths. Type in both editors and through **Show overlay**. Technical information and manual Reconnect are in Connection details.
+5. **Reset link** invalidates the old link; **Stop sharing** prevents new admissions. Existing people stay connected. Links last until sharing stops or the host session ends. Never include them in public reports. Legacy single-use invitations remain supported when pasted into Join.
 
-Empty network options uses no external discovery/relay service, but private addresses alone usually cannot connect different NAT networks. If connection fails, report it; host can configure their own STUN/TURN and friends configure their own settings before joining. See [networking notes](https://github.com/ahmad-fatayerji/veil). This build does not provide a default relay or guarantee internet connectivity.
+Every connection tries direct/STUN first, then independently uses the operator's TURN relay if needed. No default relay provider or universal connectivity guarantee is included. The host must remain open. See the operator's [deployment instructions](https://github.com/ahmad-fatayerji/veil-server).
 
 ## Updates and known limits
 
-Open **App updates** and click **Check for updates**. Checks contact GitHub only when requested. If an update is available, first copy any text you want to keep and end/leave the session. Choose **Install update and restart**. The package signature is verified and local overlay settings are saved. Updates cannot install during an open session. You can also download and run the next installer manually.
+Open **Settings > Updates** and click **Check for updates**. Checks contact GitHub only when requested. If an update is available, first copy any text you want to keep and close/leave the document. Choose **Install update and restart**. The package signature is verified and local overlay settings are saved. Updates cannot install during an open local or shared document. You can also download and run the next installer manually.
 
-Documents are temporary: ending/leaving/closing loses the local document. There are no read-only roles or capture-exclusion guarantees. The coordinating host must remain open. Reconnecting requires a fresh invitation/response exchange; keep the guest session open to retain unsent edits. Updates do not add persistence.
+Documents are temporary: ending/leaving/closing loses the local document, with confirmation when it contains content. There are no read-only roles or universal capture-exclusion guarantees. The coordinating host must remain open. Automatic recovery retains unsent edits while the same document stays open; signaling outages do not disconnect healthy peers. Server restart loses session registrations. Updates do not add persistence. Appearance, overlay preferences, capture compatibility controls, and About are in Settings.
 
 ## Useful test report
 
-Send the app version shown under **App updates**, both Windows versions, whether PCs are on the same or different networks, whether a VPN is active, configured STUN/TURN type (omit credentials), the displayed direct/relay path, the exact error, and steps to reproduce. Test bidirectional typing, simultaneous edits, pause/reconnect, third-person joining, leaving, overlays and restart preferences. Redact invitations, response codes, credentials and private document text from screenshots.
+Send the app version shown under **Settings > About**, both Windows versions, whether PCs are on the same or different networks, whether a VPN is active, the displayed direct/relay path, the exact error, and steps to reproduce. Test offline creation, sharing existing edits, simultaneous joins/edits, reset/stop, reconnect, leaving, overlays, both themes, URL activation, and restart preferences. Redact invitations, response codes, credentials and private document text from screenshots.
