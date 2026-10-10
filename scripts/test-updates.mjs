@@ -121,7 +121,16 @@ async function launch() {
   await waitFor(() => pages().some((page) => !page.url().includes('?overlay')));
   const page = pages().find((item) => !item.url().includes('?overlay'));
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.locator('summary').filter({ hasText: 'App updates' }).click();
+  await page.locator('.desktop-updates summary').waitFor();
+  if (await page.locator('.desktop-updates summary').isVisible()) {
+    await page.locator('.desktop-updates summary').click();
+  } else {
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('button', { name: 'Updates', exact: true })
+      .click();
+  }
   await page.getByLabel('Update channel').waitFor();
   await waitFor(() => page.getByLabel('Update channel').isEnabled());
   return page;

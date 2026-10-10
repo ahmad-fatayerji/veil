@@ -15,7 +15,13 @@ interface UpdateInfo {
   completion: { success: boolean; message: string } | null;
 }
 
-export function Updates({ onBusy }: { onBusy: (busy: boolean) => void }) {
+export function Updates({
+  onBusy,
+  settingsView = false,
+}: {
+  onBusy: (busy: boolean) => void;
+  settingsView?: boolean;
+}) {
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [pending, setPending] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -117,7 +123,7 @@ export function Updates({ onBusy }: { onBusy: (busy: boolean) => void }) {
           </button>
         </div>
       )}
-      <details>
+      <details open={settingsView || undefined}>
         <summary>App updates {info && `· ${info.currentVersion}`}</summary>
         <p>Updates are downloaded over HTTPS and signature-verified before installation.</p>
         <label>

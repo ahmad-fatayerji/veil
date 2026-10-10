@@ -207,13 +207,14 @@ try {
       true,
     );
   }, server);
+  const sharedLink = await host.evaluate(() => window.active.enableSharing());
   for (let index = 1; index <= 5; index++) {
     const page = await participant(index);
-    const invitation = await host.evaluate(() => window.active.createInvitation());
+    const invitation = sharedLink;
     const started = Date.now();
     await page.evaluate(
       async ({ invitation, index }) => {
-        window.active = await window.automatic.joinAutomatic(
+        window.active = await window.automatic.joinShareLink(
           invitation,
           `Friend ${index}`,
           window.transport,
@@ -236,6 +237,64 @@ try {
         'fallback waits six seconds without definite failure',
       );
   }
+  const newcomer = await participant(-1);
+  await host.evaluate(() => window.active.stopSharing());
+  assert.equal(
+    await newcomer.evaluate(async (invitation) => {
+      try {
+        await window.automatic.joinShareLink(
+          invitation,
+          'Blocked',
+          window.transport,
+          window.notice,
+          true,
+        );
+        return false;
+      } catch {
+        return true;
+      }
+    }, sharedLink),
+    true,
+    'stopped link rejects admission',
+  );
+  const resetLink = await host.evaluate(() => window.active.enableSharing(true));
+  assert.notEqual(resetLink, sharedLink);
+  assert.equal(
+    await newcomer.evaluate(async (invitation) => {
+      try {
+        await window.automatic.joinShareLink(
+          invitation,
+          'Old link',
+          window.transport,
+          window.notice,
+          true,
+        );
+        return false;
+      } catch {
+        return true;
+      }
+    }, sharedLink),
+    true,
+    'reset link rejects previous capability',
+  );
+  await newcomer.evaluate(async (invitation) => {
+    window.active = await window.automatic.joinShareLink(
+      invitation,
+      'New link',
+      window.transport,
+      window.notice,
+      true,
+    );
+  }, resetLink);
+  await waitFor(
+    () => newcomer.evaluate(() => window.active.session.provider.synced),
+    'new sharing link admits guest',
+  );
+  await newcomer.evaluate(() => window.active.close());
+  pages.pop();
+  console.log(
+    'PASS: reusable link admits five guests; stop/reset protect new admission and keep existing links.',
+  );
   await waitFor(
     () =>
       host.evaluate(() => {

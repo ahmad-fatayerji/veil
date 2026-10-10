@@ -171,7 +171,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: ahmad-fatayerji/veil-server
-          ref: 851c5492913ca3e9e689e8bdeea525c7b814ae77
+          ref: 0441fb8ea2d8ef48376d232877fd774355110e2c
           path: target/server-source
       - uses: dtolnay/rust-toolchain@1.99.0
       - uses: Swatinem/rust-cache@v2

@@ -92,3 +92,5 @@ export function validateBootstrap(value: unknown): Bootstrap {
   return data as unknown as Bootstrap;
 }
 export * from './signaling';
+
+export * from './sharing';

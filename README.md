@@ -20,13 +20,14 @@ pnpm dev:desktop
 The desktop uses automatic P2P with self-hosted signaling and selective relay:
 
 1. An operator deploys [veil-server](https://github.com/ahmad-fatayerji/veil-server). The host enters the HTTPS server address and operator-issued credential once.
-2. Enter your name and choose **Create session**, then **Create invitation** and **Copy invitation**.
-3. Your friend installs Veil, enters their name, pastes the invitation and chooses **Join**. They need no server setup or account.
-4. Make a fresh invitation for each friend. Edit together and open your local overlays. The host must stay open.
+2. Choose **Create document** to start writing immediately, including offline. Configure the hosting server and credential in **Settings > Hosting server** whenever you need sharing.
+3. Choose **Share > Copy link**. Missing setup opens Settings and resumes sharing after saving. The same reusable link admits multiple friends.
+4. Your friend installs Veil, opens or pastes the link, enters their name, and chooses **Join session**. Direct and relay connections are automatic; no guest server setup is needed.
+5. **Reset link** invalidates the old link; **Stop sharing** prevents new joins. Both retain existing collaborators. The host must stay open. Appearance, overlay, updates, and About are in Settings.
 
 Every connection tries direct/STUN first for six seconds, then requests TURN only if needed. A six-user session may have three direct friends and two relayed friends; healthy links remain independent. The displayed Direct/Relayed path comes from WebRTC statistics. No default third-party service or application participant cap is configured.
 
-Invitations are single-use and expire after ten minutes. **Leave/End discards the in-memory document.** Signaling outages keep healthy peer links running; local content remains visible if server registration ends. See [automatic networking](docs/automatic-networking.md) for security, deployment, recovery and validation boundaries. Existing manual/LAN infrastructure is debug regression tooling only; never expose its HTTP listener publicly.
+Links last until sharing stops or the host session ends. **Closing/leaving discards the temporary document**, with confirmation for content. Reusable links require a server advertising `groupSharing: 1`; older single-use invitations can still be pasted into Join. Signaling outages keep healthy peer links running; local content remains visible if server registration ends. See [automatic networking](docs/automatic-networking.md) for security, deployment, recovery and validation boundaries. Existing manual/LAN infrastructure is debug regression tooling only; never expose its HTTP listener publicly.
 
 ## Run the local development spike
 
@@ -45,7 +46,7 @@ pnpm dev:web
 
 Open **http://127.0.0.1:5173** in two browser windows. Enter different names and click **Join local session** in both. Write in either editor; both receive changes. Each collaborator has a named cursor and colored text selection. The People panel shows who is typing, selecting text, in the document, or away. **Disconnect** pauses one replica; edit both independently, then **Reconnect** to merge missing updates. Browser BroadcastChannel synchronization is disabled, so all remote changes travel through the Rust host.
 
-Click **Roadmap** in the top bar to see what is built and what remains. See the [development roadmap](docs/roadmap.md) for the same milestone overview.
+Open **Settings > About > Development roadmap** to see what is built and what remains. See the [development roadmap](docs/roadmap.md) for the same milestone overview.
 
 In a third terminal, optionally run the native shell:
 

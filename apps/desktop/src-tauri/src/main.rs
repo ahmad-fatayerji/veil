@@ -9,7 +9,23 @@ use tauri::Manager;
 
 fn main() {
     let _ = rustls::crypto::ring::default_provider().install_default();
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    // Acceptance runs intentionally use independent app profiles. Production is
+    // one instance, so invitations cannot silently create a second document.
+    if !(cfg!(debug_assertions)
+        && std::env::var_os("VEIL_TEST_SETTINGS_DIR").is_some()
+        && std::env::var_os("VEIL_TEST_SINGLE_INSTANCE").is_none())
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }));
+    }
+    builder
+        .plugin(tauri_plugin_deep_link::init())
         .manage(hosting::Hosting::default())
         .manage(networking::Networking::default())
         .manage(updates::Updates::default())
@@ -29,6 +45,8 @@ fn main() {
             overlay::overlay_reset_position,
             overlay::overlay_gesture,
             session::document_relay,
+            session::document_open,
+            session::document_closed,
             hosting::host_start,
             hosting::host_stop,
             hosting::host_status,

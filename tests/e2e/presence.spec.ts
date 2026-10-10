@@ -46,6 +46,10 @@ test('remote cursors, selections, and activity follow their author and clear on 
     await secondEditor.press('ArrowRight');
     await expect(a.locator('.collaboration-selection[data-selection-user="Sam"]')).toHaveCount(0);
     await b.getByRole('button', { name: 'Leave session' }).click();
+    await b
+      .getByRole('dialog', { name: 'Leave session?' })
+      .getByRole('button', { name: 'Leave session', exact: true })
+      .click();
     await expect(sam).toHaveCount(0);
     await expect(caret).toHaveCount(0);
     await expect(b.getByRole('status')).toHaveText('Not connected');
@@ -60,6 +64,7 @@ test('roadmap states the built editor and overlay, built hosting, and remaining 
   page,
 }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Roadmap' }).click();
   const dialog = page.getByRole('dialog', { name: "What's left to build" });
   await expect(dialog).toBeVisible();
@@ -77,7 +82,8 @@ test('roadmap states the built editor and overlay, built hosting, and remaining 
   await page.screenshot({ path: test.info().outputPath('roadmap.png'), fullPage: true });
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Roadmap' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Roadmap', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: test.info().outputPath('mobile-join.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(

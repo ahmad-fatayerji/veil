@@ -85,6 +85,10 @@ async function launch() {
   const main = pages.find((page) => !page.url().includes('?overlay'));
   const overlay = pages.find((page) => page.url().includes('?overlay'));
   await main.getByRole('button', { name: 'Settings', exact: true }).click();
+  await main
+    .getByRole('navigation', { name: 'Settings sections' })
+    .getByRole('button', { name: 'Overlay', exact: true })
+    .click();
   return { main, overlay };
 }
 async function command(page, name, args) {

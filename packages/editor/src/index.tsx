@@ -126,7 +126,12 @@ export function SharedEditor({
   return (
     <>
       {!compact && (
-        <div className="editor-toolbar" role="toolbar" aria-label="Document formatting">
+        <div
+          className="editor-toolbar"
+          role="toolbar"
+          aria-label="Document formatting"
+          onMouseDown={(event) => event.preventDefault()}
+        >
           <button
             type="button"
             aria-label="Bold"

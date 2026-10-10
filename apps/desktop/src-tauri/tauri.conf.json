@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Veil · Collaboration lab",
+        "title": "Veil",
         "width": 1180,
         "height": 860,
         "minWidth": 480,
@@ -49,6 +49,11 @@
       "endpoints": ["https://github.com/ahmad-fatayerji/veil/releases/latest/download/latest.json"],
       "windows": {
         "installMode": "passive"
+      }
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["veil"]
       }
     }
   }

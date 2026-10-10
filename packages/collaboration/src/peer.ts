@@ -29,6 +29,7 @@ const randomHex = (bytes: number) =>
 
 export interface PeerSummary {
   id: string;
+  clientId?: number;
   name: string;
   state: 'waiting' | 'connecting' | 'connected';
   path: 'direct' | 'relay' | 'checking';
@@ -138,6 +139,7 @@ export class PeerProvider extends ObservableV2<{
   summaries(): PeerSummary[] {
     return [...this.peers.values()].map((peer) => ({
       id: peer.id,
+      clientId: peer.clientId,
       name:
         peer.clientId === undefined
           ? 'New participant'

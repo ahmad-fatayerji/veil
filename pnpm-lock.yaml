@@ -65,6 +65,9 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.12.2
         version: 2.12.2
+      '@tauri-apps/plugin-deep-link':
+        specifier: ^2.6.1
+        version: 2.6.1
       '@veil/collaboration':
         specifier: workspace:*
         version: link:../../packages/collaboration
@@ -771,6 +774,9 @@ packages:
     resolution: {integrity: sha512-kEDEiGzG+yAc5FeLxtXpES/VN+F2C8H0r4gDVtfRLKxT9np9101d9REG/Kgo2lr0hKi0IpDsODiHnU3+naOmLg==}
     engines: {node: '>= 10'}
     hasBin: true
+
+  '@tauri-apps/plugin-deep-link@2.6.1':
+    resolution: {integrity: sha512-yomIOIoiiDwXW3Bgy/V5c4frWo9sfWM9WZQew2s7vr7hXtDdbLDCLzvytIMCjMxbnln9O0oJsTI3XdDd2T9XlA==}
 
   '@tiptap/core@3.31.4':
     resolution: {integrity: sha512-cIVUQYBycighzsk6GbmCef8ZiEDVxoT5EuAe4xg2q9dNkDqCXVqI4YGr9aavCQEiAS4uHiRwqvcsPqJHipFDfg==}
@@ -2182,6 +2188,10 @@ snapshots:
       '@tauri-apps/cli-win32-arm64-msvc': 2.12.1
       '@tauri-apps/cli-win32-ia32-msvc': 2.12.1
       '@tauri-apps/cli-win32-x64-msvc': 2.12.1
+
+  '@tauri-apps/plugin-deep-link@2.6.1':
+    dependencies:
+      '@tauri-apps/api': 2.12.2
 
   '@tiptap/core@3.31.4(@tiptap/pm@3.31.4)':
     dependencies:

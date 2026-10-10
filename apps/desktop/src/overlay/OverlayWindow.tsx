@@ -1,4 +1,5 @@
 import { invoke, useOverlay, errorMessage } from './api';
+import { useAppearance } from '@veil/ui';
 import { SharedEditor } from '@veil/editor';
 import { useOverlayDocument } from './session';
 
@@ -14,6 +15,7 @@ const directions = [
 ] as const;
 
 export function OverlayWindow() {
+  useAppearance();
   const { state, error, setError } = useOverlay();
   const document = useOverlayDocument();
   const gesture = (direction: string | null) => {
@@ -59,7 +61,7 @@ export function OverlayWindow() {
           ) : (
             <div className="overlay-empty">
               <p>Join the document to start writing.</p>
-              <p>Open the control panel with Ctrl+Alt+V and join a local session.</p>
+              <p>Open the control panel with Ctrl+Alt+V to create a document or join a session.</p>
             </div>
           )}
         </div>

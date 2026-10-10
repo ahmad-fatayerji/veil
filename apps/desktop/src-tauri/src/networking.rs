@@ -58,6 +58,7 @@ fn path_allowed(path: &str, method: &str) -> bool {
         ("GET", "/v2/capabilities")
             | ("POST", "/v2/sessions")
             | ("POST", "/v2/join")
+            | ("POST", "/v3/join")
             | ("POST", "/v2/relay")
             | ("POST", "/v2/path")
             | ("POST", "/v2/leave")
@@ -65,11 +66,17 @@ fn path_allowed(path: &str, method: &str) -> bool {
         return true;
     }
     let pieces: Vec<_> = path.split('/').collect();
-    (pieces.len() == 4
-        && pieces[1] == "v2"
+    (pieces.len() == 5
+        && pieces[1] == "v3"
         && pieces[2] == "sessions"
         && identity(pieces[3])
-        && method == "DELETE")
+        && pieces[4] == "sharing"
+        && matches!(method, "POST" | "DELETE"))
+        || (pieces.len() == 4
+            && pieces[1] == "v2"
+            && pieces[2] == "sessions"
+            && identity(pieces[3])
+            && method == "DELETE")
         || (pieces.len() == 5
             && pieces[1] == "v2"
             && pieces[2] == "sessions"
