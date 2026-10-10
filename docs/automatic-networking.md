@@ -3,14 +3,25 @@
 The approved P2 flow replaces manual offer/answer and LAN/browser choices in the
 normal desktop app. Install Veil on each Windows PC. An operator deploys
 [veil-server](https://github.com/ahmad-fatayerji/veil-server), gives the host an HTTPS
-address and an individual host credential. Enter these once in Hosting server.
+address and an individual host credential. Enter these once in Settings > Hosting server.
 The credential stays in Windows Credential Manager, scoped to the canonical server
 origin; the server address is saved separately. There is no bundled default server.
 
-Enter your name and Create session. Create invitation and Copy invitation for one
-friend. They enter their name, paste it into Invitation and Join. Repeat with a
-fresh invitation for every friend. Invitations expire in ten minutes and are
-single-use. Older `veil-p2p:v1:` codes are incompatible. Forget saved host credential
+Create document opens a local editor before any server request. Share attaches to
+that same document and uses saved configuration. Missing setup opens Hosting
+settings and resumes after saving. Setup/activation failure leaves edits available
+for retry. Copy link shares one reusable `veil://join/...` version-4 invitation;
+friends open or paste it, enter their name, and explicitly Join session. The Windows
+installer registers `veil`, and Tauri deep-link/single-instance integration delivers
+links to the running main window. Opening another invitation requires leaving the
+current document; content receives confirmation and Cancel preserves it.
+
+Reset link replaces the admission credential; Stop sharing revokes admission.
+Existing guests retain their tickets, recovery, and relay renewal. Links last until
+sharing stops or the host session ends. A server must advertise `groupSharing: 1`;
+otherwise Share explains the upgrade requirement without issuing single-use links.
+Pasted legacy `veil-invite:v2:` codes remain supported with their original ten-minute,
+single-use semantics. Older `veil-p2p:v1:` codes are incompatible. Forget saved host credential
 removes it locally; operators revoke server authorization separately.
 
 ## Per-connection state machine
@@ -47,6 +58,22 @@ secret. Fingerprints/participant IDs are checked before document traffic. An
 operator can observe metadata and deny service but cannot silently replace a peer.
 Keep invitations private; holders can edit. No additional permission roles exist.
 
+Reusable admission uses distinct guest tickets and link IDs. Each guest creates an
+ephemeral P-256 ECDH exchange key. The host signs a canonical transcript containing
+the session/group/link IDs, both Yjs identities, and both exchange keys using the
+ECDSA P-256 identity pinned in the link. Guests verify this signature before accepting
+host signaling. HKDF-SHA-256 binds the ECDH secret, transcript, and invitation root;
+the resulting per-link secret feeds independent directional AES-GCM keys/counters.
+The shared invitation root protects bootstrap messages only, never established
+guest signaling. Reset/stop do not erase existing authenticated link state. Secrets
+stay in memory and are omitted from logs/preferences and masked in test screenshots.
+
+Deploy the compatible server before making the new desktop build available. The
+coordinated server implementation is [server PR #3](https://github.com/ahmad-fatayerji/veil-server/pull/3),
+commit `0441fb8ea2d8ef48376d232877fd774355110e2c`; desktop network CI pins that source.
+The new server retains v2 routes and legacy clients. The old server cannot admit
+version-4 group links. No deployment or release is performed by this overhaul.
+
 Native Rust commands alone perform bounded HTTPS/WSS and scoped credential access.
 The frontend CSP remains restrictive. Incremental Yjs changes batch for 30 ms;
 awareness batches for 100 ms. Transport messages are bounded to 4 MiB and queues
@@ -79,14 +106,24 @@ pnpm test:network
 Remove-Item Env:VEIL_TURN_TRANSPORT
 # After Cargo tests, rebuild the native executable before acceptance.
 pnpm --filter @veil/desktop exec -- tauri build --debug --no-bundle
-node scripts/test-network-native.mjs
+pnpm test:sharing
 ```
 
 `VEIL_SERVER_SOURCE` can point to another server checkout. CI pins its exact server
 commit. Test fixtures allow loopback TURN peers and plaintext loopback signaling;
 these settings must never be used in deployment. Debug-only `VEIL_TEST_LEGACY=1`
 retains the previous manual/LAN UI for existing native regressions. Release builds
-ignore that variable. Normal Create/Join always uses the automatic flow.
+ignore that variable. Normal Create is local; Share/Join use automatic networking.
+
+For installed URL acceptance without replacing an existing Veil installation,
+build a temporary debug NSIS bundle with a config override setting productName
+`Veil UX acceptance`, identifier `dev.veil.uxacceptance`, and
+`bundle.createUpdaterArtifacts: false`. Run `node scripts/test-deep-links.mjs <installer>`.
+It refuses an existing `veil` registration, installs into a temporary directory,
+checks cold/warm Windows URL activation and document protection, then uninstalls.
+`VEIL_TEST_SINGLE_INSTANCE=1` enables single-instance behavior in isolated debug
+profiles; ordinary multi-instance acceptance disables it only in debug builds.
+Rebuild the normal native executable after the config-override build.
 
 Real internet acceptance still requires separate Windows PCs on unrelated networks,
 valid HTTPS, direct ICE, TURN UDP/TCP and optional TURN TLS. Record selected paths,

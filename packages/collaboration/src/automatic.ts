@@ -11,6 +11,18 @@ import {
   type ServerInvitation,
   type SignalEnvelope,
   type PeerCode,
+  createShareIdentity,
+  createExchange,
+  decodeShareLink,
+  encodeShareLink,
+  linkInvitation,
+  shareAdmission,
+  signHandshake,
+  verifyHandshake,
+  establishLink,
+  newShareId,
+  type ShareInvitation,
+  type ShareHandshake,
 } from '@veil/protocol';
 import { createPeerSession, type PeerSession, type AutomaticCallbacks } from './peer';
 
@@ -49,6 +61,14 @@ interface Link {
   timer?: ReturnType<typeof setTimeout>;
   refresh?: ReturnType<typeof setTimeout>;
   candidates: RTCIceCandidateInit[];
+}
+interface GroupBootstrap {
+  group: ShareInvitation;
+  cipher: SignalCipher;
+  exchange: Awaited<ReturnType<typeof createExchange>>;
+  remoteId: number;
+  handshake?: ShareHandshake;
+  signature?: string;
 }
 interface Signal {
   kind: 'offer' | 'answer' | 'candidate' | 'request' | 'cancel';
@@ -101,6 +121,19 @@ function validateSdp(sdp: unknown): string {
 export class AutomaticSession {
   readonly session: PeerSession;
   private links = new Map<string, Link>();
+  private groups = new Map<string, { invite: ShareInvitation; signingKey: CryptoKey }>();
+  private bootstraps = new Map<string, GroupBootstrap>();
+  private sharingLink = '';
+  private groupGuestId?: string;
+  get sharedLink() {
+    return this.sharingLink;
+  }
+  get serviceOnline() {
+    return this.socketOnline && !this.ended;
+  }
+  get sessionEnded() {
+    return this.ended;
+  }
   private ticket = '';
   private sessionId = '';
   private discovery: RTCIceServer[] = [];
@@ -119,8 +152,9 @@ export class AutomaticSession {
     name: string,
     private transport: SignalingTransport,
     private notice: (message: string) => void,
+    existingSession?: PeerSession,
   ) {
-    this.session = createPeerSession(role, name);
+    this.session = existingSession ?? createPeerSession(role, name);
     this.connectivity = (navigator as Navigator & { connection?: EventTarget }).connection;
     this.connectivity?.addEventListener('change', this.networkChanged);
     window.addEventListener('online', this.networkChanged);
@@ -205,6 +239,160 @@ export class AutomaticSession {
       if (link.remoteId === undefined && link.invite.expiresAt < Date.now()) this.links.delete(id);
     return encodeServerInvitation(invite);
   }
+  async enableSharing(reset = false): Promise<string> {
+    if (this.role !== 'host' || this.stopped || this.ended)
+      throw new Error('Only an active host can share.');
+    if (this.sharingLink && !reset) return this.sharingLink;
+    const capabilities = await this.request('/v2/capabilities', {}, 'GET');
+    if (capabilities.groupSharing !== 1)
+      throw new Error(
+        'This server needs an update to support reusable sharing links. Update the server, then retry.',
+      );
+    const signing = await createShareIdentity();
+    const invite: ShareInvitation = {
+      version: 4,
+      server: this.server,
+      sessionId: this.sessionId,
+      groupId: newShareId(),
+      secret: randomSecret(),
+      hostClientId: this.session.doc.clientID,
+      hostPublic: signing.publicKey,
+    };
+    // Store before registration so an immediately admitted guest finds its key.
+    this.groups.set(invite.groupId, { invite, signingKey: signing.privateKey });
+    try {
+      await this.request(`/v3/sessions/${this.sessionId}/sharing`, {
+        groupId: invite.groupId,
+        admissionHash: await sha256(await shareAdmission(invite)),
+      });
+    } catch (error) {
+      this.groups.delete(invite.groupId);
+      throw error;
+    }
+    this.sharingLink = encodeShareLink(invite);
+    return this.sharingLink;
+  }
+  async stopSharing() {
+    await this.request(`/v3/sessions/${this.sessionId}/sharing`, {}, 'DELETE');
+    this.sharingLink = '';
+  }
+  async startGroupGuest(group: ShareInvitation) {
+    const inviteId = newShareId();
+    const exchange = await createExchange();
+    const data = await this.request('/v3/join', {
+      sessionId: group.sessionId,
+      groupId: group.groupId,
+      admission: await shareAdmission(group),
+      inviteId,
+      clientId: this.session.doc.clientID,
+      guestPublic: exchange.publicKey,
+    });
+    if (data.hostClientId !== group.hostClientId)
+      throw new Error('Server substituted the invited host identity.');
+    this.ticket = token(data.ticket);
+    this.sessionId = group.sessionId;
+    this.session.provider.sessionId = this.sessionId;
+    this.discovery = stunServers(data.stunUrls);
+    const invite = linkInvitation(group, inviteId);
+    this.bootstraps.set(inviteId, {
+      group,
+      cipher: new SignalCipher(invite, await invitationKeys(invite)),
+      exchange,
+      remoteId: group.hostClientId,
+    });
+    this.groupGuestId = inviteId;
+    await this.openSocket();
+  }
+  private async bootstrapSend(id: string, payload: unknown) {
+    const bootstrap = this.bootstraps.get(id);
+    if (!bootstrap) return;
+    const envelope = await bootstrap.cipher.seal(this.role, 0, payload);
+    await this.transport.send({ ...envelope, bootstrap: true });
+  }
+  private async admitGroup(message: Record<string, unknown>) {
+    const id = identity(message.inviteId),
+      groupId = identity(message.groupId);
+    if (this.bootstraps.has(id) || this.links.has(id)) return;
+    const group = this.groups.get(groupId);
+    if (
+      !group ||
+      !Number.isInteger(message.clientId) ||
+      (message.clientId as number) < 0 ||
+      (message.clientId as number) > 0xffffffff ||
+      message.clientId === this.session.doc.clientID ||
+      typeof message.guestPublic !== 'string'
+    )
+      throw new Error('Invalid group admission.');
+    const exchange = await createExchange();
+    const handshake: ShareHandshake = {
+      version: 1,
+      sessionId: this.sessionId,
+      groupId,
+      inviteId: id,
+      hostClientId: this.session.doc.clientID,
+      guestClientId: message.clientId as number,
+      guestPublic: message.guestPublic,
+      hostExchange: exchange.publicKey,
+    };
+    const established = await establishLink(
+      group.invite,
+      handshake,
+      exchange.privateKey,
+      handshake.guestPublic,
+    );
+    this.links.set(id, this.link(established.invite, established.keys, handshake.guestClientId));
+    const invite = linkInvitation(group.invite, id);
+    this.bootstraps.set(id, {
+      group: group.invite,
+      cipher: new SignalCipher(invite, await invitationKeys(invite)),
+      exchange,
+      remoteId: handshake.guestClientId,
+      handshake,
+      signature: await signHandshake(group.signingKey, handshake),
+    });
+    await this.bootstrapSend(id, { handshake, signature: this.bootstraps.get(id)!.signature });
+  }
+  private async receiveBootstrap(envelope: SignalEnvelope) {
+    const bootstrap = this.bootstraps.get(envelope.inviteId);
+    if (!bootstrap || envelope.generation !== 0) return;
+    const payload = record(
+      await bootstrap.cipher.open(envelope, this.role === 'host' ? 'guest' : 'host'),
+    );
+    if (this.role === 'host') {
+      if (payload.clientId !== bootstrap.remoteId || payload.kind !== 'handshake')
+        throw new Error('Invalid handshake request.');
+      await this.bootstrapSend(envelope.inviteId, {
+        handshake: bootstrap.handshake,
+        signature: bootstrap.signature,
+      });
+      return;
+    }
+    if (this.links.has(envelope.inviteId)) return;
+    const received = record(payload.handshake);
+    if (typeof received.hostExchange !== 'string' || typeof payload.signature !== 'string')
+      throw new Error('Invalid host handshake.');
+    // Reconstruct the canonical transcript from locally expected identities/keys.
+    const handshake: ShareHandshake = {
+      version: 1,
+      sessionId: this.sessionId,
+      groupId: bootstrap.group.groupId,
+      inviteId: envelope.inviteId,
+      hostClientId: bootstrap.remoteId,
+      guestClientId: this.session.doc.clientID,
+      guestPublic: bootstrap.exchange.publicKey,
+      hostExchange: received.hostExchange,
+    };
+    await verifyHandshake(bootstrap.group, handshake, payload.signature);
+    const established = await establishLink(
+      bootstrap.group,
+      handshake,
+      bootstrap.exchange.privateKey,
+      handshake.hostExchange,
+    );
+    const link = this.link(established.invite, established.keys, bootstrap.remoteId);
+    this.links.set(envelope.inviteId, link);
+    await this.send(link, { kind: 'request', clientId: this.session.doc.clientID });
+  }
   private async openSocket() {
     this.socketOnline = true;
     try {
@@ -253,6 +441,11 @@ export class AutomaticSession {
       return;
     }
     if (message.kind === 'ready') {
+      if (this.groupGuestId && !this.links.has(this.groupGuestId))
+        await this.bootstrapSend(this.groupGuestId, {
+          kind: 'handshake',
+          clientId: this.session.doc.clientID,
+        });
       if (this.role === 'guest')
         for (const link of this.links.values())
           await this.send(link, { kind: 'request', clientId: this.session.doc.clientID });
@@ -267,10 +460,15 @@ export class AutomaticSession {
         if (link.connectionId) this.session.provider.automaticClose(link.connectionId);
         if (link.previous) this.session.provider.automaticClose(link.previous);
         this.links.delete(link.invite.inviteId);
+        this.bootstraps.delete(link.invite.inviteId);
       }
       return;
     }
     if (message.kind === 'admitted' && this.role === 'host') {
+      if (message.groupId) {
+        await this.admitGroup(message);
+        return;
+      }
       const link = this.links.get(identity(message.inviteId));
       if (!link) return;
       if (
@@ -286,6 +484,10 @@ export class AutomaticSession {
     }
     if (message.kind !== 'signal') return;
     const envelope = record(message.envelope) as unknown as SignalEnvelope;
+    if (envelope.bootstrap) {
+      await this.receiveBootstrap(envelope);
+      return;
+    }
     const link = this.links.get(envelope.inviteId);
     if (!link) return;
     const payload = record(
@@ -321,6 +523,9 @@ export class AutomaticSession {
       link.phase = payload.phase!;
       link.migrating = Boolean(payload.migrate);
       link.ready = false;
+      this.notice(
+        link.phase === 'relay' ? 'Trying a relay' + '\u2026' : 'Connecting to host' + '\u2026',
+      );
       const servers = await this.servers(link);
       const pending: RTCIceCandidateInit[] = [];
       let announced = false;
@@ -410,6 +615,7 @@ export class AutomaticSession {
     link.previous = link.ready && migrate ? previous : undefined;
     link.migrating = migrate;
     link.phase = phase;
+    this.notice(phase === 'relay' ? 'Trying a relay' + '\u2026' : 'Connecting directly' + '\u2026');
     link.ready = false;
     link.generation++;
     const connectionId = randomSecret(16);
@@ -484,6 +690,7 @@ export class AutomaticSession {
         if (link.connectionId === connectionId) void this.failed(link, connectionId);
       },
       authenticated: () => {
+        this.notice('Synchronizing' + '\u2026');
         if (link.connectionId === connectionId) {
           clearTimeout(link.timer);
           link.timer = setTimeout(() => {
@@ -676,7 +883,7 @@ export class AutomaticSession {
       }
     }
   }
-  async close() {
+  async close(preserveDocument = false) {
     if (this.stopped) return;
     this.stopped = true;
     this.stopTimers();
@@ -689,11 +896,11 @@ export class AutomaticSession {
         /* Server expires abandoned session registrations. */
       }
     } else if (this.role === 'guest' && this.sessionId && !this.ended) {
-      for (const link of this.links.values()) {
+      for (const inviteId of new Set([...this.links.keys(), ...this.bootstraps.keys()])) {
         try {
           await this.request('/v2/leave', {
             sessionId: this.sessionId,
-            inviteId: link.invite.inviteId,
+            inviteId,
           });
         } catch {
           /* Closing local transports still releases allocations. */
@@ -703,8 +910,10 @@ export class AutomaticSession {
     try {
       await this.transport.disconnect();
     } finally {
-      this.session.destroy();
+      if (!preserveDocument) this.session.destroy();
       this.links.clear();
+      this.bootstraps.clear();
+      this.groups.clear();
     }
   }
 }
@@ -741,6 +950,59 @@ export async function joinAutomatic(
   const current = new AutomaticSession('guest', invite.server, name, transport, notice);
   try {
     await current.startGuest(invite);
+    return current;
+  } catch (error) {
+    await current.close();
+    throw error;
+  }
+}
+
+/** Attach sharing to a document that already exists. Failure does not own it. */
+export async function shareDocument(
+  session: PeerSession,
+  server: string,
+  name: string,
+  transport: SignalingTransport,
+  notice: (message: string) => void,
+  development = false,
+) {
+  const current = new AutomaticSession(
+    'host',
+    normalizeServer(server, development),
+    name,
+    transport,
+    notice,
+    session,
+  );
+  try {
+    const capabilities = record(
+      await transport.request(current.server, '/v2/capabilities', 'GET', {}),
+    );
+    if (capabilities.groupSharing !== 1)
+      throw new Error(
+        'This server needs an update to support reusable sharing links. Update the server, then retry.',
+      );
+    await current.startHost();
+    await current.enableSharing();
+    return current;
+  } catch (error) {
+    await current.close(true);
+    throw error;
+  }
+}
+export async function joinShareLink(
+  code: string,
+  name: string,
+  transport: SignalingTransport,
+  notice: (message: string) => void,
+  development = false,
+) {
+  if (!code.trim().startsWith('veil://'))
+    return joinAutomatic(code, name, transport, notice, development);
+  const invite = decodeShareLink(code, development);
+  const current = new AutomaticSession('guest', invite.server, name, transport, notice);
+  try {
+    await current.startGroupGuest(invite);
     return current;
   } catch (error) {
     await current.close();

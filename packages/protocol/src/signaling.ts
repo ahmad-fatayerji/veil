@@ -17,6 +17,7 @@ export interface SignalEnvelope {
   sequence: number;
   nonce: string;
   ciphertext: string;
+  bootstrap?: boolean;
 }
 export const randomSecret = (bytes = 32) =>
   Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (v) =>

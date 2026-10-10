@@ -4,6 +4,18 @@
 
 ## 1. Product vision
 
+### Approved experience revision: Create, Share, Join
+
+The current overhaul supersedes the P2 single-use invitation journey below. Opening Veil offers Create document, Join session, and Settings. Creating is offline and immediate; Share attaches networking to the existing Yjs document without replacing its identity, content, selection, or overlay bridge. Appearance (System/light/dark), hosting server/credential, overlay preferences, updates, and About live in Settings. Sharing resumes after missing hosting configuration is saved; failed activation retains the editable local document for retry. Local documents also block updater installation.
+
+Share issues one reusable `veil://join/...` version-4 link. Anyone holding it can explicitly join and edit while the host remains available. Stop/reset revoke new admissions only; admitted participants retain authenticated recovery and relay renewal. Ending the session disconnects everyone. Documents and invitation secrets remain temporary; no persistence, logo redesign, host migration, permission roles, or application participant cap is added.
+
+Guests enter their name and Join, with automatic direct-then-relay negotiation. People uses actual ICE statistics for Direct/Relayed/Connecting. Sharing-service availability is separate from document connectivity; technical details and manual Reconnect are expandable. Windows installation registers the URL scheme, single-instance delivery brings Veil forward, malformed links are rejected, and opening another invitation requires explicit leave confirmation when the current document contains content.
+
+Coordinated public server changes advertise `groupSharing: 1` and add authenticated link create/replace/revoke plus isolated participant tickets. The invitation pins a host ECDSA P-256 public key. Signed transcripts bind identities and ephemeral ECDH keys; each admitted host-guest link derives independent directional AES-GCM/replay state. The server receives neither document content nor invitation root secrets. Legacy invitations remain supported; unsupported servers require an upgrade rather than a single-use substitution. See [automatic networking](docs/automatic-networking.md) and the public server protocol for compatibility and security details.
+
+This work produces feature PRs into both repositories' `develop` branches. It does not authorize merging, deployment, version changes, installer publication, or release.
+
 ### Approved architecture revision: self-hosted signaling and selective relay (P2)
 
 This revision supersedes the manual P1 flow and the historical LAN/browser journeys below. Current implementation work adds a public MIT `ahmad-fatayerji/veil-server` deployment while desktop source remains private. M6 release automation and signing remain unchanged; this task does not authorize a desktop version bump or release.

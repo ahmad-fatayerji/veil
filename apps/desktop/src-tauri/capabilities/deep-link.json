@@ -1,0 +1,6 @@
+{
+  "identifier": "main-deep-links",
+  "description": "Only the control panel can receive invitation links.",
+  "windows": ["main"],
+  "permissions": ["deep-link:allow-get-current"]
+}

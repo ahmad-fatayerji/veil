@@ -139,6 +139,8 @@ async function setRange(page, name, value) {
 }
 async function dragRange(page, name) {
   const slider = page.getByRole('slider', { name: new RegExp(name) });
+  // Restore before measuring: Windows can change client bounds on activation.
+  native('Raise', {}, 'main');
   // Expanded capture settings can push sliders below the viewport in the legacy panel.
   await slider.scrollIntoViewIfNeeded();
   await slider.evaluate((node) => {
@@ -148,7 +150,6 @@ async function dragRange(page, name) {
   const rect = await slider.boundingBox();
   const dpi = await page.evaluate(() => window.devicePixelRatio);
   const origin = native('Probe', {}, 'main');
-  native('Raise', {}, 'main');
   native(
     'Drag',
     {
@@ -171,7 +172,10 @@ try {
   let { main, overlay } = await launch();
   await main.getByRole('button', { name: 'LAN / browser', exact: true }).click();
   assert.equal((await snapshot(main)).recoveryAvailable, true, 'Recovery shortcut registered.');
-  await main.getByRole('button', { name: 'Settings', exact: true }).click();
+  await main
+    .getByRole('region', { name: 'Overlay controls' })
+    .getByRole('button', { name: 'Settings', exact: true })
+    .click();
   await dragRange(main, 'Opacity');
   await waitFor(async () => (await snapshot(main)).settings.opacity === 1, 'drag opacity saved');
   assert.equal(native('Probe').alpha, 255);
@@ -337,6 +341,10 @@ try {
   }, 'overlay reconnect retains concurrent edits');
   await overlay.screenshot({ path: resolve(directory, 'shared-document-overlay.png') });
   await main.getByRole('button', { name: 'Leave session' }).click();
+  await main
+    .getByRole('dialog', { name: 'Leave session?' })
+    .getByRole('button', { name: 'Leave session', exact: true })
+    .click();
   await waitFor(async () => (await overlayEditor.count()) === 0, 'leaving clears overlay');
   await main.getByRole('button', { name: 'Join session', exact: true }).click();
   await waitFor(
@@ -359,6 +367,7 @@ try {
     moved.x !== bounds.x && moved.y !== bounds.y,
     'Real mouse drag moves the native window.',
   );
+  native('Focus');
   native('Drag', {
     X: moved.x + moved.width - 4,
     Y: moved.y + moved.height - 4,
@@ -431,12 +440,38 @@ try {
     'Interactive overlay intercepts the underlying click.',
   );
   // Starting a new session resets the workspace view, while native settings persist.
-  const settingsButton = main.getByRole('button', { name: 'Settings', exact: true });
+  const settingsButton = main
+    .getByRole('region', { name: 'Overlay controls' })
+    .getByRole('button', { name: 'Settings', exact: true });
   if ((await settingsButton.getAttribute('aria-expanded')) !== 'true') await settingsButton.click();
   await main.getByLabel('Click-through', { exact: true }).click();
   await waitFor(async () => (await snapshot(main)).settings.clickThrough, 'click-through enabled');
   assert.equal(native('Probe').clickThrough, true);
   assert.equal(native('Probe').alpha, 102, 'Click-through preserves opacity.');
+  // Clicking the control panel raised it above the underlay; restore the test target.
+  native('Raise', {}, 'main', underlay.pid);
+  // Windows can refuse SetForegroundWindow from a helper process. An actual
+  // click outside the overlay establishes the underlying app as the input target.
+  native('Click', {
+    X: surface.clientX + surface.width - 50,
+    Y: surface.clientY + surface.height - 80,
+  });
+  await waitFor(() => native('Probe', {}, 'main', underlay.pid).foreground, 'underlay activated');
+  await writeFile(clickFile, '');
+  await writeFile(
+    resolve(directory, 'click-through-windows.json'),
+    JSON.stringify(
+      { overlay: native('Probe'), underlay: native('Probe', {}, 'main', underlay.pid), point },
+      null,
+      2,
+    ),
+  );
+  native(
+    'Capture',
+    { OutputPath: resolve(directory, 'click-through-target.png') },
+    'main',
+    underlay.pid,
+  );
   native('Click', point);
   await waitFor(
     async () => (await readFile(clickFile, 'utf8').catch(() => '')) === 'clicked',
@@ -474,9 +509,14 @@ try {
     return value.width === 520 && value.height === 320;
   }, 'reset bounds');
   await setRange(main, 'Opacity', 75);
+  native('Focus');
   bounds = native('Probe');
   native('Drag', { X: bounds.x + 50, Y: bounds.y + 22, ToX: bounds.x + 100, ToY: bounds.y + 72 });
   bounds = native('Probe');
+  await waitFor(
+    async () => (await snapshot(main)).settings.x === bounds.x && bounds.x !== 80,
+    'non-default drag position saved',
+  );
   native('Drag', {
     X: bounds.x + bounds.width - 4,
     Y: bounds.y + bounds.height - 4,
@@ -571,7 +611,10 @@ try {
     .contexts()
     .flatMap((context) => context.pages())
     .find((page) => !page.url().includes('?overlay'));
-  await other.getByRole('button', { name: 'Settings', exact: true }).click();
+  await other
+    .getByRole('region', { name: 'Overlay controls' })
+    .getByRole('button', { name: 'Settings', exact: true })
+    .click();
   const conflict = await snapshot(other);
   assert.equal(conflict.recoveryAvailable, false);
   assert.equal(

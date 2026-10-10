@@ -171,6 +171,10 @@ try {
     'Unauthenticated WebSockets rejected.',
   );
   await second.getByRole('button', { name: 'Leave session' }).click();
+  await second
+    .getByRole('dialog', { name: 'Leave session?' })
+    .getByRole('button', { name: 'Leave session', exact: true })
+    .click();
   await waitFor(
     async () =>
       (await main.getByRole('list', { name: 'Participants' }).getByRole('listitem').count()) === 2,

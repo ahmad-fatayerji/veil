@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { errorMessage, invoke, useOverlay, type OverlayPatch, type OverlaySnapshot } from './api';
 
-export function OverlayControls() {
+export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boolean }) {
   const { state, setState, error, setError } = useOverlay();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(settingsOnly);
   const [captureExpanded, setCaptureExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<OverlayPatch>({});
@@ -66,14 +66,16 @@ export function OverlayControls() {
         >
           {state?.settings.visible ? 'Hide overlay' : 'Show overlay'}
         </button>
-        <button
-          className="quiet-button"
-          aria-expanded={expanded}
-          aria-controls="overlay-settings"
-          onClick={() => setExpanded(!expanded)}
-        >
-          Settings
-        </button>
+        {!settingsOnly && (
+          <button
+            className="quiet-button"
+            aria-expanded={expanded}
+            aria-controls="overlay-settings"
+            onClick={() => setExpanded(!expanded)}
+          >
+            Settings
+          </button>
+        )}
       </div>
       {expanded && state && (
         <div id="overlay-settings" className="overlay-settings">
