@@ -9,11 +9,34 @@ pub fn capabilities() -> OverlayCapabilities {
         transparency: cfg!(windows),
         always_on_top: cfg!(windows),
         click_through: cfg!(windows),
-        capture_exclusion: if cfg!(windows) {
-            "unknown"
-        } else {
-            "unsupported"
-        },
+        capture_exclusion: capture_capability(),
+    }
+}
+
+fn capture_capability() -> &'static str {
+    #[cfg(windows)]
+    return match windows::capture_support() {
+        Ok(()) => "supported",
+        Err(error) if error.code == "UNSUPPORTED" => "unsupported",
+        Err(_) => "unknown",
+    };
+    #[cfg(not(windows))]
+    "unsupported"
+}
+
+pub fn capture_exclusion(
+    window: &WebviewWindow,
+    enabled: bool,
+    apply: bool,
+) -> Result<(), OverlayError> {
+    #[cfg(windows)]
+    return windows::capture_exclusion(window, enabled, apply);
+    #[cfg(not(windows))]
+    {
+        let _ = (window, enabled, apply);
+        Err(OverlayError::unsupported(
+            "Capture exclusion is unavailable on this platform.",
+        ))
     }
 }
 

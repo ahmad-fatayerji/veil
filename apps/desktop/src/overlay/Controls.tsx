@@ -4,6 +4,7 @@ import { errorMessage, invoke, useOverlay, type OverlayPatch, type OverlaySnapsh
 export function OverlayControls() {
   const { state, setState, error, setError } = useOverlay();
   const [expanded, setExpanded] = useState(false);
+  const [captureExpanded, setCaptureExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<OverlayPatch>({});
   const pending = useRef<OverlayPatch>({});
@@ -167,6 +168,95 @@ export function OverlayControls() {
           <p className="overlay-help">
             The overlay edits the same document. Turn off click-through to write in it.
           </p>
+          <div className="capture-settings">
+            <label className="overlay-check">
+              <input
+                type="checkbox"
+                checked={state.settings.captureExclusion}
+                disabled={
+                  busy ||
+                  (state.capabilities.captureExclusion === 'unsupported' &&
+                    !state.settings.captureExclusion)
+                }
+                onChange={(event) => void update({ captureExclusion: event.target.checked })}
+              />
+              Exclude overlay from compatible captures
+            </label>
+            <p className="overlay-help" role="status" data-capture-status={state.capture.status}>
+              {state.capture.message}
+            </p>
+            <p className="overlay-help">
+              Applies only to the overlay. The control panel remains capturable. Results depend on
+              the recording or sharing tool and mode; test before sharing sensitive content.
+            </p>
+            <button
+              className="quiet-button"
+              aria-expanded={captureExpanded}
+              aria-controls="capture-compatibility"
+              onClick={() => setCaptureExpanded(!captureExpanded)}
+            >
+              Capture compatibility test
+            </button>
+            {captureExpanded && (
+              <section
+                id="capture-compatibility"
+                className="capture-compatibility"
+                aria-label="Capture compatibility test"
+              >
+                <h3>Check your capture mode</h3>
+                <ol>
+                  <li>
+                    Show the test card. It temporarily replaces the overlay document on this device.
+                  </li>
+                  <li>
+                    With exclusion off, record or share the screen containing the overlay. Confirm
+                    the card appears in the recorded output or on another device.
+                  </li>
+                  <li>
+                    Enable exclusion and repeat with the same tool and mode. Compare the actual
+                    output, not just your desktop or the native status.
+                  </li>
+                  <li>
+                    Record your Windows build, tool version, capture mode and result: excluded,
+                    visible, blank/black or not tested. Repeat after changing tools or modes.
+                  </li>
+                </ol>
+                <div className="capture-actions">
+                  <button
+                    className="outline-button"
+                    disabled={busy}
+                    onClick={() =>
+                      void run('overlay_capture_test', { enabled: !state.captureTest })
+                    }
+                  >
+                    {state.captureTest ? 'Return to document' : 'Show test card'}
+                  </button>
+                  <button
+                    className="quiet-button"
+                    disabled={busy}
+                    onClick={() => void run('overlay_capture_check')}
+                  >
+                    Recheck native setting
+                  </button>
+                  {state.capture.status === 'error' && (
+                    <button
+                      className="quiet-button"
+                      disabled={busy}
+                      onClick={() =>
+                        void update({ captureExclusion: state.settings.captureExclusion })
+                      }
+                    >
+                      Reapply setting
+                    </button>
+                  )}
+                </div>
+                <p className="overlay-help">
+                  A confirmed native setting does not certify OBS, Teams, Discord or every capture
+                  method. A visible or black card means this mode did not exclude it as expected.
+                </p>
+              </section>
+            )}
+          </div>
         </div>
       )}
       {(error || state?.warning) && (
@@ -174,6 +264,13 @@ export function OverlayControls() {
           {error || state?.warning}
         </p>
       )}
+      {!expanded &&
+        state?.settings.captureExclusion &&
+        (state.capture.status === 'error' || state.capture.status === 'unsupported') && (
+          <p className="overlay-error" role="alert">
+            {state.capture.message}
+          </p>
+        )}
     </section>
   );
 }

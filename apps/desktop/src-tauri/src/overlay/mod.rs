@@ -57,6 +57,45 @@ pub struct Snapshot {
     recovery_available: bool,
     hide_shortcut_available: bool,
     warning: Option<String>,
+    capture: CaptureStatus,
+    capture_test: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct CaptureStatus {
+    status: &'static str,
+    message: String,
+}
+
+fn capture_status(window: &WebviewWindow, enabled: bool, apply: bool) -> CaptureStatus {
+    capture_result(platform::capture_exclusion(window, enabled, apply), enabled)
+}
+
+fn capture_result(result: Result<(), OverlayError>, enabled: bool) -> CaptureStatus {
+    match result {
+        Ok(()) => CaptureStatus {
+            status: if enabled { "applied" } else { "disabled" },
+            message: if enabled {
+                "Windows confirmed the exclusion setting. Test your recording or sharing mode; this is not a guarantee."
+            } else {
+                "Capture exclusion is off. The overlay may appear in recordings and screen sharing."
+            }.to_owned(),
+        },
+        Err(error) => CaptureStatus {
+            status: if error.code == "UNSUPPORTED" { "unsupported" } else { "error" },
+            message: format!("{} The overlay may be captured.", error.message),
+        },
+    }
+}
+
+fn refresh_capture(app: &AppHandle, apply: bool) -> Result<(), OverlayError> {
+    let overlay = window(app)?;
+    let capture = capture_status(&overlay, snapshot(app).settings.capture_exclusion, apply);
+    modify(app, |model| {
+        model.capture = capture;
+        model.capabilities.capture_exclusion = platform::capabilities().capture_exclusion;
+    });
+    Ok(())
 }
 
 pub struct OverlayState {
@@ -72,6 +111,7 @@ pub struct Patch {
     always_on_top: Option<bool>,
     click_through: Option<bool>,
     font_size: Option<u32>,
+    capture_exclusion: Option<bool>,
 }
 
 fn snapshot(app: &AppHandle) -> Snapshot {
@@ -167,6 +207,11 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         recovery_available: false,
         hide_shortcut_available: false,
         warning: warning.clone(),
+        capture: CaptureStatus {
+            status: "unknown",
+            message: "Checking capture capability…".to_owned(),
+        },
+        capture_test: false,
     }));
     let (sender, receiver) = mpsc::channel::<Settings>();
     // Creating a WebView can pump IPC before setup returns. Register state first.
@@ -231,12 +276,15 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             error.message
         ));
     }
+    let capture = capture_status(&overlay, preferences.capture_exclusion, true);
     *model.lock().unwrap() = Snapshot {
         settings: preferences,
         capabilities,
         recovery_available,
         hide_shortcut_available,
         warning,
+        capture,
+        capture_test: false,
     };
     let _ = app.emit("overlay-changed", model.lock().unwrap().clone());
     let handle = app.handle().clone();
@@ -286,6 +334,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         overlay.show()?;
         let current = snapshot(app.handle());
         apply(&overlay, &current.settings, &current.capabilities).map_err(|error| error.message)?;
+        refresh_capture(app.handle(), true).map_err(|error| error.message)?;
     }
     Ok(())
 }
@@ -318,6 +367,7 @@ fn set_visible(app: &AppHandle, visible: bool) -> Result<(), OverlayError> {
             model.settings = preferences;
             model.settings.visible = true;
         });
+        refresh_capture(app, true)?;
     } else {
         overlay.hide().map_err(OverlayError::native)?;
         modify(app, |model| model.settings.visible = false);
@@ -382,6 +432,9 @@ pub fn overlay_update(
     if let Some(value) = patch.font_size {
         next.font_size = value;
     }
+    if let Some(value) = patch.capture_exclusion {
+        next.capture_exclusion = value;
+    }
     next.validate()?;
     // Reapply the appearance after toolkit style changes replace the extended styles.
     let overlay = window(&app)?;
@@ -406,6 +459,40 @@ pub fn overlay_update(
         return Err(error);
     }
     modify(&app, |model| model.settings = next);
+    // Toolkit style and alpha changes must preserve/reapply display affinity. Capture
+    // failure has its own status and must not disable unrelated overlay controls.
+    if patch.capture_exclusion.is_some()
+        || patch.always_on_top.is_some()
+        || patch.click_through.is_some()
+        || patch.opacity.is_some()
+    {
+        refresh_capture(&app, true)?;
+    }
+    Ok(snapshot(&app))
+}
+
+#[tauri::command]
+pub fn overlay_capture_check(
+    app: AppHandle,
+    caller: WebviewWindow,
+) -> Result<Snapshot, OverlayError> {
+    control_only(&caller)?;
+    refresh_capture(&app, false)?;
+    Ok(snapshot(&app))
+}
+
+#[tauri::command]
+pub fn overlay_capture_test(
+    app: AppHandle,
+    caller: WebviewWindow,
+    enabled: bool,
+) -> Result<Snapshot, OverlayError> {
+    control_only(&caller)?;
+    if enabled {
+        set_visible(&app, true)?;
+    }
+    // Local ephemeral card, not shared document content or a persisted test result.
+    modify(&app, |model| model.capture_test = enabled);
     Ok(snapshot(&app))
 }
 
@@ -486,4 +573,28 @@ pub fn overlay_gesture(
         .window()
         .start_resize_dragging(direction)
         .map_err(OverlayError::native)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capture_failures_never_report_applied_even_when_preference_is_enabled() {
+        let status = capture_result(Err(OverlayError::native("Access denied")), true);
+        assert_eq!(status.status, "error");
+        assert!(status.message.contains("Access denied"));
+        assert!(status.message.contains("may be captured"));
+        let status = capture_result(Err(OverlayError::unsupported("Old OS")), true);
+        assert_eq!(status.status, "unsupported");
+        assert_eq!(
+            capture_result(Err(OverlayError::native("Readback failed")), false).status,
+            "error"
+        );
+        assert_eq!(capture_result(Ok(()), true).status, "applied");
+        assert!(capture_result(Ok(()), true)
+            .message
+            .contains("not a guarantee"));
+        assert_eq!(capture_result(Ok(()), false).status, "disabled");
+    }
 }

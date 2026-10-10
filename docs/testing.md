@@ -1,4 +1,18 @@
-# M0-M2 verification
+# Verification record
+
+## M4 capture compatibility — 10 October 2026
+
+Implemented opt-in, device-local overlay display affinity with Windows build/composition checks, verified native readback, separate disabled/applied/unsupported/error status, control-panel-only administration and an ephemeral local compatibility test card. Existing overlay settings migrate with exclusion off. See the [capture compatibility matrix and procedure](capture-compatibility.md).
+
+`pnpm check` passed formatting, ESLint, TypeScript, Cargo check and Clippy. `pnpm test` passed fourteen TypeScript and twenty-four Rust tests, including old-Windows version gating, legacy preference migration/persistence and failure-status reporting. Two packaged-artifact tests remain intentionally ignored without signed installer fixtures. The debug executable was rebuilt after Cargo tests. All four browser regressions passed.
+
+`pnpm test:capture` passed actual GDI and DXGI output comparisons on Windows 10.0.26300 with FFmpeg 7.1: the card was visible with exclusion off, absent with exclusion on, and underlying app pixels remained visible rather than a black window. It also verified native affinity, control-panel scope, forbidden overlay administration, opacity/topmost changes, hide/show, global shortcut recovery, click-through style preservation, saved opt-in/out, restart readback and ephemeral test-card reset. No JavaScript errors occurred. The known WebView2 window-class cleanup diagnostic appeared on clean exit. Evidence: `target/capture-acceptance/run-HbIVUA/`.
+
+An isolated portable OBS 32.0.4 fixture recorded the same off/on result through Display Capture / DXGI and Display Capture / Windows Graphics Capture. Extracted recorded frames and OBS method/start logs are under `target/capture-acceptance/run-HbIVUA/`; the frame pairs were visually inspected. No normal OBS profiles/scenes or credentials were used. The final optional-OBS run passed complete capture acceptance, including global shortcut recovery and click-through style preservation.
+
+`pnpm test:overlay` passed the full rebuilt Windows/WebView2 regression: actual continuous slider drags, bidirectional desktop/overlay/browser editing, convergence/reconnect, native move/resize, opacity/compositor, click-through, global recovery/hide/show, restart persistence and shortcut-collision rejection. The drag fixture now scrolls sliders into view before computing OS input coordinates for the taller settings panel. Evidence: `target/overlay-acceptance/run-YNuL7x/`. Native control-panel/test-card screenshots and off/on capture frames were visually inspected.
+
+Old/non-Windows runtime behavior, Teams/Discord remote viewers, Snipping Tool, OBS window/game capture, other GPUs/monitors/DPI and remote desktop remain unverified. Neither native readback nor these four observed capture modes establishes universal capture exclusion. No release was published.
 
 ## M6 updater resilience — 10 October 2026
 

@@ -336,11 +336,13 @@ Yjs binary sync/awareness messages should use their established protocol and fra
 
 ### M4 — Windows capture compatibility
 
-- [ ] Implement Windows capture-exclusion adapter.
-- [ ] Surface supported/unsupported/error state in UI.
-- [ ] Build manual capture compatibility test procedure.
-- [ ] Verify overlay behavior with supported recording/sharing modes.
-- [ ] Document limitations and failure cases.
+- [x] Implement Windows capture-exclusion adapter.
+- [x] Surface supported/unsupported/error state in UI.
+- [x] Build manual capture compatibility test procedure.
+- [x] Verify overlay behavior with supported recording/sharing modes (local GDI, DXGI and OBS display capture; see the per-mode matrix for unverified tools).
+- [x] Document limitations and failure cases.
+
+M4 implementation and the per-mode acceptance matrix are documented in [capture compatibility](docs/capture-compatibility.md). A confirmed Windows display-affinity setting is separate from observing exclusion in a specific recorder or remote viewer.
 
 **Done when:** behavior is verified for a documented test matrix; no universal guarantee is claimed.
 

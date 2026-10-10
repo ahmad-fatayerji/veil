@@ -41,18 +41,28 @@ export function OverlayWindow() {
         <span className="overlay-recovery-hint">Ctrl+Alt+V to restore controls</span>
       </header>
       <article className="overlay-document" aria-label="Overlay document">
-        {document.connection ? (
-          <SharedEditor
-            key={document.connection.doc.clientID}
-            connection={document.connection}
-            compact
-          />
-        ) : (
-          <div className="overlay-empty">
-            <p>Join the document to start writing.</p>
-            <p>Open the control panel with Ctrl+Alt+V and join a local session.</p>
+        {state?.captureTest && (
+          <div className="capture-test-card" aria-label="Capture test card">
+            <strong>VEIL CAPTURE TEST</strong>
+            <p>This card is visible on your desktop.</p>
+            <p>Check the recording or remote viewer for this card.</p>
+            <span>Local test card · no document changes</span>
           </div>
         )}
+        <div hidden={state?.captureTest}>
+          {document.connection ? (
+            <SharedEditor
+              key={document.connection.doc.clientID}
+              connection={document.connection}
+              compact
+            />
+          ) : (
+            <div className="overlay-empty">
+              <p>Join the document to start writing.</p>
+              <p>Open the control panel with Ctrl+Alt+V and join a local session.</p>
+            </div>
+          )}
+        </div>
       </article>
       {(error || document.error) && (
         <p role="alert" className="overlay-error">

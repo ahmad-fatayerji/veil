@@ -18,6 +18,7 @@ export interface OverlaySettings {
   opacity: number;
   alwaysOnTop: boolean;
   clickThrough: boolean;
+  captureExclusion: boolean;
   fontSize: number;
   visible: boolean;
 }
@@ -28,10 +29,18 @@ export interface OverlaySnapshot {
   recoveryAvailable: boolean;
   hideShortcutAvailable: boolean;
   warning: string | null;
+  capture: {
+    status: 'unknown' | 'disabled' | 'applied' | 'unsupported' | 'error';
+    message: string;
+  };
+  captureTest: boolean;
 }
 
 export type OverlayPatch = Partial<
-  Pick<OverlaySettings, 'opacity' | 'alwaysOnTop' | 'clickThrough' | 'fontSize'>
+  Pick<
+    OverlaySettings,
+    'opacity' | 'alwaysOnTop' | 'clickThrough' | 'fontSize' | 'captureExclusion'
+  >
 >;
 
 export function errorMessage(error: unknown) {

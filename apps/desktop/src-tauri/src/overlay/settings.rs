@@ -13,6 +13,7 @@ pub struct Settings {
     pub opacity: f64,
     pub always_on_top: bool,
     pub click_through: bool,
+    pub capture_exclusion: bool,
     pub font_size: u32,
     pub visible: bool,
 }
@@ -28,6 +29,7 @@ impl Default for Settings {
             opacity: 0.85,
             always_on_top: true,
             click_through: false,
+            capture_exclusion: false,
             font_size: 20,
             visible: false,
         }
@@ -104,6 +106,20 @@ pub fn save(path: &Path, settings: &Settings) -> Result<(), OverlayError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn capture_preference_is_opt_in_and_legacy_settings_still_load() {
+        let old = serde_json::json!({"version": 1, "opacity": 0.65, "fontSize": 24});
+        let mut settings: Settings = serde_json::from_value(old).unwrap();
+        settings.validate().unwrap();
+        assert!(!settings.capture_exclusion);
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("overlay.json");
+        settings.capture_exclusion = true;
+        save(&path, &settings).unwrap();
+        assert!(load(&path).unwrap().capture_exclusion);
+        assert_eq!(load(&path).unwrap().opacity, 0.65);
+    }
 
     #[test]
     fn settings_replace_atomically_and_reject_corruption() {

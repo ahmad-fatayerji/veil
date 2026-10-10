@@ -139,6 +139,8 @@ async function setRange(page, name, value) {
 }
 async function dragRange(page, name) {
   const slider = page.getByRole('slider', { name: new RegExp(name) });
+  // Expanded capture settings can push sliders below the viewport in the legacy panel.
+  await slider.scrollIntoViewIfNeeded();
   await slider.evaluate((node) => {
     window.__rangeValues = [];
     node.addEventListener('input', () => window.__rangeValues.push(Number(node.value)));
