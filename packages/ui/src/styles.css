@@ -699,6 +699,28 @@ input::placeholder {
 .desktop-updates p {
   max-width: 75ch;
 }
+.desktop-updates progress {
+  display: block;
+  width: min(100%, 380px);
+  margin: 12px 0;
+  accent-color: #7451ab;
+}
+.update-result {
+  padding: 0 12px 12px;
+  margin-bottom: 12px;
+  border: 1px solid;
+  border-radius: 8px;
+}
+.update-success {
+  color: #195541;
+  background: #eff9f5;
+  border-color: #badccc;
+}
+.update-warning {
+  color: #744912;
+  background: #fff8ed;
+  border-color: #ebcfa9;
+}
 .release-notes {
   white-space: pre-wrap;
 }
