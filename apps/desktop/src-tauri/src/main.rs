@@ -11,7 +11,11 @@ fn main() {
         .manage(hosting::Hosting::default())
         .manage(updates::Updates::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(overlay::setup)
+        .setup(|app| {
+            overlay::setup(app)?;
+            updates::setup(app.handle())?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             overlay::overlay_snapshot,
             overlay::overlay_update,
@@ -27,6 +31,8 @@ fn main() {
             updates::update_check,
             updates::update_install,
             updates::update_set_channel,
+            updates::update_cancel,
+            updates::update_dismiss_result,
         ])
         .on_window_event(|window, event| {
             if window.label() == "main"
