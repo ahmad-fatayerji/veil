@@ -1,11 +1,11 @@
 {
-  "version": "0.2.0",
-  "notes": "# Veil 0.2.0\n\n## Other changes\n\n- ci: upgrade Actions runtimes and pin the Linux runner\n- chore: bootstrap Gitflow workflows and release governance\n\n## Features\n\n- feat: add Gitflow release proposals and updater channels\n",
-  "pub_date": "2026-10-09T11:00:07.363Z",
+  "version": "0.3.0-beta.1",
+  "notes": "# Veil 0.3.0-beta.1\n\n## Breaking changes\n\n- feat(network)!: automate signaling and selective relay fallback\n\n## Fixes\n\n- fix(updater): recover interrupted downloads and confirm installation\n- fix(release): locate and verify unpublished drafts by release ID\n\n## Other changes\n\n- docs: require a separate worktree for every AI task\n- ci: upgrade Actions runtimes and pin the Linux runner\n- docs: guide agents through the Gitflow task workflow\n",
+  "pub_date": "2026-10-10T05:15:47.878Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDVUd01QRWtBbk05cmF3V3dHVzZiVnk4ay9WTnBzTzhWeFN6dkNpeUVFVllzeU1McisvUkEwb0xpOWlRQVpZcTFtQlhaSkhqcmNpSzNQOVNpc1VYUFFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNTQzNjA2CWZpbGU6VmVpbF8wLjIuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4yLjAKTjVCNUY4YkhXTnUyemVKUmcxRDVyUmdLZ3JuOEJOVElQT2gxSWw2SDZwNkt5TFJBUlBVdEt3YkU1ZEJ2bnI0WXFYVWZvTklnQnJwOGlVYXBrbWh3Q3c9PQo=",
-      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.2.0/Veil_0.2.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDcyQm04NnByOXo5bndOdkhNSUZwdE5xUTM2ZXM3dlhDbGJaN2xJUUZjZEZUZUhEWU1Bck90Q2Q5U0gzc1NtWFE3UG5QMjVobitmSytMR2thQ2xOSVF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjA5MzQ3CWZpbGU6VmVpbF8wLjMuMC1iZXRhLjFfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMy4wLWJldGEuMQpjTThkTnNVYzdZbitrOWhlZWN5V20ySjJVMnNUWTdOc243WnhLWXovQys0MDR3cWQ5eFlBSTc0cWo0YTQvZkc4QThTclFURk1sMUV5RWYvL3djQlBEdz09Cg==",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.3.0-beta.1/Veil_0.3.0-beta.1_x64-setup.exe"
     }
   }
 }
