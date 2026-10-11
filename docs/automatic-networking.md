@@ -44,6 +44,12 @@ replacement authenticates and exchanges state vectors. Failed replacements retai
 working relay connections. Credential renewal similarly replaces only an active
 measured relay link. Healthy unrelated links are never restarted for fallback.
 
+Unused invitations do not negotiate or request TURN credentials. When a guest leaves,
+its link is removed before transports close; pending setup results, queued signals,
+callbacks and retry/renewal timers cannot restart that link. After the last guest
+leaves, the host reports that it is waiting for someone to join. Recovery remains
+available for admitted guests during temporary connection loss.
+
 Signaling outages preserve healthy data channels. New joins/recovery wait for the
 server. Restart loses registrations; authorization rejection ends transport and
 leaves local content visible for copying. The host must remain open. Leave/End
