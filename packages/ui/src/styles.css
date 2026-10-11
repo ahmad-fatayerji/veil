@@ -638,6 +638,30 @@ input::placeholder {
   border: 1px solid;
   border-radius: 8px;
 }
+.desktop-content {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 68px;
+}
+.desktop-footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px;
+}
+.settings-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
 .update-success {
   color: #195541;
   background: #eff9f5;

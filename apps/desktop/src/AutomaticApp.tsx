@@ -315,7 +315,7 @@ export function AutomaticApp() {
           : 'Local document';
   return (
     <div className="app-shell desktop-shell">
-      <div inert={updating} aria-busy={busy || updating}>
+      <div className="desktop-content" inert={updating} aria-busy={busy || updating}>
         <header className="app-header">
           <Brand />
           {document && (
@@ -360,9 +360,6 @@ export function AutomaticApp() {
                 </button>
               </>
             )}
-            <button className="quiet-button" onClick={() => openSettings()}>
-              Settings
-            </button>
           </div>
         </header>
         {!document ? (
@@ -540,6 +537,29 @@ export function AutomaticApp() {
             </button>
           </div>
         )}
+        <footer className="desktop-footer">
+          <button
+            className="quiet-button settings-button"
+            aria-label="Settings"
+            title="Settings"
+            onClick={() => openSettings()}
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m9.5 3-.5 2-2 .9-1.9-.6-2.5 4.3 1.5 1.4v2l-1.5 1.4 2.5 4.3 1.9-.6 2 .9.5 2h5l.5-2 2-.9 1.9.6 2.5-4.3-1.5-1.4v-2l1.5-1.4-2.5-4.3-1.9.6-2-.9-.5-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </footer>
       </div>
       <SessionBridge connection={document} />
       <Dialog
