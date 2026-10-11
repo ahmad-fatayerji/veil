@@ -95,9 +95,10 @@ migration is complete; all development and release work uses this repository.
 Never publish unaudited private material or signing credentials.
 
 `develop` is the default branch for ordinary work; `main` holds approved release
-source. Every AI task uses its own external worktree and follows the Gitflow PR
-checks and merge routes. Feature merges do not authorize a release. Release actions
-use Prepare release, Publish beta, Finalize release, and Back-merge main only when
+source. Every AI task uses its own worktree as a direct sibling of the original
+`Veil` checkout inside `Veil-app`, following the location rule in [AGENTS.md](AGENTS.md)
+and the Gitflow PR checks and merge routes. Feature merges do not authorize a
+release. Release actions use Prepare release, Publish beta, Finalize release, and Back-merge main only when
 requested. Do not manually bump versions, reuse published versions, overwrite
 published assets, or bypass branch protections. See [releasing](docs/releasing.md).
 

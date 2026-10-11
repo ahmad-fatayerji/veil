@@ -6,16 +6,25 @@ The authorized consolidation moves audited MIT source, installers, signed update
 
 `main` contains approved release source; `develop` integrates the next release and is the repository's default branch for new checkouts and PRs. Agents follow the task procedure in [AGENTS.md](../AGENTS.md). Both branches require PRs, a successful **CI gate**, resolved conversations and an up-to-date branch. Direct pushes, force pushes and deletion are blocked, with no administrator bypass. External approvals are zero while there is one contributor. Select `main` when manually running the Gitflow management Actions, even though the default branch is `develop`.
 
+Start in the original `Veil-app/Veil` checkout. All task worktrees must be direct
+siblings inside `Veil-app`, including release stabilization and hotfix work. Verify
+the destination parent before creation, as required by [AGENTS.md](../AGENTS.md).
+
 ```powershell
-git switch develop
-git pull --ff-only
-git switch -c feature/reconnect
+git fetch origin
+git worktree add -b feature/reconnect ../Veil-reconnect origin/develop
+Set-Location ../Veil-reconnect
 # Make changes, run the relevant tests, and commit.
 git add .
 git commit -m "fix: reconnect after losing connection"
 git push -u origin feature/reconnect
 gh pr create --base develop --title "fix: reconnect after losing connection"
 ```
+
+Link issue-backed PRs in their body: `Closes #123` for a fully resolved issue or
+`Refs #123` for partial work. Give delegated agents the issue number and URL, then
+verify the published PR body and linked issues before handoff, following
+[AGENTS.md](../AGENTS.md). A PR being opened does not itself close the issue.
 
 Use Conventional Commit PR titles: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `build:`, `ci:`, `chore:` or `revert:`, optionally with a scope. Use `!` or a `BREAKING CHANGE:` footer for incompatible changes. Feature PRs squash so the reviewed title becomes the commit used for version proposals.
 
@@ -105,10 +114,12 @@ Stable publication builds the final version; it does not relabel a beta installe
 
 For an urgent compatible fix, branch from `main`, commit the fix and prepare that existing branch:
 
+From the original `Veil-app/Veil` checkout:
+
 ```powershell
-git switch main
-git pull --ff-only
-git switch -c hotfix/reconnect
+git fetch origin
+git worktree add -b hotfix/reconnect ../Veil-hotfix-reconnect origin/main
+Set-Location ../Veil-hotfix-reconnect
 # Fix and test.
 git add .
 git commit -m "fix: restore reconnect"
