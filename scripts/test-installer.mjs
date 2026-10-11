@@ -96,6 +96,13 @@ async function launch() {
 }
 async function close() {
   if (browser) {
+    const main = browser
+      .contexts()
+      .flatMap((context) => context.pages())
+      .find((page) => !page.url().includes('?overlay'));
+    // Current builds quit explicitly; published older installers still use window close.
+    if (main)
+      await main.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
     await browser.close().catch(() => {});
     browser = null;
   }

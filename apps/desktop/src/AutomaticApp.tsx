@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
+import { listen } from '@tauri-apps/api/event';
 import {
   createPeerSession,
   joinShareLink,
@@ -24,10 +25,17 @@ import { nativeSignaling } from './networking';
 import { DesktopEditor, SessionBridge } from './overlay/session';
 import { OverlayControls } from './overlay/Controls';
 import { Updates } from './Updates';
-import { errorMessage, invoke, useOverlay } from './overlay/api';
+import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
 
-type Section = 'Appearance' | 'Hosting server' | 'Overlay' | 'Updates' | 'About';
-const sections: Section[] = ['Appearance', 'Hosting server', 'Overlay', 'Updates', 'About'];
+type Section = 'General' | 'Appearance' | 'Hosting server' | 'Overlay' | 'Updates' | 'About';
+const sections: Section[] = [
+  'General',
+  'Appearance',
+  'Hosting server',
+  'Overlay',
+  'Updates',
+  'About',
+];
 export function AutomaticApp() {
   const [document, setDocument] = useState<PeerSession | null>(null);
   const documentRef = useRef<PeerSession | null>(null);
@@ -51,17 +59,26 @@ export function AutomaticApp() {
   const [development, setDevelopment] = useState(false);
   const [people, setPeople] = useState(() => window.innerWidth >= 900);
   const [settings, setSettings] = useState(false);
-  const [section, setSection] = useState<Section>('Appearance');
+  const [section, setSection] = useState<Section>('General');
   const [shareOpen, setShareOpen] = useState(false);
   const [resumeShare, setResumeShare] = useState(false);
   const [pendingLink, setPendingLink] = useState('');
   const [confirmExit, setConfirmExit] = useState(false);
+  const [confirmQuit, setConfirmQuit] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [connected, setConnected] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
   const { appearance, setAppearance } = useAppearance();
   const overlay = useOverlay();
   const onUpdateBusy = useCallback((value: boolean) => setUpdating(value), []);
+  useEffect(() => {
+    const unlisten = listen('app-quit-requested', () => setConfirmQuit(true));
+    const unlistenFailure = listen<string>('app-quit-failed', (event) => setError(event.payload));
+    return () => {
+      void unlisten.then((stop) => stop()).catch(() => {});
+      void unlistenFailure.then((stop) => stop()).catch(() => {});
+    };
+  }, []);
   useEffect(() => {
     void invoke<{ server: string; development: boolean }>('network_preferences')
       .then((p) => {
@@ -180,7 +197,7 @@ export function AutomaticApp() {
       throw e;
     }
   }
-  function openSettings(next: Section = 'Appearance') {
+  function openSettings(next: Section = 'General') {
     setSection(next);
     setSettings(true);
   }
@@ -546,6 +563,41 @@ export function AutomaticApp() {
             ))}
           </nav>
           <div className="settings-content">
+            <section hidden={section !== 'General'}>
+              <h3>Window and app</h3>
+              <label htmlFor="close-behavior">When closing the main window</label>
+              <select
+                id="close-behavior"
+                value={overlay.state?.settings.closeBehavior ?? 'tray'}
+                disabled={!overlay.state || busy || updating}
+                onChange={(event) => {
+                  const closeBehavior = event.target.value;
+                  void run(async () => {
+                    overlay.setState(
+                      await invoke<OverlaySnapshot>('overlay_update', {
+                        patch: { closeBehavior },
+                      }),
+                    );
+                  });
+                }}
+              >
+                <option value="tray">Minimize to tray</option>
+                <option value="quit">Quit app</option>
+              </select>
+              <p>
+                Minimize to tray keeps your document, connections and visible overlay active. Quit
+                app closes Veil and its overlay immediately. You can reopen Veil, show or hide the
+                overlay, or quit from the tray menu.
+              </p>
+              <button
+                className="danger-button"
+                disabled={busy || updating}
+                onClick={() => setConfirmQuit(true)}
+              >
+                Quit Veil
+              </button>
+              <p className="muted">Fully closes Veil and its overlay, ending your session.</p>
+            </section>
             <section hidden={section !== 'Appearance'}>
               <h3>Appearance</h3>
               <p>Make this space feel like yours.</p>
@@ -751,6 +803,36 @@ export function AutomaticApp() {
           </>
         )}
         {notice && <p role="status">{notice}</p>}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+      </Dialog>
+      <Dialog
+        open={confirmQuit}
+        title="Quit Veil?"
+        locked={updating || busy}
+        onClose={() => setConfirmQuit(false)}
+      >
+        <p>
+          Veil and the overlay will close.
+          {document &&
+            ' This document is temporary. Copy any text you want to keep before quitting.'}
+          {document && !guest && session && ' Everyone will be disconnected.'}
+        </p>
+        <div className="form-actions">
+          <button className="secondary-button" onClick={() => setConfirmQuit(false)}>
+            Cancel
+          </button>
+          <button
+            className="danger-button"
+            disabled={busy || updating}
+            onClick={() => void run(() => invoke('app_quit'))}
+          >
+            Quit Veil
+          </button>
+        </div>
         {error && (
           <p className="error" role="alert">
             {error}

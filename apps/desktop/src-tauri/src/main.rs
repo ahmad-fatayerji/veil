@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod hosting;
+mod lifecycle;
 mod networking;
 mod overlay;
 mod session;
@@ -34,9 +35,11 @@ fn main() {
         .setup(|app| {
             overlay::setup(app)?;
             updates::setup(app.handle())?;
+            lifecycle::setup(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            lifecycle::app_quit,
             overlay::overlay_snapshot,
             overlay::overlay_update,
             overlay::overlay_capture_check,
@@ -67,10 +70,21 @@ fn main() {
             updates::update_dismiss_result,
         ])
         .on_window_event(|window, event| {
-            if window.label() == "main"
-                && matches!(event, tauri::WindowEvent::CloseRequested { .. })
-            {
-                window.app_handle().exit(0);
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    if overlay::close_behavior(window.app_handle())
+                        == lifecycle::CloseBehavior::Quit
+                    {
+                        lifecycle::quit_on_window_close(window.app_handle());
+                        return;
+                    }
+                    // A pending WebView focus restoration (for example after a dialog)
+                    // can show a hidden normal window again. Minimize before hiding;
+                    // tray reopening explicitly restores the window.
+                    let _ = window.minimize();
+                    let _ = window.hide();
+                }
             }
         })
         .build(tauri::generate_context!())

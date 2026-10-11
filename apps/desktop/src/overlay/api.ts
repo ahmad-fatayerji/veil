@@ -21,6 +21,7 @@ export interface OverlaySettings {
   captureExclusion: boolean;
   fontSize: number;
   visible: boolean;
+  closeBehavior: 'tray' | 'quit';
 }
 
 export interface OverlaySnapshot {
@@ -39,7 +40,7 @@ export interface OverlaySnapshot {
 export type OverlayPatch = Partial<
   Pick<
     OverlaySettings,
-    'opacity' | 'alwaysOnTop' | 'clickThrough' | 'fontSize' | 'captureExclusion'
+    'opacity' | 'alwaysOnTop' | 'clickThrough' | 'fontSize' | 'captureExclusion' | 'closeBehavior'
   >
 >;
 

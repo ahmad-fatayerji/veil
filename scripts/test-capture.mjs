@@ -107,7 +107,11 @@ async function command(page, name, args) {
 }
 const snapshot = (page) => command(page, 'overlay_snapshot');
 async function close() {
-  native('Close', {}, 'main');
+  const main = browser
+    .contexts()
+    .flatMap((context) => context.pages())
+    .find((page) => !page.url().includes('?overlay'));
+  await main.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
   await waitFor(() => app.exitCode !== null, 'clean exit');
   await browser.close();
   browser = undefined;

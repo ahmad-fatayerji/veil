@@ -106,7 +106,11 @@ async function launch() {
 }
 async function close() {
   const stopped = new Promise((done) => app.once('exit', done));
-  native('Close', {}, 'main');
+  const main = browser
+    .contexts()
+    .flatMap((context) => context.pages())
+    .find((page) => !page.url().includes('?overlay'));
+  await main.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
   await Promise.race([
     stopped,
     delay(10000).then(() => {
@@ -629,7 +633,7 @@ try {
       .catch((error) => error),
   );
   assert.equal(rejection.code, 'UNSUPPORTED');
-  native('Close', {}, 'main', conflictingApp.pid);
+  await other.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
   await waitFor(() => conflictingApp.exitCode !== null, 'conflict instance clean exit');
   await conflictingBrowser.close();
   conflictingBrowser = undefined;

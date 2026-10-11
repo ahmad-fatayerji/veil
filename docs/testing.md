@@ -1,5 +1,29 @@
 # Verification record
 
+## Immediate window-close quit — 11 October 2026
+
+When **Quit app** is selected, the main window's close button now exits immediately without the quit confirmation, including with a temporary document and visible overlay. Settings/tray **Quit Veil** still confirms. Both paths save preferences and refuse to exit during update installation.
+
+`pnpm check` and `pnpm test` passed (24 TypeScript and 24 Rust tests; two packaged-installer tests intentionally ignored). After rebuilding the isolated debug executable following Cargo tests, `scripts/test-tray-close.mjs` passed actual Windows/WebView2 default tray close, overlay/document preservation, explicit quit cancellation/exit, saved Quit preference after restart, and immediate native window-close exit with an active document/overlay. Evidence: `target/tray-acceptance/run-rNPKGy/`. Physical tray-menu interaction, non-Windows behavior and multi-peer networking while hidden remain unverified. No release was published.
+
+## Configurable window close and tray overlay actions — 11 October 2026
+
+Settings → General now saves **When closing the main window** as **Minimize to tray** (default, including legacy preferences) or **Quit app**. Quit app routes the native close request to the quit confirmation. Tray actions include Open Veil, Show/Hide overlay and Quit Veil; the overlay action's label follows visibility changes from controls and shortcuts.
+
+CI exposed a recurring browser presence fixture race: typing could start at the beginning before keyboard navigation established the caret. The fixture now clicks the editor and verifies a collapsed selection at the end before typing. Five consecutive local presence/roadmap runs passed (ten tests), and `pnpm check` passed with this fixture change.
+
+`pnpm check` and `pnpm test` passed after integrating current develop (24 TypeScript and 24 Rust tests; two packaged-installer tests intentionally ignored). Settings tests cover legacy defaults and round-trip persistence of Quit while retaining appearance preferences. A separate debug output directory preserved the already-running executable/session. After rebuilding following Cargo tests, `VEIL_TRAY_TEST_EXE=target/tray-preferences/debug/veil-desktop.exe node scripts/test-tray-close.mjs` passed real Windows/WebView2 acceptance: default tray close, retained editable overlay/document, both saved close choices, quit cancellation and confirmation, hidden overlay preservation, persisted choice after a full restart, and native window-close quit after restart. Screenshots were visually inspected. Evidence: `target/tray-acceptance/run-PQaLpD/` and `target/tray-acceptance/run-r9SB4S/`.
+
+Actual tray icon/menu pointer interaction, non-Windows behavior and multi-peer networking while hidden remain unverified by this focused native test. No release was published and no PR was merged by this task.
+
+## Close to tray and explicit quit — 10 October 2026
+
+Closing the main window minimizes and hides it in the system tray while preserving the document, connections and overlay visibility. Settings opens to General with an explicit Quit Veil action and confirmation; the tray also offers Open Veil and Quit Veil. Native quit is restricted to the control panel and blocks update installation interruptions.
+
+`pnpm check` and `pnpm test` passed (18 TypeScript and 24 Rust tests; two packaged-installer tests remain intentionally ignored). The debug executable was rebuilt after Cargo tests. `node scripts/test-tray-close.mjs` passed twice on actual Windows/WebView2 with an isolated profile: native main-window close, overlay editing while the main window is hidden, retained document state, forbidden overlay quit administration, quit cancellation, closing from Settings with the overlay hidden, and confirmed process exit with code zero. Settings and confirmation screenshots were visually inspected. Evidence: `target/tray-acceptance/run-6TXPMG/` and `target/tray-acceptance/run-cG0aHm/`.
+
+The regression restores the main window through native window APIs; actual clicks on the system tray icon/menu and non-Windows behavior remain unverified. Multi-peer networking while hidden is not covered by this focused native test. No merge or release publication was performed by this task.
+
 ## Mandatory credential validation on save - 11 October 2026
 
 Saving a newly entered or replacement host credential now runs the native

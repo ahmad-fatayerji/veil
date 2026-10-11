@@ -26,7 +26,20 @@ test('remote cursors, selections, and activity follow their author and clear on 
     const secondEditor = b.getByRole('textbox', { name: 'Shared document' });
     await expect(secondEditor).toHaveText('A shared sentence.');
     await b.bringToFront();
-    await secondEditor.press('Control+End');
+    await secondEditor.click();
+    await expect
+      .poll(async () => {
+        await secondEditor.press('Control+End');
+        return secondEditor.evaluate((editor) => {
+          const selection = window.getSelection();
+          if (!selection?.isCollapsed || !editor.contains(selection.anchorNode)) return false;
+          const beforeCaret = document.createRange();
+          beforeCaret.selectNodeContents(editor);
+          beforeCaret.setEnd(selection.anchorNode!, selection.anchorOffset);
+          return beforeCaret.toString() === editor.textContent;
+        });
+      })
+      .toBe(true);
     await b.keyboard.insertText(' Together.');
     await expect(firstEditor).toHaveText('A shared sentence. Together.');
     const sam = a.locator('[data-participant-name="Sam"]');
