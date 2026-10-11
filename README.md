@@ -4,9 +4,9 @@
 
 # Veil
 
-**Your words. A shared space. Always in view.**
+**Visible to you. Hidden from compatible recordings.**
 
-Real-time collaborative notes with a customizable desktop overlay for Windows.
+Real-time collaborative notes for Windows, with a desktop overlay that can stay out of compatible screen recordings and screen sharing.
 
 [**Download for Windows**](https://github.com/ahmad-fatayerji/veil/releases/latest) · [Getting started](#get-started) · [Self-hosting](https://github.com/ahmad-fatayerji/veil-server) · [Report an issue](https://github.com/ahmad-fatayerji/veil/issues)
 
@@ -16,9 +16,15 @@ Real-time collaborative notes with a customizable desktop overlay for Windows.
 
 </div>
 
-Veil gives you a temporary space to write together and a floating overlay to keep those notes beside whatever you're doing. Use it for meeting notes, a shared checklist, or a quick brainstorming session. Start writing locally, then invite people when you're ready.
+Veil keeps your notes on your screen while **hiding the overlay from compatible recording and screen-sharing methods**. Read your talking points, follow a checklist, or collaborate with your team in a floating window without including that overlay in supported captures. Start writing locally, then invite people when you're ready.
 
 ## See it in action
+
+### Keep your notes on screen, out of the recording
+
+**Recording exclusion is a core Veil feature.** The overlay stays visible on your desktop while compatible capture methods record the content underneath it. Exclusion is on by default; check **Settings → Overlay → Exclude overlay from compatible captures** to keep it enabled for your notes during recordings, presentations, or screen sharing.
+
+Capture exclusion has been verified with OBS Display Capture using DXGI and Windows Graphics Capture, and with FFmpeg GDI and DXGI capture on the tested Windows machine. Other tools and capture modes can behave differently: check a saved recording or the remote viewer's screen before relying on it. The control panel remains capturable. See the [capture compatibility results and built-in test](docs/capture-compatibility.md).
 
 ### Write together
 
@@ -43,6 +49,7 @@ The overlay shows the same live document in a separate window. Move it, resize i
 
 | Make it yours           | What you can do                                                                                           |
 | ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| Hidden from recordings  | Keep the overlay visible to you while excluding it from compatible screen recordings and screen sharing.  |
 | A document in seconds   | Write locally without setting up a server.                                                                |
 | A shared space          | Invite multiple participants with a reusable session link. There is no application-level participant cap. |
 | Notes that stay visible | Edit from the control panel or the movable, resizable overlay.                                            |
@@ -54,7 +61,7 @@ The overlay shows the same live document in a separate window. Move it, resize i
 
 1. [Download the latest Windows installer](https://github.com/ahmad-fatayerji/veil/releases/latest) and run the setup `.exe`. Veil supports Windows 10 and 11 on x64; the installer installs WebView2 if needed.
 2. Open Veil, enter an optional name, and choose **Create document**. You can start writing immediately.
-3. Choose **Show overlay** to keep your document in view. Customize it under **Settings → Overlay**.
+3. Choose **Show overlay** to keep your document in view. Under **Settings → Overlay**, keep **Exclude overlay from compatible captures** enabled and check your recording or screen-sharing output. Customize the overlay's appearance there too.
 
 ![Veil's welcome screen with Create document and Join session tabs](docs/media/welcome.png)
 
