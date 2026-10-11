@@ -15,6 +15,57 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 const OVERLAY: &str = "overlay";
+pub const DEFAULT_HIDE_SHORTCUT: &str = "Ctrl+Alt+Shift+V";
+
+fn recovery_shortcut() -> Shortcut {
+    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV)
+}
+
+fn parse_hide_shortcut(value: &str) -> Result<Shortcut, OverlayError> {
+    let invalid = || {
+        OverlayError::new("INVALID_SHORTCUT", "Choose Ctrl or Alt with a letter, digit or F1-F24, or use a function key. Ctrl+Alt+V is reserved for recovery.")
+    };
+    if value.len() > 40 {
+        return Err(invalid());
+    }
+    let parts: Vec<_> = value.split('+').collect();
+    let key = *parts.last().ok_or_else(invalid)?;
+    let function_key = key
+        .strip_prefix('F')
+        .and_then(|number| number.parse::<u8>().ok())
+        .is_some_and(|number| (1..=24).contains(&number) && key == format!("F{number}"));
+    if !(function_key
+        || (key.len() == 1
+            && key
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())))
+    {
+        return Err(invalid());
+    }
+    let shortcut: Shortcut = value.parse().map_err(|_| invalid())?;
+    let mut canonical = String::new();
+    for (modifier, name) in [
+        (Modifiers::CONTROL, "Ctrl"),
+        (Modifiers::ALT, "Alt"),
+        (Modifiers::SHIFT, "Shift"),
+    ] {
+        if shortcut.mods.contains(modifier) {
+            canonical.push_str(name);
+            canonical.push('+');
+        }
+    }
+    canonical.push_str(key);
+    if canonical != value
+        || (!function_key
+            && !shortcut
+                .mods
+                .intersects(Modifiers::CONTROL | Modifiers::ALT))
+        || shortcut == recovery_shortcut()
+    {
+        return Err(invalid());
+    }
+    Ok(shortcut)
+}
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -221,11 +272,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         save_requests: sender,
         path: path.clone(),
     });
-    let recover = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
-    let hide = Shortcut::new(
-        Some(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT),
-        Code::KeyV,
-    );
+    let recover = recovery_shortcut();
+    let hide = parse_hide_shortcut(&preferences.hide_shortcut).map_err(|error| error.message)?;
     app.handle().plugin(
         tauri_plugin_global_shortcut::Builder::new()
             .with_handler(move |app, shortcut, event| {
@@ -234,9 +282,15 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 {
                     return;
                 }
+                let current = snapshot(app);
                 let result = if shortcut == &recover {
                     recover_controls(app)
-                } else if shortcut == &hide {
+                } else if current.hide_shortcut_available
+                    && parse_hide_shortcut(&current.settings.hide_shortcut)
+                        .ok()
+                        .as_ref()
+                        == Some(shortcut)
+                {
                     toggle_visible(app)
                 } else {
                     Ok(())
@@ -490,6 +544,37 @@ pub fn overlay_update(
     {
         refresh_capture(&app, true)?;
     }
+    Ok(snapshot(&app))
+}
+
+#[tauri::command]
+pub fn overlay_set_shortcut(
+    app: AppHandle,
+    caller: WebviewWindow,
+    shortcut: String,
+) -> Result<Snapshot, OverlayError> {
+    control_only(&caller)?;
+    let next = parse_hide_shortcut(&shortcut)?;
+    let current = snapshot(&app);
+    let previous = parse_hide_shortcut(&current.settings.hide_shortcut)?;
+    if next == previous && current.hide_shortcut_available {
+        return Ok(current);
+    }
+    // Acquire the replacement first, so collisions leave the working binding intact.
+    app.global_shortcut().register(next).map_err(|_| OverlayError::new(
+        "SHORTCUT_UNAVAILABLE",
+        format!("{shortcut} could not be registered. It may be in use by another app. Your current shortcut was kept."),
+    ))?;
+    if current.hide_shortcut_available {
+        if let Err(error) = app.global_shortcut().unregister(previous) {
+            let _ = app.global_shortcut().unregister(next);
+            return Err(OverlayError::native(error));
+        }
+    }
+    modify(&app, |model| {
+        model.settings.hide_shortcut = shortcut;
+        model.hide_shortcut_available = true;
+    });
     Ok(snapshot(&app))
 }
 

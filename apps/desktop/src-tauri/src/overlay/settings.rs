@@ -16,12 +16,14 @@ pub struct Settings {
     pub capture_exclusion: bool,
     pub font_size: u32,
     pub visible: bool,
+    pub hide_shortcut: String,
     pub close_behavior: crate::lifecycle::CloseBehavior,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            hide_shortcut: super::DEFAULT_HIDE_SHORTCUT.to_owned(),
             version: 1,
             x: 80,
             y: 80,
@@ -52,6 +54,7 @@ impl Settings {
                 "Overlay settings are outside the supported range.",
             ));
         }
+        super::parse_hide_shortcut(&self.hide_shortcut)?;
         Ok(())
     }
 
@@ -134,6 +137,46 @@ mod tests {
             crate::lifecycle::CloseBehavior::Quit
         );
         assert_eq!(load(&path).unwrap().opacity, 0.65);
+    }
+
+    #[test]
+    fn shortcut_preferences_migrate_persist_and_reject_invalid_bindings() {
+        let legacy: Settings = serde_json::from_str(r#"{"version":1}"#).unwrap();
+        assert_eq!(legacy.hide_shortcut, super::super::DEFAULT_HIDE_SHORTCUT);
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("overlay.json");
+        let mut settings = Settings {
+            hide_shortcut: "Ctrl+Shift+H".to_owned(),
+            ..legacy
+        };
+        save(&path, &settings).unwrap();
+        assert_eq!(load(&path).unwrap().hide_shortcut, "Ctrl+Shift+H");
+        for invalid in [
+            "",
+            "V",
+            "Shift+V",
+            "Ctrl+Alt+V",
+            "Ctrl+Ctrl+H",
+            "Alt+Ctrl+H",
+            "Super+H",
+            "Ctrl+Enter",
+            "F25",
+            "F01",
+            "Ctrl+H+J",
+        ] {
+            settings.hide_shortcut = invalid.to_owned();
+            assert!(save(&path, &settings).is_err(), "{invalid}");
+        }
+        for valid in [
+            "Ctrl+H",
+            "Alt+Shift+9",
+            "F8",
+            "Shift+F24",
+            "Ctrl+Alt+Shift+V",
+        ] {
+            settings.hide_shortcut = valid.to_owned();
+            settings.validate().unwrap();
+        }
     }
 
     #[test]

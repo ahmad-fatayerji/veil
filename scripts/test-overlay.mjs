@@ -547,6 +547,73 @@ try {
   await waitFor(async () => (await snapshot(main)).settings.visible, 'overlay shown by shortcut');
   assert.equal(native('Probe').visible, true);
   console.log('PASS: clicks reach the underlying app, global recovery, global hide/show');
+  // Record through the UI; test real global rebinding with the unrelated app focused.
+  await main.getByRole('button', { name: 'Change shortcut', exact: true }).click();
+  await main.getByRole('button', { name: 'Press shortcut...', exact: true }).press('Escape');
+  assert.equal((await snapshot(main)).settings.hideShortcut, 'Ctrl+Alt+Shift+V');
+  await main.getByRole('button', { name: 'Change shortcut', exact: true }).click();
+  await main
+    .getByRole('button', { name: 'Press shortcut...', exact: true })
+    .press('Control+Shift+H');
+  await waitFor(
+    async () => (await snapshot(main)).settings.hideShortcut === 'Ctrl+Shift+H',
+    'custom binding saved',
+  );
+  native('Raise', {}, 'main', underlay.pid);
+  const shortcutSurface = native('Probe', {}, 'main', underlay.pid);
+  native('Click', {
+    X: shortcutSurface.clientX + shortcutSurface.width - 50,
+    Y: shortcutSurface.clientY + shortcutSurface.height - 80,
+  });
+  await waitFor(
+    () => native('Probe', {}, 'main', underlay.pid).foreground,
+    'independent app focused for custom shortcut',
+  );
+  native('CustomToggle');
+  await waitFor(
+    async () => !(await snapshot(main)).settings.visible,
+    'custom shortcut hides outside Veil',
+  );
+  native('Toggle');
+  await delay(400);
+  assert.equal((await snapshot(main)).settings.visible, false, 'Old shortcut no longer toggles.');
+  native('CustomToggle');
+  await waitFor(
+    async () => (await snapshot(main)).settings.visible,
+    'custom shortcut shows outside Veil',
+  );
+  const reserved = await main.evaluate(() =>
+    window.__TAURI_INTERNALS__
+      .invoke('overlay_set_shortcut', { shortcut: 'Ctrl+Alt+V' })
+      .catch((error) => error),
+  );
+  assert.equal(reserved.code, 'INVALID_SHORTCUT');
+  const shortcutForbidden = await overlay.evaluate(() =>
+    window.__TAURI_INTERNALS__
+      .invoke('overlay_set_shortcut', { shortcut: 'Ctrl+Shift+J' })
+      .catch((error) => error),
+  );
+  assert.equal(shortcutForbidden.code, 'FORBIDDEN');
+  await main.getByRole('button', { name: 'Reset shortcut', exact: true }).click();
+  await waitFor(
+    async () => (await snapshot(main)).settings.hideShortcut === 'Ctrl+Alt+Shift+V',
+    'reset default binding',
+  );
+  native('Toggle');
+  await waitFor(async () => !(await snapshot(main)).settings.visible, 'reset default works');
+  native('Toggle');
+  await waitFor(async () => (await snapshot(main)).settings.visible, 'reset default shows');
+  await main.getByRole('button', { name: 'Change shortcut', exact: true }).click();
+  await main
+    .getByRole('button', { name: 'Press shortcut...', exact: true })
+    .press('Control+Shift+H');
+  await waitFor(
+    async () => (await snapshot(main)).settings.hideShortcut === 'Ctrl+Shift+H',
+    'custom binding for restart',
+  );
+  console.log(
+    'PASS: custom hide/show recording, cancel, reset, native authorization and recovery reservation',
+  );
   native('Close', {}, 'main', underlay.pid);
 
   await main.getByRole('button', { name: 'Reset position & size' }).click();
@@ -605,6 +672,7 @@ try {
     'alwaysOnTop',
     'clickThrough',
     'visible',
+    'hideShortcut',
   ])
     assert.equal(after[field], before[field], `${field} restored after restart`);
   assert.equal(native('Probe').alpha, 191);
@@ -617,6 +685,16 @@ try {
     'recover restored click-through after restart',
   );
 
+  native('CustomToggle');
+  await waitFor(
+    async () => !(await snapshot(main)).settings.visible,
+    'custom shortcut after restart hides',
+  );
+  native('CustomToggle');
+  await waitFor(
+    async () => (await snapshot(main)).settings.visible,
+    'custom shortcut after restart shows',
+  );
   // A second native instance cannot acquire the shortcut already held by the first.
   const conflictDirectory = resolve(directory, 'conflict');
   await mkdir(conflictDirectory);
@@ -663,6 +741,32 @@ try {
     .click();
   const conflict = await snapshot(other);
   assert.equal(conflict.recoveryAvailable, false);
+  assert.equal(conflict.hideShortcutAvailable, false);
+  await other.evaluate(() =>
+    window.__TAURI_INTERNALS__.invoke('overlay_set_shortcut', { shortcut: 'Ctrl+Shift+J' }),
+  );
+  assert.equal(
+    (await snapshot(other)).hideShortcutAvailable,
+    true,
+    'Can replace unavailable startup binding.',
+  );
+  const collision = await main.evaluate(() =>
+    window.__TAURI_INTERNALS__
+      .invoke('overlay_set_shortcut', { shortcut: 'Ctrl+Shift+J' })
+      .catch((error) => error),
+  );
+  assert.equal(collision.code, 'SHORTCUT_UNAVAILABLE');
+  assert.equal((await snapshot(main)).settings.hideShortcut, 'Ctrl+Shift+H');
+  native('CustomToggle');
+  await waitFor(
+    async () => !(await snapshot(main)).settings.visible,
+    'collision retained previous shortcut',
+  );
+  native('CustomToggle');
+  await waitFor(
+    async () => (await snapshot(main)).settings.visible,
+    'retained shortcut still shows',
+  );
   assert.equal(
     conflict.settings.clickThrough,
     false,

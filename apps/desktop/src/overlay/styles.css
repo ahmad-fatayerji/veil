@@ -78,6 +78,17 @@
   font-size: 11px;
   color: var(--muted);
 }
+.overlay-shortcut-controls {
+  flex-wrap: wrap;
+  margin-inline: 0;
+}
+.overlay-shortcut-controls span {
+  margin-left: 0;
+  margin-right: auto;
+}
+.overlay-shortcut-controls kbd {
+  color: var(--text);
+}
 .overlay-help {
   font-size: 11px;
   color: var(--muted);

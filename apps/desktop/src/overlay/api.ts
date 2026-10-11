@@ -22,6 +22,7 @@ export interface OverlaySettings {
   fontSize: number;
   visible: boolean;
   closeBehavior: 'tray' | 'quit';
+  hideShortcut: string;
 }
 
 export interface OverlaySnapshot {
