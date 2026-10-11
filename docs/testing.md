@@ -1,5 +1,11 @@
 # Verification record
 
+## Change-based CI
+
+PR check selection and gate enforcement are implemented in `scripts/ci-plan.mjs`, with regression cases in `scripts/ci-plan.test.mjs` and `scripts/workflows.test.mjs`. The gate must reject failed/cancelled/missing jobs and any skip not explicitly selected as unnecessary. Unknown paths and dependency/workflow configuration changes select every check. Release validation and nightly CI always run the full suite.
+
+`VEIL_NETWORK_MODE=smoke pnpm test:network` checks one direct and one forced-relay guest, staged fallback, selected ICE paths, concurrent document convergence, presence, session cleanup and TURN allocation cleanup. Run again with `VEIL_TURN_TRANSPORT=tcp` for TURN TCP. Ordinary networking PRs run both transports. The default `pnpm test:network` retains the full six-peer handover/recovery/load/capacity/outage suite; nightly and release validation explicitly use `VEIL_NETWORK_MODE=full`. These are loopback/container tests, not real-internet acceptance.
+
 ## Create, Share, Join verification — 10 October 2026
 
 The desktop creates an offline temporary document before hosting, keeps configuration in Settings, and shares one reusable version-4 `veil://join/...` link. Browser and overlay share light/dark/System tokens and accessible dialogs. The compatible public server is coordinated in [server PR #3](https://github.com/ahmad-fatayerji/veil-server/pull/3).
