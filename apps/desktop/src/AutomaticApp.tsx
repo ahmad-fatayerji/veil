@@ -589,14 +589,6 @@ export function AutomaticApp() {
                 app closes Veil and its overlay immediately. You can reopen Veil, show or hide the
                 overlay, or quit from the tray menu.
               </p>
-              <button
-                className="danger-button"
-                disabled={busy || updating}
-                onClick={() => setConfirmQuit(true)}
-              >
-                Quit Veil
-              </button>
-              <p className="muted">Fully closes Veil and its overlay, ending your session.</p>
             </section>
             <section hidden={section !== 'Appearance'}>
               <h3>Appearance</h3>

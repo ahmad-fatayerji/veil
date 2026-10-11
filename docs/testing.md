@@ -1,5 +1,13 @@
 # Verification record
 
+## General settings quit cleanup ? 11 October 2026
+
+General no longer shows the standalone **Quit Veil** button or its explanatory line. The existing native **Quit app** close path exits immediately without a confirmation, including with a temporary document and visible overlay. Default tray behavior and tray quit confirmation remain unchanged.
+
+`pnpm check`, both production frontend builds, 24 TypeScript tests and 25 Rust tests passed; two signed-artifact tests were intentionally ignored. The initial parallel Rust run hit the previously recorded updater timing failures during concurrent builds; the full serial Rust rerun passed. The debug executable finished rebuilding after Cargo tests. `node scripts/test-tray-close.mjs` passed actual Windows/WebView2 default tray close, overlay/document preservation, absent Settings quit controls, quit cancellation/exit through the registered tray-request listener, saved Quit preference after restart, and immediate native window-close exit with an active document/overlay. The Settings screenshot was visually inspected. Evidence: `target/tray-acceptance/run-z6XxRE/`.
+
+The fixture invokes the existing Tauri listener rather than clicking the physical tray menu. Physical tray-menu interaction, non-Windows behavior and multi-peer networking while hidden remain unverified. No release was published.
+
 ## Normal cursor with local gesture hints — 11 October 2026
 
 With the saved capture-exclusion preference on, overlay move/resize handles use the normal arrow and show a compact Move/Resize direction badge inside the header. Active gestures take precedence over hover and retain the arrow over document content. Gesture completion/errors clear active state; native window-focus events supplement browser blur, and hiding/click-through clear hover. Handles prevent browser selection/drag-and-drop so repeated resizing cannot start a separate forbidden drag cursor. Idle editing and exclusion-off cursors remain ordinary. No global cursor settings or production native command interfaces changed.
