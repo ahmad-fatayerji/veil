@@ -42,6 +42,7 @@ fn main() {
             lifecycle::app_quit,
             overlay::overlay_snapshot,
             overlay::overlay_update,
+            overlay::overlay_set_shortcut,
             overlay::overlay_capture_check,
             overlay::overlay_capture_test,
             overlay::overlay_visibility,

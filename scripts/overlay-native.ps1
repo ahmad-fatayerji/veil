@@ -1,9 +1,10 @@
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Focus','Probe','CursorProbe','MovePointer','Escape','Click','Drag','HoldDrag','Move','Recover','Toggle','Capture','Pixel','Close')][string]$Action,
+  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Focus','Probe','CursorProbe','MovePointer','Escape','Click','Drag','HoldDrag','Move','Recover','Toggle','CustomToggle','Capture','Pixel','Close')][string]$Action,
   [Parameter(Mandatory=$true)][int]$AppProcessId,
   [ValidateSet('main','overlay')][string]$Window = 'overlay',
   [int]$X = 0, [int]$Y = 0, [int]$ToX = 0, [int]$ToY = 0,
   [int]$Width = 0, [int]$Height = 0,
+  [int]$KeyCode = 0x48,
   [string]$OutputPath
 )
 $ErrorActionPreference = 'Stop'
@@ -74,6 +75,11 @@ public class VeilNativeTest {
       mouse_event(4,0,0,0,UIntPtr.Zero);
       if (!SystemParametersInfo(0x25,(uint)original,ref unused,0)) throw new Exception("Cannot restore drag-full-windows setting.");
     }
+  }
+  public static void CustomShortcut(byte key) {
+    keybd_event(0x11,0,0,UIntPtr.Zero); keybd_event(0x10,0,0,UIntPtr.Zero);
+    keybd_event(key,0,0,UIntPtr.Zero); Thread.Sleep(100); keybd_event(key,0,2,UIntPtr.Zero);
+    keybd_event(0x10,0,2,UIntPtr.Zero); keybd_event(0x11,0,2,UIntPtr.Zero); Thread.Sleep(150);
   }
   public static void Shortcut(bool shift) {
     keybd_event(0x11,0,0,UIntPtr.Zero); keybd_event(0x12,0,0,UIntPtr.Zero);
@@ -156,6 +162,7 @@ switch ($Action) {
     [VeilNativeTest]::SetWindowPos($handle,[IntPtr]::Zero,$X,$Y,$Width,$Height,$flags) | Out-Null
   }
   'Recover' { [VeilNativeTest]::Shortcut($false) }
+  'CustomToggle' { [VeilNativeTest]::CustomShortcut([byte]$KeyCode) }
   'Toggle' { [VeilNativeTest]::Shortcut($true) }
   'Close' { [VeilNativeTest]::PostMessage($handle,0x10,[IntPtr]::Zero,[IntPtr]::Zero) | Out-Null }
   'Pixel' {

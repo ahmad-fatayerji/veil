@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { errorMessage, invoke, useOverlay, type OverlayPatch, type OverlaySnapshot } from './api';
 
 export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boolean }) {
   const { state, setState, error, setError } = useOverlay();
   const [expanded, setExpanded] = useState(settingsOnly);
   const [captureExpanded, setCaptureExpanded] = useState(false);
+  const [recordingShortcut, setRecordingShortcut] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<OverlayPatch>({});
   const pending = useRef<OverlayPatch>({});
@@ -50,6 +51,45 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
     } finally {
       setBusy(false);
     }
+  }
+  function recordShortcut(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!recordingShortcut || event.key === 'Tab') return;
+    event.preventDefault();
+    if (event.key === 'Escape') {
+      setRecordingShortcut(false);
+      setError('');
+      return;
+    }
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key) || event.repeat) return;
+    const key = event.code.startsWith('Key')
+      ? event.code.slice(3)
+      : event.code.startsWith('Digit')
+        ? event.code.slice(5)
+        : /^F([1-9]|1[0-9]|2[0-4])$/.test(event.code)
+          ? event.code
+          : '';
+    if (
+      !key ||
+      event.metaKey ||
+      (!event.ctrlKey && !event.altKey && !/^F([1-9]|1[0-9]|2[0-4])$/.test(key))
+    ) {
+      setError('Use Ctrl or Alt with a letter, digit or F1-F24, or use a function key.');
+      return;
+    }
+    const shortcut = [
+      event.ctrlKey && 'Ctrl',
+      event.altKey && 'Alt',
+      event.shiftKey && 'Shift',
+      key,
+    ]
+      .filter(Boolean)
+      .join('+');
+    if (shortcut === 'Ctrl+Alt+V') {
+      setError('Ctrl+Alt+V is reserved for recovery. Choose another shortcut.');
+      return;
+    }
+    setRecordingShortcut(false);
+    void run('overlay_set_shortcut', { shortcut });
   }
   const update = (patch: OverlayPatch) => run('overlay_update', { patch });
   return (
@@ -148,6 +188,44 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
             Drag the overlay header to move it, or an edge to resize it. Appearance is saved on this
             device.
           </p>
+          <div className="overlay-settings-actions overlay-shortcut-controls">
+            <span>
+              Hide/show shortcut: <kbd>{state.settings.hideShortcut}</kbd>
+            </span>
+            <button
+              className="outline-button"
+              disabled={busy}
+              aria-pressed={recordingShortcut}
+              onClick={() => {
+                setError('');
+                setRecordingShortcut(!recordingShortcut);
+              }}
+              onKeyDown={recordShortcut}
+              onBlur={() => setRecordingShortcut(false)}
+            >
+              {recordingShortcut ? 'Press shortcut...' : 'Change shortcut'}
+            </button>
+            <button
+              className="quiet-button"
+              disabled={
+                busy ||
+                (state.settings.hideShortcut === 'Ctrl+Alt+Shift+V' && state.hideShortcutAvailable)
+              }
+              onClick={() => {
+                setRecordingShortcut(false);
+                void run('overlay_set_shortcut', { shortcut: 'Ctrl+Alt+Shift+V' });
+              }}
+            >
+              Reset shortcut
+            </button>
+          </div>
+          <p className="overlay-help" aria-live="polite">
+            {recordingShortcut
+              ? 'Press Ctrl or Alt with a letter, digit or F1-F24, or a function key. Escape cancels.'
+              : 'This global shortcut works outside Veil and is saved on this device.'}
+            {!state.hideShortcutAvailable &&
+              ' Shortcut unavailable. Choose another combination or use the tray or Show/Hide overlay button.'}
+          </p>
           <p className="overlay-help">
             {state.recoveryAvailable ? (
               <>
@@ -158,7 +236,7 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
             )}{' '}
             {state.hideShortcutAvailable && (
               <>
-                <kbd>Ctrl+Alt+Shift+V</kbd> hides or shows the overlay.
+                <kbd>{state.settings.hideShortcut}</kbd> hides or shows the overlay.
               </>
             )}
           </p>

@@ -74,7 +74,8 @@ validated, and saved separately from the document.
 
 Support opacity, font size, always on top, movement, resizing, hide/show, and
 click-through. Click-through requires a registered recovery shortcut. Ctrl+Alt+V
-restores interaction and the control panel; Ctrl+Alt+Shift+V toggles overlay visibility.
+restores interaction and the control panel; Ctrl+Alt+Shift+V toggles overlay visibility by default; Settings supports a custom,
+device-local hide/show shortcut with collision rejection and reset to default.
 Tray controls offer recovery as well. Closing the main window moves to the tray by
 default; the configurable quit behavior must remain explicit because documents
 are temporary.
