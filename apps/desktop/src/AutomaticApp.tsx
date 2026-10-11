@@ -25,6 +25,7 @@ import { nativeSignaling } from './networking';
 import { DesktopEditor, SessionBridge } from './overlay/session';
 import { OverlayControls } from './overlay/Controls';
 import { Updates } from './Updates';
+import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
 
 type Section = 'General' | 'Appearance' | 'Hosting server' | 'Overlay' | 'Updates' | 'About';
@@ -48,7 +49,7 @@ export function AutomaticApp() {
   const [serverTest, setServerTest] = useState('');
   const [testingServer, setTestingServer] = useState(false);
   const [savingServer, setSavingServer] = useState(false);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(readDisplayName);
   const [invitation, setInvitation] = useState('');
   const [link, setLink] = useState('');
   const [peers, setPeers] = useState<PeerSummary[]>([]);
@@ -71,6 +72,10 @@ export function AutomaticApp() {
   const { appearance, setAppearance } = useAppearance();
   const overlay = useOverlay();
   const onUpdateBusy = useCallback((value: boolean) => setUpdating(value), []);
+  function updateName(value: string) {
+    saveDisplayName(value);
+    setName(value);
+  }
   useEffect(() => {
     const unlisten = listen('app-quit-requested', () => setConfirmQuit(true));
     const unlistenFailure = listen<string>('app-quit-failed', (event) => setError(event.payload));
@@ -438,7 +443,7 @@ export function AutomaticApp() {
                   value={name}
                   maxLength={40}
                   disabled={busy}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => updateName(e.target.value)}
                 />
                 {tab === 'join' && (
                   <>
@@ -589,14 +594,6 @@ export function AutomaticApp() {
                 app closes Veil and its overlay immediately. You can reopen Veil, show or hide the
                 overlay, or quit from the tray menu.
               </p>
-              <button
-                className="danger-button"
-                disabled={busy || updating}
-                onClick={() => setConfirmQuit(true)}
-              >
-                Quit Veil
-              </button>
-              <p className="muted">Fully closes Veil and its overlay, ending your session.</p>
             </section>
             <section hidden={section !== 'Appearance'}>
               <h3>Appearance</h3>
@@ -617,7 +614,7 @@ export function AutomaticApp() {
                 value={name}
                 maxLength={40}
                 onChange={(e) => {
-                  setName(e.target.value);
+                  updateName(e.target.value);
                   if (document)
                     document.provider.awareness.setLocalStateField('user', {
                       ...document.provider.awareness.getLocalState()?.user,

@@ -69,6 +69,23 @@ const invoke = (page, command, args) =>
     command,
     args,
   });
+// Exercise the event emitted by the tray menu without requiring a physical
+// tray-menu pointer action. The Settings panel has no standalone quit button.
+const requestTrayQuit = (page) =>
+  page.evaluate(() => {
+    const event = 'app-quit-requested';
+    const listeners = Object.values(Object.getOwnPropertyDescriptors(window))
+      .map((property) => property.value)
+      .find((value) => value && Object.hasOwn(value, event))?.[event];
+    if (!listeners) throw new Error('Tray quit listener is not registered');
+    for (const id of Object.getOwnPropertyNames(listeners)) {
+      window.__TAURI_INTERNALS__.runCallback(listeners[id].handlerId, {
+        event,
+        id: Number(id),
+        payload: null,
+      });
+    }
+  });
 try {
   await waitFor(async () => (await fetch(`${endpoint}/json/version`).catch(() => null))?.ok);
   browser = await chromium.connectOverCDP(endpoint);
@@ -94,12 +111,16 @@ try {
   await main.getByRole('button', { name: 'Settings', exact: true }).click();
   const settings = main.getByRole('dialog', { name: 'Settings', exact: true });
   await expect(settings.getByLabel('When closing the main window')).toHaveValue('tray');
+  await expect(settings.getByRole('button', { name: 'Quit Veil', exact: true })).toHaveCount(0);
+  await expect(
+    settings.getByText('Fully closes Veil and its overlay, ending your session.'),
+  ).toHaveCount(0);
   await main.screenshot({ path: resolve(directory, 'settings.png') });
   await settings.getByLabel('When closing the main window').selectOption('quit');
   await waitFor(
     async () => (await invoke(main, 'overlay_snapshot')).settings.closeBehavior === 'quit',
   );
-  await settings.getByRole('button', { name: 'Quit Veil', exact: true }).click();
+  await requestTrayQuit(main);
   const quit = main.getByRole('dialog', { name: 'Quit Veil?', exact: true });
   await expect(quit).toContainText('temporary');
   await main.screenshot({ path: resolve(directory, 'quit-confirmation.png') });
@@ -117,7 +138,7 @@ try {
   await waitFor(() => !native('Probe', 'main').visible);
   assert.equal(native('Probe', 'overlay').visible, false);
   native('Focus', 'main');
-  await settings.getByRole('button', { name: 'Quit Veil', exact: true }).click();
+  await requestTrayQuit(main);
   await expect(quit).toBeVisible();
   await quit.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(quit).not.toBeVisible();
@@ -125,7 +146,7 @@ try {
   await waitFor(
     async () => (await invoke(main, 'overlay_snapshot')).settings.closeBehavior === 'quit',
   );
-  await settings.getByRole('button', { name: 'Quit Veil', exact: true }).click();
+  await requestTrayQuit(main);
   await quit.getByRole('button', { name: 'Quit Veil', exact: true }).click();
   await waitFor(() => app.exitCode !== null);
   assert.equal(app.exitCode, 0);
