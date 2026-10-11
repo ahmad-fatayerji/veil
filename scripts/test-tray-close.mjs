@@ -116,10 +116,16 @@ try {
   }
   assert.equal(app.exitCode, null);
   await expect(main.locator('.tiptap')).toContainText('Tray keeps my temporary document');
-  await assert.rejects(
-    invoke(overlay, 'overlay_visibility', { visible: true }),
-    /Only the control panel/,
-  );
+  const forbiddenShow = await overlay.evaluate(async () => {
+    try {
+      await window.__TAURI_INTERNALS__.invoke('overlay_visibility', { visible: true });
+      return null;
+    } catch (error) {
+      return error;
+    }
+  });
+  assert.equal(forbiddenShow?.code, 'FORBIDDEN');
+  assert.match(forbiddenShow.message, /Use the control panel/);
   await invoke(main, 'overlay_visibility', { visible: true });
   await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
   native('Move', 'overlay', [
