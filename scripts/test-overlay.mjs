@@ -211,7 +211,7 @@ try {
   assert.equal(
     await overlay.locator('.collaboration-carets__caret').count(),
     0,
-    'Overlay has no remote cursors.',
+    'Overlay has no cursors before joining a document.',
   );
   await setRange(main, 'Opacity', 40);
   await waitFor(async () => (await snapshot(main)).settings.opacity === 0.4, 'opacity applied');
@@ -278,6 +278,15 @@ try {
     async () => (await overlayGuestActivity.textContent()).startsWith('Typing'),
     'overlay shows remote typing',
   );
+  const guestCaret = overlay.locator('.collaboration-carets__label[data-name="Browser guest"]');
+  await waitFor(async () => (await guestCaret.count()) === 1, 'overlay shows named remote cursor');
+  assert.equal(await guestCaret.isVisible(), true, 'Remote cursor name is visible in the overlay.');
+  assert.equal(
+    await overlay.locator('.collaboration-carets__label[data-name="Desktop author"]').count(),
+    0,
+    'The desktop identity does not appear as a remote overlay cursor.',
+  );
+  await overlay.screenshot({ path: resolve(directory, 'named-remote-cursor.png') });
   await waitFor(
     async () => (await overlayGuestActivity.textContent()) === 'In document',
     'overlay typing settles after idle',
@@ -287,6 +296,35 @@ try {
     async () => (await overlayGuestActivity.textContent()) === 'Selecting text',
     'overlay shows remote selection activity',
   );
+  await waitFor(
+    async () =>
+      (await overlay
+        .locator('.collaboration-selection[data-selection-user="Browser guest"]')
+        .count()) > 0,
+    'overlay shows remote selection highlight',
+  );
+  assert.match(
+    await overlay
+      .locator('.collaboration-selection[data-selection-user="Browser guest"]')
+      .first()
+      .getAttribute('style'),
+    /background-color:/,
+  );
+  await overlay.reload();
+  await waitFor(
+    async () => (await guestCaret.count()) === 1,
+    'reopened overlay receives the current remote cursor',
+  );
+  await waitFor(
+    async () =>
+      (await overlay
+        .locator('.collaboration-selection[data-selection-user="Browser guest"]')
+        .count()) > 0,
+    'reopened overlay receives the current remote selection',
+  );
+  // Awareness expires after 30 seconds without forwarded network heartbeats.
+  await delay(32000);
+  assert.equal(await guestCaret.isVisible(), true, 'Idle remote cursor survives awareness expiry.');
   await guestEditor.press('ArrowRight');
   // The guest uses headless Chromium, so native window activation cannot blur it.
   await guest.getByRole('button', { name: 'Settings', exact: true }).focus();
@@ -301,6 +339,15 @@ try {
     async () => (await overlayGuestActivity.textContent()) === 'Away from document',
     'overlay shows remote away activity',
   );
+  await waitFor(async () => (await guestCaret.count()) === 0, 'blur clears overlay remote cursor');
+  const alignment = await overlay
+    .locator('[data-participant-name="Browser guest"]')
+    .evaluate((row) => {
+      const name = row.querySelector('.overlay-person-name').getBoundingClientRect();
+      const activity = row.querySelector('.participant-activity').getBoundingClientRect();
+      return Math.abs(name.top + name.height / 2 - activity.top - activity.height / 2);
+    });
+  assert.ok(alignment < 1, 'Participant name and away status are vertically aligned.');
   await waitFor(
     async () =>
       (await overlayEditor.textContent()) === (await guestEditor.textContent()) &&
@@ -393,11 +440,17 @@ try {
     async () => (await overlayEditor.textContent()) === (await guestEditor.textContent()),
     'rejoining rebinds overlay',
   );
+  await guestEditor.press('Control+End');
+  await waitFor(async () => (await guestCaret.count()) === 1, 'remote cursor returns after rejoin');
   await guestBrowser.close();
   guestBrowser = undefined;
   await waitFor(
     async () => (await overlay.locator('[data-participant-name="Browser guest"]').count()) === 0,
     'departing participant disappears from overlay',
+  );
+  await waitFor(
+    async () => (await guestCaret.count()) === 0,
+    'departing cursor disappears from overlay',
   );
   console.log(
     'PASS: shared desktop/overlay/browser editing, one identity, cursor/selection, concurrent edits, disconnect/reconnect, leave/rejoin',

@@ -233,6 +233,8 @@ html.overlay-mode,
 }
 .overlay-participants .participant-activity {
   flex-shrink: 0;
+  margin-top: 0;
+  font-size: inherit;
 }
 .overlay-resize {
   position: absolute;
