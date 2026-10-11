@@ -4,6 +4,11 @@
 
 ## 1. Product vision
 
+### Approved repository consolidation
+
+The user has authorized importing audited desktop source history into `ahmad-fatayerji/veil` under MIT, preserving existing releases, updater URLs, signing identity, and application versions during migration. `main` retains approved release source; `develop` retains unreleased work. Migration and feed PRs never publish installers. The next beta/stable release follows migration validation, and `Veil-source` remains a private fallback until actual upgrade acceptance succeeds. Earlier private-source descriptions below are historical.
+
+
 ### Approved experience revision: Create, Share, Join
 
 The current overhaul supersedes the P2 single-use invitation journey below. Opening Veil offers Create document, Join session, and Settings. Creating is offline and immediate; Share attaches networking to the existing Yjs document without replacing its identity, content, selection, or overlay bridge. Appearance (System/light/dark), hosting server/credential, overlay preferences, updates, and About live in Settings. Sharing resumes after missing hosting configuration is saved; failed activation retains the editable local document for retry. Local documents also block updater installation.

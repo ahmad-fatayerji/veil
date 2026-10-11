@@ -12,21 +12,23 @@ on:
         required: true
         type: string
     secrets:
-      RELEASES_TOKEN:
-        required: true
       TAURI_SIGNING_PRIVATE_KEY:
         required: true
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
         required: true
 permissions:
   contents: write
+  pull-requests: write
+  actions: write
 concurrency:
   group: public-release-publication
   cancel-in-progress: false
 jobs:
   publish:
+    if: github.repository == 'ahmad-fatayerji/veil' && vars.RELEASE_PUBLICATION_ENABLED == 'true'
     runs-on: windows-latest
     env:
+      RELEASE_PUBLICATION_ENABLED: ${{ vars.RELEASE_PUBLICATION_ENABLED }}
       CARGO_PROFILE_DEV_DEBUG: 1
       CARGO_PROFILE_TEST_DEBUG: 1
       CARGO_TARGET_DIR: ${{ github.workspace }}/target/verifier
@@ -63,7 +65,7 @@ jobs:
       - name: Validate release source before signing
         env:
           RELEASE_BRANCH: ${{ inputs.branch }}
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/publish-release.mjs preflight
       - name: Bundle and sign the validated executable without recompiling
         env:
@@ -84,7 +86,7 @@ jobs:
       - name: Publish complete release and advance beta feed
         env:
           RELEASE_BRANCH: ${{ inputs.branch }}
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/publish-release.mjs publish
       - uses: actions/upload-artifact@v7
         if: always()

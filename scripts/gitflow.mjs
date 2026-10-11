@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { format } from 'prettier';
 import semver from 'semver';
+import {
+  isFeedBranch,
+  isReleaseBranch,
+  verifyFeedPull,
+  distributionRepository,
+} from './update-feed.mjs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import {
   assertBranchPolicy,
@@ -11,7 +19,7 @@ import {
 } from './release-lib.mjs';
 import { readJson, setVersion, verifyVersions, writeJson } from './release-files.mjs';
 
-const repo = process.env.GITHUB_REPOSITORY ?? 'ahmad-fatayerji/Veil-source';
+const repo = process.env.GITHUB_REPOSITORY ?? 'ahmad-fatayerji/veil';
 const publicRepo = 'ahmad-fatayerji/veil';
 const run = (file, args) =>
   execFileSync(file, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -48,7 +56,16 @@ function commit(message) {
 }
 function messagesSince(ref) {
   git('merge-base', '--is-ancestor', ref, 'HEAD');
-  return git('log', '--no-merges', '--format=%B%x00', `${ref}..HEAD`)
+  const distributionBase = existsSync('.release/migration.json')
+    ? readJson('.release/migration.json').publicBase
+    : null;
+  return git(
+    'log',
+    '--no-merges',
+    '--format=%B%x00',
+    `${ref}..HEAD`,
+    ...(distributionBase ? ['--not', distributionBase] : []),
+  )
     .split('\0')
     .map((item) => item.trim())
     .filter(Boolean)
@@ -100,10 +117,59 @@ async function main() {
     }
     if (event.pull_request) {
       const pull = event.pull_request;
-      if (pull.head.repo.full_name !== repo)
-        throw new Error('Use a branch in the source repository.');
+      if (pull.head.repo.full_name !== repo && !pull.head.ref.startsWith('feature/'))
+        throw new Error('Management PRs require a branch in this repository.');
       const version = verifyVersions();
       assertBranchPolicy({ base: pull.base.ref, head: pull.head.ref, title: pull.title, version });
+      if (isFeedBranch(pull.head.ref)) {
+        verifyFeedPull(pull, repo);
+        return;
+      }
+      if (pull.head.ref === 'migration/source-import') {
+        if (repo !== distributionRepository)
+          throw new Error('Migration is public-repository only.');
+        git('fetch', 'origin', pull.base.sha, pull.head.sha, '--tags');
+        let alreadyImported = false;
+        try {
+          git('cat-file', '-e', `${pull.base.sha}:apps/desktop/src-tauri/tauri.conf.json`);
+          alreadyImported = true;
+        } catch {
+          /* initial distribution tree */
+        }
+        if (alreadyImported) throw new Error('Source import is a one-time route.');
+        const migration = JSON.parse(git('show', `${pull.head.sha}:.release/migration.json`));
+        if (
+          migration.sourceMain !== '7d74ec6259c68c86ad78039c5dae55d200444461' ||
+          migration.publicBase !== pull.base.sha
+        )
+          throw new Error('Migration must match the audited source and current distribution base.');
+        git('merge-base', '--is-ancestor', migration.sourceMain, pull.head.sha);
+        const files = api(
+          `repos/${repo}/pulls/${pull.number}/files?per_page=100`,
+          '--paginate',
+          '--slurp',
+        ).flat();
+        // The import may add all approved source files, but its source delta is tooling/documentation only.
+        for (const path of git('diff', '--name-only', migration.sourceMain, pull.head.sha)
+          .split('\n')
+          .filter(Boolean))
+          if (
+            !/^(scripts\/|\.github\/|docs\/|\.release\/|updates\/beta\.json$|LICENSE$|README\.md$|AGENTS\.md$|PROJECT_SPEC\.md$)/.test(
+              path,
+            )
+          )
+            throw new Error('Migration changed approved application source.');
+        if (!files.length) throw new Error('Empty migration.');
+        if (
+          git('show', `${pull.base.sha}:updates/beta.json`) !==
+          git('show', `${pull.head.sha}:updates/beta.json`)
+        )
+          throw new Error('Migration changed the live beta feed.');
+        const baseline = JSON.parse(git('show', `${pull.head.sha}:.release/baseline.json`));
+        if (baseline.version !== '0.3.0' || baseline.sourceRef !== 'refs/tags/legacy-source/v0.3.0')
+          throw new Error('Migration baseline must reference approved legacy source.');
+        return;
+      }
       if (pull.base.ref === 'main') {
         const candidate = readJson('.release/candidate.json');
         const baseline = readJson('.release/baseline.json');
@@ -136,6 +202,16 @@ async function main() {
       version,
       mergeMethod: method,
     });
+    if (isFeedBranch(pull.head.ref)) verifyFeedPull(pull, repo);
+    if (pull.head.ref === 'migration/source-import') {
+      const eventFile = join(tmpdir(), `veil-migration-policy-${pull.number}.json`);
+      writeFileSync(eventFile, JSON.stringify({ pull_request: pull }));
+      run('git', ['fetch', 'origin', pull.base.ref]);
+      execFileSync(process.execPath, ['scripts/gitflow.mjs', 'policy'], {
+        stdio: 'inherit',
+        env: { ...process.env, GITHUB_EVENT_PATH: eventFile },
+      });
+    }
     gh(
       'pr',
       'merge',
@@ -149,7 +225,7 @@ async function main() {
     );
     const merged = api(`repos/${repo}/pulls/${requested}`);
     if (!merged.merged) throw new Error('PR was not merged.');
-    if (pull.base.ref === 'main')
+    if (pull.base.ref === 'main' && isReleaseBranch(pull.head.ref))
       gh(
         'workflow',
         'run',
@@ -341,7 +417,15 @@ async function main() {
     git('push', 'origin', `HEAD:refs/heads/${source}`);
     output('version', version);
   } else if (command === 'finalize') {
-    git('merge-base', '--is-ancestor', 'origin/main', 'HEAD');
+    // Checked feed PRs advance main during beta testing. Preserve that history
+    // in the candidate before final review; conflicts stop without a push.
+    try {
+      git('merge-base', '--is-ancestor', 'origin/main', 'HEAD');
+    } catch {
+      git('config', 'user.name', 'github-actions[bot]');
+      git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com');
+      git('merge', '--no-ff', '--no-edit', 'origin/main');
+    }
     const mainBaseline = JSON.parse(git('show', 'origin/main:.release/baseline.json'));
     if (!semver.gt(candidate.targetVersion, mainBaseline.version))
       throw new Error(

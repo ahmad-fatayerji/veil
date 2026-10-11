@@ -166,3 +166,30 @@ test('Windows jobs use purpose-specific caches, reduced CI debug info and timing
     '. -> target/verifier',
   );
 });
+
+test('unified publication is opt-in, feed merges use trusted main and PR CI has no signing secrets', () => {
+  for (const [name, job] of [
+    ['release', 'source'],
+    ['beta', 'candidate'],
+    ['prepare-release', 'prepare'],
+    ['finalize-release', 'finalize'],
+    ['publish', 'publish'],
+  ]) {
+    const condition = workflow(name).jobs[job].if;
+    assert.match(condition, /github.repository == 'ahmad-fatayerji\/veil'/);
+    assert.match(condition, /RELEASE_PUBLICATION_ENABLED == 'true'/);
+  }
+  const publish = workflow('publish');
+  assert.equal(publish.on.workflow_call.secrets.RELEASES_TOKEN, undefined);
+  assert.equal(publish.permissions['pull-requests'], 'write');
+  assert.equal(publish.permissions.actions, 'write');
+  assert.doesNotMatch(JSON.stringify(publish), /secrets.RELEASES_TOKEN/);
+  assert.doesNotMatch(JSON.stringify(workflow('ci')), /secrets\./);
+  const feed = workflow('merge-update-feed');
+  assert.equal(feed.jobs.merge.steps[0].with.ref, 'main');
+  assert.match(feed.jobs.merge.if, /head_repository.full_name == github.repository/);
+  assert.match(feed.jobs.merge.if, /conclusion == 'success'/);
+  const coordinator = readFileSync('scripts/gitflow.mjs', 'utf8');
+  assert.match(coordinator, /pull.base.ref === 'main' && isReleaseBranch\(pull.head.ref\)/);
+  assert.doesNotMatch(JSON.stringify(feed), /release\.yml|secrets\./);
+});

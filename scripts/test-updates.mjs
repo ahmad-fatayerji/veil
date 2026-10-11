@@ -8,6 +8,9 @@ import { chromium } from '@playwright/test';
 
 assert.equal(process.platform, 'win32');
 const root = resolve(import.meta.dirname, '..');
+const currentVersion = JSON.parse(
+  await readFile(resolve(root, 'apps/desktop/src-tauri/tauri.conf.json'), 'utf8'),
+).version;
 await mkdir(resolve(root, 'target/update-acceptance'), { recursive: true });
 const directory = await mkdtemp(resolve(root, 'target/update-acceptance/run-'));
 const endpoint = 'http://127.0.0.1:9236';
@@ -148,10 +151,12 @@ async function close() {
 try {
   await writeFile(
     resolve(directory, 'update-receipt.json'),
-    JSON.stringify({ fromVersion: '0.1.0', toVersion: '0.2.0' }),
+    JSON.stringify({ fromVersion: '0.1.0', toVersion: currentVersion }),
   );
   let page = await launch();
-  await page.getByText('Veil updated successfully from 0.1.0 to 0.2.0.', { exact: true }).waitFor();
+  await page
+    .getByText(`Veil updated successfully from 0.1.0 to ${currentVersion}.`, { exact: true })
+    .waitFor();
   await page.screenshot({ path: resolve(directory, 'update-success.png') });
   await page.getByRole('button', { name: 'Dismiss update result' }).click();
   await waitFor(async () => !(await invoke(page, 'update_status')).completion);
@@ -172,6 +177,13 @@ try {
     'Dismissal survives restart',
   );
   assert.equal(await page.getByLabel('Update channel').inputValue(), 'beta');
+  await invoke(page, 'overlay_visibility', { visible: true });
+  await waitFor(() =>
+    browser
+      .contexts()
+      .flatMap((context) => context.pages())
+      .some((item) => item.url().includes('?overlay')),
+  );
   const overlay = browser
     .contexts()
     .flatMap((context) => context.pages())

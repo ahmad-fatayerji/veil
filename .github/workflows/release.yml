@@ -17,10 +17,13 @@ permissions:
 jobs:
   source:
     if: >-
+      github.repository == 'ahmad-fatayerji/veil' && vars.RELEASE_PUBLICATION_ENABLED == 'true' &&
+      (
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event.pull_request.merged == true &&
        github.event.pull_request.head.repo.full_name == github.repository &&
        (startsWith(github.event.pull_request.head.ref, 'release/') || startsWith(github.event.pull_request.head.ref, 'hotfix/')))
+      )
     runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.source.outputs.sha }}

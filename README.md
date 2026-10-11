@@ -110,3 +110,7 @@ Use `pnpm package:windows` to build the production NSIS installer and updater si
 - `docs`: architecture, security boundaries, networking, and test notes.
 
 See [architecture](docs/architecture.md) for the protocol decision and [testing](docs/testing.md) for verification. Durable documents and permissions remain later work; different-network/relay and broader capture-mode acceptance are still needed. M6 installers and signed updates are available for testing; clean-VM acceptance remains manual.
+
+## License
+
+Veil is licensed under the [MIT license](LICENSE). Third-party dependencies retain their own licenses and notices. Source, installers, and updates are being consolidated into [ahmad-fatayerji/veil](https://github.com/ahmad-fatayerji/veil); see [the migration procedure](docs/repository-consolidation.md).

@@ -8,7 +8,7 @@ on:
         type: string
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
   actions: write
   checks: read
 concurrency:
@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   candidate:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.repository == 'ahmad-fatayerji/veil' && vars.RELEASE_PUBLICATION_ENABLED == 'true'
     runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.candidate.outputs.sha }}

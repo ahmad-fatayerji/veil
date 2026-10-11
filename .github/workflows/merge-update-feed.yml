@@ -1,0 +1,42 @@
+name: Merge verified update feed
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: read
+concurrency:
+  group: update-feed-merge
+  cancel-in-progress: false
+jobs:
+  merge:
+    if: >-
+      github.repository == 'ahmad-fatayerji/veil' &&
+      vars.RELEASE_PUBLICATION_ENABLED == 'true' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'automation/update-feed-')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: Merge only the exact validated feed head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FEED_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          FEED_SHA: ${{ github.event.workflow_run.head_sha }}
+          FEED_RUN: ${{ github.event.workflow_run.id }}
+        run: node scripts/merge-update-feed.mjs
