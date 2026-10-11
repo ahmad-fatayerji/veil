@@ -1,4 +1,4 @@
-# Gitflow and Windows releases (M6)
+# Gitflow and Windows releases
 
 The authorized consolidation moves audited MIT source, installers, signed update packages, release notes and tester instructions into [ahmad-fatayerji/veil](https://github.com/ahmad-fatayerji/veil). GitHub distributes the app; it does not handle peer signaling. No purchased domain is needed.
 
@@ -6,16 +6,25 @@ The authorized consolidation moves audited MIT source, installers, signed update
 
 `main` contains approved release source; `develop` integrates the next release and is the repository's default branch for new checkouts and PRs. Agents follow the task procedure in [AGENTS.md](../AGENTS.md). Both branches require PRs, a successful **CI gate**, resolved conversations and an up-to-date branch. Direct pushes, force pushes and deletion are blocked, with no administrator bypass. External approvals are zero while there is one contributor. Select `main` when manually running the Gitflow management Actions, even though the default branch is `develop`.
 
+Start in the original `Veil-app/Veil` checkout. All task worktrees must be direct
+siblings inside `Veil-app`, including release stabilization and hotfix work. Verify
+the destination parent before creation, as required by [AGENTS.md](../AGENTS.md).
+
 ```powershell
-git switch develop
-git pull --ff-only
-git switch -c feature/reconnect
+git fetch origin
+git worktree add -b feature/reconnect ../Veil-reconnect origin/develop
+Set-Location ../Veil-reconnect
 # Make changes, run the relevant tests, and commit.
 git add .
 git commit -m "fix: reconnect after losing connection"
 git push -u origin feature/reconnect
 gh pr create --base develop --title "fix: reconnect after losing connection"
 ```
+
+Link issue-backed PRs in their body: `Closes #123` for a fully resolved issue or
+`Refs #123` for partial work. Give delegated agents the issue number and URL, then
+verify the published PR body and linked issues before handoff, following
+[AGENTS.md](../AGENTS.md). A PR being opened does not itself close the issue.
 
 Use Conventional Commit PR titles: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `build:`, `ci:`, `chore:` or `revert:`, optionally with a scope. Use `!` or a `BREAKING CHANGE:` footer for incompatible changes. Feature PRs squash so the reviewed title becomes the commit used for version proposals.
 
@@ -55,7 +64,7 @@ Linux jobs pin `ubuntu-24.04` rather than following `ubuntu-latest` image migrat
 
 Each Windows job uploads Cargo HTML timing reports and `build-diagnostics/environment.json`, including cache-hit status, source SHA, toolchain and runner details. An exact cache miss can still restore a compatible fallback cache. Use the GitHub step durations to compare cache restore/save overhead as well as compilation; timing artifacts are retained for seven days.
 
-Baseline: [the last legacy release run](https://github.com/ahmad-fatayerji/veil/actions/runs/37902133850) took 29m 27s, including 11m 31s of optimized Rust compilation and 3m 24s saving a 1.11 GB compressed Rust cache. Its Rust cache restore reported no cache found. The new workflow's cold/warm hosted durations and end-to-end GitHub publication remain pending until actual runs; no new version is published solely for benchmarking.
+Baseline: [the last legacy release run](https://github.com/ahmad-fatayerji/Veil-source/actions/runs/37902133850) took 29m 27s, including 11m 31s of optimized Rust compilation and 3m 24s saving a 1.11 GB compressed Rust cache. Its Rust cache restore reported no cache found. The new workflow's cold/warm hosted durations and end-to-end GitHub publication remain pending until actual runs; no new version is published solely for benchmarking.
 
 ## Prepare and test a release
 
@@ -105,10 +114,12 @@ Stable publication builds the final version; it does not relabel a beta installe
 
 For an urgent compatible fix, branch from `main`, commit the fix and prepare that existing branch:
 
+From the original `Veil-app/Veil` checkout:
+
 ```powershell
-git switch main
-git pull --ff-only
-git switch -c hotfix/reconnect
+git fetch origin
+git worktree add -b hotfix/reconnect ../Veil-hotfix-reconnect origin/main
+Set-Location ../Veil-hotfix-reconnect
 # Fix and test.
 git add .
 git commit -m "fix: restore reconnect"

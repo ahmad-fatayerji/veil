@@ -25,6 +25,7 @@ import { nativeSignaling } from './networking';
 import { DesktopEditor, SessionBridge } from './overlay/session';
 import { OverlayControls } from './overlay/Controls';
 import { Updates } from './Updates';
+import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
 
 type Section = 'General' | 'Appearance' | 'Hosting server' | 'Overlay' | 'Updates' | 'About';
@@ -48,7 +49,7 @@ export function AutomaticApp() {
   const [serverTest, setServerTest] = useState('');
   const [testingServer, setTestingServer] = useState(false);
   const [savingServer, setSavingServer] = useState(false);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(readDisplayName);
   const [invitation, setInvitation] = useState('');
   const [link, setLink] = useState('');
   const [peers, setPeers] = useState<PeerSummary[]>([]);
@@ -71,6 +72,10 @@ export function AutomaticApp() {
   const { appearance, setAppearance } = useAppearance();
   const overlay = useOverlay();
   const onUpdateBusy = useCallback((value: boolean) => setUpdating(value), []);
+  function updateName(value: string) {
+    saveDisplayName(value);
+    setName(value);
+  }
   useEffect(() => {
     const unlisten = listen('app-quit-requested', () => setConfirmQuit(true));
     const unlistenFailure = listen<string>('app-quit-failed', (event) => setError(event.payload));
@@ -310,7 +315,7 @@ export function AutomaticApp() {
           : 'Local document';
   return (
     <div className="app-shell desktop-shell">
-      <div inert={updating} aria-busy={busy || updating}>
+      <div className="desktop-content" inert={updating} aria-busy={busy || updating}>
         <header className="app-header">
           <Brand />
           {document && (
@@ -355,9 +360,6 @@ export function AutomaticApp() {
                 </button>
               </>
             )}
-            <button className="quiet-button" onClick={() => openSettings()}>
-              Settings
-            </button>
           </div>
         </header>
         {!document ? (
@@ -438,7 +440,7 @@ export function AutomaticApp() {
                   value={name}
                   maxLength={40}
                   disabled={busy}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => updateName(e.target.value)}
                 />
                 {tab === 'join' && (
                   <>
@@ -535,6 +537,29 @@ export function AutomaticApp() {
             </button>
           </div>
         )}
+        <footer className="desktop-footer">
+          <button
+            className="desktop-settings-button"
+            aria-label="Settings"
+            title="Settings"
+            onClick={() => openSettings()}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m9.5 3-.5 2-2 .9-1.9-.6-2.5 4.3 1.5 1.4v2l-1.5 1.4 2.5 4.3 1.9-.6 2 .9.5 2h5l.5-2 2-.9 1.9.6 2.5-4.3-1.5-1.4v-2l1.5-1.4-2.5-4.3-1.9.6-2-.9-.5-2z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </footer>
       </div>
       <SessionBridge connection={document} />
       <Dialog
@@ -589,14 +614,6 @@ export function AutomaticApp() {
                 app closes Veil and its overlay immediately. You can reopen Veil, show or hide the
                 overlay, or quit from the tray menu.
               </p>
-              <button
-                className="danger-button"
-                disabled={busy || updating}
-                onClick={() => setConfirmQuit(true)}
-              >
-                Quit Veil
-              </button>
-              <p className="muted">Fully closes Veil and its overlay, ending your session.</p>
             </section>
             <section hidden={section !== 'Appearance'}>
               <h3>Appearance</h3>
@@ -617,7 +634,7 @@ export function AutomaticApp() {
                 value={name}
                 maxLength={40}
                 onChange={(e) => {
-                  setName(e.target.value);
+                  updateName(e.target.value);
                   if (document)
                     document.provider.awareness.setLocalStateField('user', {
                       ...document.provider.awareness.getLocalState()?.user,
@@ -725,6 +742,26 @@ export function AutomaticApp() {
                   });
                 }}
               />
+              <button
+                type="button"
+                className="secondary-button repository-button"
+                onClick={() => {
+                  void openUrl('https://github.com/ahmad-fatayerji/veil').catch((cause) => {
+                    setError(errorMessage(cause));
+                  });
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M12 .297C5.37.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.043-1.61-4.043-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.084-.729.084-.729 1.205.084 1.838 1.237 1.838 1.237 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.605-2.665-.3-5.466-1.333-5.466-5.93 0-1.31.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23a11.52 11.52 0 0 1 3.003-.404c1.02.005 2.047.138 3.003.404 2.291-1.552 3.297-1.23 3.297-1.23.654 1.652.243 2.873.12 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.803 5.625-5.475 5.922.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+                </svg>
+                View repository on GitHub
+              </button>
             </section>
             {notice && <p role="status">{notice}</p>}
             {error && (

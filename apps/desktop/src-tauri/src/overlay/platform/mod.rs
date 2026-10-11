@@ -4,6 +4,23 @@ use tauri::WebviewWindow;
 #[cfg(windows)]
 mod windows;
 
+pub async fn gesture(
+    window: WebviewWindow,
+    direction: Option<tauri_runtime::ResizeDirection>,
+) -> Result<(), OverlayError> {
+    #[cfg(windows)]
+    return windows::gesture(window, direction).await;
+    #[cfg(not(windows))]
+    match direction {
+        None => window.start_dragging().map_err(OverlayError::native),
+        Some(direction) => window
+            .as_ref()
+            .window()
+            .start_resize_dragging(direction)
+            .map_err(OverlayError::native),
+    }
+}
+
 pub fn capabilities() -> OverlayCapabilities {
     OverlayCapabilities {
         transparency: cfg!(windows),

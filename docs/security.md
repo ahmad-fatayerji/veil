@@ -1,27 +1,118 @@
-> Normal desktop sessions now use [automatic networking](automatic-networking.md). The older LAN/manual sections below describe debug regression infrastructure.
+# Security and privacy
 
-## Automatic signaling and relay boundary
+Veil uses authenticated, encrypted peer connections for collaborative documents
+and signed packages for app updates. These protections have defined boundaries;
+Veil has not undergone an independent security audit. Local automated tests and
+recorded native acceptance do not establish security against every attacker or
+connectivity on every network.
 
-Production server selection requires an HTTPS origin, with no bundled service. Host credentials are saved in Windows Credential Manager scoped to that origin; main-window-only Rust commands perform allowlisted, bounded HTTPS/WSS operations. Credential reads never return to frontend JavaScript. CSP does not permit arbitrary remote WebSockets. Active document sessions prevent updater installation.
+## Documents and participants
 
-Ten-minute single-use invitations derive independent admission and directional encryption keys using HKDF-SHA-256. Signaling uses AES-GCM with authenticated session, invitation, role, generation and sequence. Nonces combine a fixed random sender prefix with a monotonically increasing sequence; receivers reject replay and prefix changes. Authenticate descriptions before trusting DTLS fingerprints; authenticate expected participant identity before Yjs/awareness traffic. The server cannot silently substitute a peer, but can deny service and observe metadata.
+Documents and session secrets are held in memory, rather than saved as durable
+documents by the desktop app or sharing server. Closing a document, ending a
+session, or quitting discards that in-memory work. This is not a secure-erasure
+guarantee: operating-system paging, crash dumps, endpoint malware, or a participant
+copying content can retain information. Preferences and server configuration are
+stored separately from documents.
 
-Operators approve/revoke hosts locally. Only credential hashes/configuration persist. Neither server nor desktop persists documents. TURN grants are issued lazily to admitted fallback links and renew only selected relay paths, with bounded per-host identities/rates and coturn global/per-credential quotas. Destination exclusions deny private, loopback, link-local and multicast peers. Metrics require separate operator access; TURN metrics bind to loopback. Never log secrets, decrypted signaling or document contents.
+Anyone holding a reusable `veil://join/...` link can join and edit while sharing
+is active. There are no viewer roles, per-user permission controls, or verified
+real-world identities. Display names and activity are self-reported. Share links
+through a trusted channel and treat them as secrets.
 
-Allocation expiry is distinct from credential expiry. Explicitly close old transports after authenticated synchronization and after leaving; verify coturn cleanup using allocation metrics. Capacity failures keep local edits and healthy direct connections. Public deployment/protocol/security documentation is in [veil-server](https://github.com/ahmad-fatayerji/veil-server). Real internet acceptance and an independent security audit remain separate from local automated checks.
+**Reset link** replaces the admission credential. **Stop sharing** prevents new
+admissions. Neither removes guests already admitted: their authenticated tickets,
+recovery, and relay renewal remain valid until the session ends. End the session
+to disconnect everyone. The host must stay available; there is no host migration
+or durable recovery after quitting.
 
-# M2 security boundary
+## Encrypted peer connections and signaling
 
-Desktop P2P now uses WebRTC DTLS, exchanged fingerprint-bound offer/answer codes and a session-bound credential check before collaboration messages. It opens no HTTP session listener. Manual codes must travel through a trusted channel. Optional STUN/TURN servers receive metadata; TURN relays encrypted traffic and must use authenticated access. Transport queues/fragments/timeouts are bounded; this is not a complete malicious-collaborator or whole-document resource policy. See [P1 security and networking](p2p.md). The remaining sections apply to retained LAN/browser hosting.
+Document and awareness traffic travel over WebRTC data channels protected by
+DTLS. The host forwards collaboration updates to guests in a star topology; the
+host and every admitted participant can read the shared document. TURN relays
+encrypted transport traffic when a direct connection is unavailable.
 
-Embedded sessions default to loopback. Trusted LAN exposure is explicit, restricted to a selected RFC1918 IPv4 address, and requires acknowledgement of plaintext HTTP. This is intended only for trusted networks. The app does not configure firewall rules or enable public internet access.
+Reusable links pin the host's ECDSA P-256 public identity. Each guest link performs
+an ephemeral P-256 ECDH exchange. The host signs a canonical transcript binding
+the session, group, link, both collaboration identities, and both exchange keys;
+guests verify it against the invited host. HKDF-SHA-256 derives per-link secrets
+and independent directional AES-GCM signaling keys. Authenticated envelopes bind
+role, generation, and sequence, and receivers reject replay. Peer identities and
+DTLS fingerprints are checked before collaboration traffic is accepted.
 
-Each start creates a cryptographically random UUID session ID and a high-entropy invitation credential made from two random UUIDs (with UUID version/variant bits fixed). Any invite holder can edit. Authentication occurs before WebSocket upgrade and before document access. Native administration is separate: only the main Tauri control window can invoke hosting lifecycle commands. Ending a session invalidates its invitation and closes existing clients. Individual roles, kicking participants and invite regeneration are deferred.
+The invitation root protects bootstrap messages; established guest links have
+separate keys. The server receives an admission credential and encrypted signaling,
+not the root invitation secret or document contents. A server operator can observe
+connection metadata, deny service, or interrupt admission. These protocol checks
+do not protect a compromised desktop, malicious authorized participant, or an
+invitation delivered through an untrusted channel.
 
-Host headers must match a configured numeric listener. Sensitive requests require an exact allowed Origin; CORS allows only those origins. Invitations use fragments rather than request URLs; the browser removes the fragment after reading it. Credentials are sent in a JSON join body and requested WebSocket subprotocol, never echoed in the selected subprotocol, persisted in preferences or logged by the application. Authentication responses are not cached. Static assets use a restrictive CSP, no-referrer, nosniff, and exact compiled-path lookup. Tauri's CSP permits local numeric loopback connections; native operations remain isolated from shared React.
+See [automatic networking](automatic-networking.md) and the public
+[sharing protocol](https://github.com/ahmad-fatayerji/veil-server/blob/develop/protocol.md)
+for the handshake, transport limits, and recovery behavior. Legacy invitation
+formats keep their original expiry and single-use behavior; they do not define
+the current reusable-link flow.
 
-Join requests have a 4 KiB body limit and a room-wide 30-attempt/second guard. Binary frames are limited to 256 KiB, fan-out to 128 queued broadcasts per subscriber, sends to five seconds, and incoming connections to 200 frames/second. Slow consumers disconnect and must resynchronize. These resource safeguards are not participant caps. Admission defaults to no application-level count limit.
+## Host credentials and server operation
 
-These measures do not protect against a malicious invite holder, network packet interception on a LAN, malicious local processes, a compromised allowed frontend or a compromised host. Awareness names are self-reported; they do not prove identity. Rich text uses the editor schema; raw HTML import and links are disabled, and presence names/colors are sanitized for rendering. M5 must review independent edit/awareness/auth rate limits, direct upgrade throttling, document-size safeguards, origin configuration, invitation management and HTTPS/WSS before remote use. This is not a reviewed internet deployment.
+Production configuration requires an HTTPS server origin. Native Rust commands
+perform bounded HTTPS/WSS operations and validate certificates. Host credentials
+are stored in Windows Credential Manager, scoped to that origin; saved credentials
+are not returned to frontend JavaScript. Native administration belongs to the
+control panel, and frontend CSP does not allow arbitrary remote WebSockets.
 
-The standalone M0 demo has a trusted-origin credential bootstrap for development only. That route does not exist in embedded sessions. No capture-exclusion guarantee, signing key, updater or public listener is configured.
+Operators issue and revoke host authorization. Forgetting a saved credential only
+removes the local copy; server revocation is a separate operator action. The server
+persists credential hashes and configuration, but not collaborative documents.
+Authenticated TURN credentials, destination exclusions, quotas, and rate limits
+bound relay usage. Metrics require separate operator access. Operators must secure
+their server, TLS configuration, relay, logs, and credentials; see
+[veil-server](https://github.com/ahmad-fatayerji/veil-server).
+
+Transport queues and message sizes are bounded, and names/colors are sanitized for
+rendering. These safeguards do not provide a complete malicious-collaborator or
+whole-document resource policy. There is no application-level participant cap;
+actual capacity depends on device, network, and relay resources.
+
+## Overlay capture exclusion
+
+The overlay can remain visible locally while compatible Windows capture methods
+record the content beneath it. Exclusion is enabled by default and can be changed
+in Overlay settings. It affects only the overlay, not the control panel.
+
+Capture exclusion is a best-effort display feature, not encryption, access control,
+or protection against a camera, malicious software, or an incompatible recorder.
+A successful Windows API call does not prove exclusion in a particular recording.
+Check saved output or a remote viewer's screen with the built-in test. See the
+[verified capture modes and limitations](capture-compatibility.md).
+
+## Installer and updater trust
+
+Download installers from the [official releases](https://github.com/ahmad-fatayerji/veil/releases).
+The updater verifies package signatures against the embedded public key and checks
+the candidate version before installation. Stable and beta channels use the
+repository's published metadata. Installation is blocked while a document session
+or embedded host is active; it does not save or recover documents across updates.
+
+Updater signing keys remain restricted to publication jobs; fork PR validation
+receives no signing secrets. Published versioned assets are immutable. These
+signatures protect update authenticity, not Windows SmartScreen reputation: the
+installer currently has no Authenticode publisher certificate.
+
+## Legacy development boundaries
+
+The retained LAN/browser and manual signaling modes are debug regression tools,
+not the normal desktop experience. The standalone demo binds to loopback. Explicit
+trusted-LAN hosting uses plaintext HTTP and must not be exposed through a public
+proxy or forwarded port. Its invitation checks and Origin restrictions do not
+make that plaintext mode safe for untrusted networks.
+
+## Report a security issue
+
+For a suspected vulnerability, use GitHub's
+[private vulnerability reporting](https://github.com/ahmad-fatayerji/veil/security/advisories/new). Include the
+Veil version, affected component, impact, and reproducible steps with fictional
+content. Do not publish live invitation links, credentials, private documents, or
+signing material in a public issue. Ordinary non-sensitive bugs can use
+[GitHub issues](https://github.com/ahmad-fatayerji/veil/issues).
