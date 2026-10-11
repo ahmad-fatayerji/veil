@@ -1,0 +1,11 @@
+{
+  "version": "0.3.0",
+  "notes": "# Veil 0.3.0\n\n## Features\n\n- feat: include create share join in beta candidate\n- feat(overlay): include capture controls in beta candidate\n\n## Breaking changes\n\n- feat(network)!: automate signaling and selective relay fallback\n\n## Fixes\n\n- fix(updater): recover interrupted downloads and confirm installation\n- fix(release): locate and verify unpublished drafts by release ID\n\n## Other changes\n\n- docs: require a separate worktree for every AI task\n- ci: upgrade Actions runtimes and pin the Linux runner\n- docs: guide agents through the Gitflow task workflow\n",
+  "pub_date": "2026-10-10T12:38:30.846Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDVJci9UcmpkZ3J4SVlzbm1kaDVuN1o4NVI5SEZrWnloajFEMWNpeVhYeEphNUM4SEw0ZDZhbk9BRHZnZk1qVE40SDlyMFN2OU9BcElVeklqRzdYOVFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjM1OTEwCWZpbGU6VmVpbF8wLjMuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4zLjAKcXM2dW9BTzVDcFg1N0NUL01ROHFwZUN1Z2ZOeC9nVHVUdFRDaXE1Y2U3S3NhdW82ZzZsQVVZRjJ1WVpsemNQWVVRZ09BY20wcVhiWEE2cjlwMUJwQ0E9PQo=",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.3.0/Veil_0.3.0_x64-setup.exe"
+    }
+  }
+}
