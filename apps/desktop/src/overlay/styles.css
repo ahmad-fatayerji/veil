@@ -50,6 +50,9 @@
   width: 100%;
   margin: 0;
   accent-color: var(--text);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 .overlay-check {
   display: flex;
@@ -196,6 +199,40 @@ html.overlay-mode,
 }
 .overlay-surface.is-click-through .overlay-drag-handle {
   cursor: default;
+}
+.overlay-participants {
+  flex-shrink: 0;
+  max-height: 25%;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  list-style: none;
+  font-size: 12px;
+}
+.overlay-participants li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.overlay-person-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.overlay-person-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overlay-participants .participant-activity {
+  flex-shrink: 0;
 }
 .overlay-resize {
   position: absolute;

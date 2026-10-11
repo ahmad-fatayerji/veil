@@ -1,5 +1,109 @@
 # Verification record
 
+## Overlay participant activity — 10 October 2026
+
+The overlay now receives sanitized participant snapshots through the existing desktop-only bridge and shows names, colors, typing, selecting, in-document and away activity in a compact strip. Opening the overlay retains one desktop identity; leaving clears the strip and participant departure removes the corresponding entry.
+
+`pnpm check`, `pnpm test` (18 TypeScript and 24 Rust tests, with two packaged-artifact tests intentionally ignored) and both frontend builds passed. The debug executable was rebuilt after Cargo tests. Focused real Windows/WebView2 acceptance passed remote typing, idle transitions, selection and away activity, participant roster/departure cleanup, bidirectional editing, concurrent convergence, reconnect and leave/rejoin. The overlay screenshot was visually inspected. Evidence: `target/overlay-acceptance/run-l1g2bF/`.
+
+Two full `pnpm test:overlay` attempts stopped before the presence checks at the existing native slider-drag assertions (opacity, then font size). The focused run used keyboard setup for those sliders and stopped after document/presence acceptance; it does not verify the full native drag, compositor, click-through, shortcut or preference-restart matrix. The guest's away test explicitly focuses a browser control because native window activation cannot blur a headless Chromium editor. No release was published.
+
+## Immediate window-close quit — 11 October 2026
+
+When **Quit app** is selected, the main window's close button now exits immediately without the quit confirmation, including with a temporary document and visible overlay. Settings/tray **Quit Veil** still confirms. Both paths save preferences and refuse to exit during update installation.
+
+`pnpm check` and `pnpm test` passed (24 TypeScript and 24 Rust tests; two packaged-installer tests intentionally ignored). After rebuilding the isolated debug executable following Cargo tests, `scripts/test-tray-close.mjs` passed actual Windows/WebView2 default tray close, overlay/document preservation, explicit quit cancellation/exit, saved Quit preference after restart, and immediate native window-close exit with an active document/overlay. Evidence: `target/tray-acceptance/run-rNPKGy/`. Physical tray-menu interaction, non-Windows behavior and multi-peer networking while hidden remain unverified. No release was published.
+
+## Configurable window close and tray overlay actions — 11 October 2026
+
+Settings → General now saves **When closing the main window** as **Minimize to tray** (default, including legacy preferences) or **Quit app**. Quit app routes the native close request to the quit confirmation. Tray actions include Open Veil, Show/Hide overlay and Quit Veil; the overlay action's label follows visibility changes from controls and shortcuts.
+
+CI exposed a recurring browser presence fixture race: typing could start at the beginning before keyboard navigation established the caret. The fixture now clicks the editor and verifies a collapsed selection at the end before typing. Five consecutive local presence/roadmap runs passed (ten tests), and `pnpm check` passed with this fixture change.
+
+`pnpm check` and `pnpm test` passed after integrating current develop (24 TypeScript and 24 Rust tests; two packaged-installer tests intentionally ignored). Settings tests cover legacy defaults and round-trip persistence of Quit while retaining appearance preferences. A separate debug output directory preserved the already-running executable/session. After rebuilding following Cargo tests, `VEIL_TRAY_TEST_EXE=target/tray-preferences/debug/veil-desktop.exe node scripts/test-tray-close.mjs` passed real Windows/WebView2 acceptance: default tray close, retained editable overlay/document, both saved close choices, quit cancellation and confirmation, hidden overlay preservation, persisted choice after a full restart, and native window-close quit after restart. Screenshots were visually inspected. Evidence: `target/tray-acceptance/run-PQaLpD/` and `target/tray-acceptance/run-r9SB4S/`.
+
+Actual tray icon/menu pointer interaction, non-Windows behavior and multi-peer networking while hidden remain unverified by this focused native test. No release was published and no PR was merged by this task.
+
+## Close to tray and explicit quit — 10 October 2026
+
+Closing the main window minimizes and hides it in the system tray while preserving the document, connections and overlay visibility. Settings opens to General with an explicit Quit Veil action and confirmation; the tray also offers Open Veil and Quit Veil. Native quit is restricted to the control panel and blocks update installation interruptions.
+
+`pnpm check` and `pnpm test` passed (18 TypeScript and 24 Rust tests; two packaged-installer tests remain intentionally ignored). The debug executable was rebuilt after Cargo tests. `node scripts/test-tray-close.mjs` passed twice on actual Windows/WebView2 with an isolated profile: native main-window close, overlay editing while the main window is hidden, retained document state, forbidden overlay quit administration, quit cancellation, closing from Settings with the overlay hidden, and confirmed process exit with code zero. Settings and confirmation screenshots were visually inspected. Evidence: `target/tray-acceptance/run-6TXPMG/` and `target/tray-acceptance/run-cG0aHm/`.
+
+The regression restores the main window through native window APIs; actual clicks on the system tray icon/menu and non-Windows behavior remain unverified. Multi-peer networking while hidden is not covered by this focused native test. No merge or release publication was performed by this task.
+
+## Mandatory credential validation on save - 11 October 2026
+
+Saving a newly entered or replacement host credential now runs the native
+connection/authentication probe before writing Credential Manager or preferences.
+Failed checks preserve entered values, existing saved settings, and the pending
+Save and share flow. An empty credential requires a saved key for that exact
+origin; an unchanged saved key can be reused without another online check.
+
+`pnpm check` and `pnpm test` passed: 24 TypeScript tests and 24 Rust tests, with
+two signed-installer artifact tests intentionally skipped. Production frontend
+builds passed. The ordinary debug rebuild could not replace an already-running
+executable, which was left untouched. After Cargo tests, a separate embedded-assets
+debug binary was built with `cargo rustc -p veil-desktop --bin veil-desktop
+--features custom-protocol -- -o target/credential-save-validation/veil-desktop-save-check.exe`.
+The acceptance harness supports `VEIL_SHARING_DESKTOP_BINARY` for this isolated path.
+
+`pnpm test:sharing` passed on Windows/WebView2 using that binary and the compatible
+local server. It verified first-save rejection for missing/rejected credentials
+and an unreachable server, no saved origin or key after rejection, a fresh rejected
+save despite a prior successful manual test, successful automatic validation and
+Save and share, rejected replacement preserving the saved origin and working key,
+and denial of saved-key reuse for another origin. Manual testing, active-document
+retention, multiple collaborators, overlay scope, themes, and updater guards also
+passed. Redacted evidence is under `target/create-share-join/run-ZY3rI3/`; the
+credential form layout was visually inspected. After merging the current develop
+About-screen update, checks, tests, builds, and native acceptance passed again.
+Public HTTPS and unrelated-network
+peer/TURN acceptance remain separate. No release was published.
+
+## Hosting server credential test - 10 October 2026
+
+Hosting server Settings now tests the entered origin and credential before saving,
+or the saved credential for that exact origin when the field is empty. A scoped
+native command checks reusable-sharing support, creates an authenticated temporary
+registration, and verifies its deletion. It does not save settings or credentials,
+issue an invitation, request relay resources, or change an active document.
+
+Local validation passed `pnpm check`, all 18 TypeScript tests, 24 workspace Rust
+tests (two signed-installer artifact tests intentionally skipped), both production
+frontend builds, and the rebuilt debug Windows executable. Changed-file lint,
+Prettier, rustfmt, and `git diff --check` also passed.
+
+`pnpm test:sharing` passed against the compatible local group-sharing server with
+three isolated Windows/WebView2 profiles and dynamically assigned loopback ports.
+It checked missing, malformed, and rejected credentials; unreachable origin;
+successful unsaved-credential authentication; zero remaining test registrations
+and relay grants; unchanged preferences and entered credential; saved-credential
+retesting while sharing; retained document/collaborators; and overlay command denial.
+The existing create/share/join, edit convergence, reset/stop, themes, overlay, exit,
+and updater-session guard regression also passed. Redacted screenshots are under
+`target/create-share-join/run-JYczsq/`; the credential-test success layout was
+visually inspected. The initial run found an ambiguous test status selector, which
+was scoped to the credential form before the passing rerun.
+
+Public HTTPS/certificate failure paths, unrelated-network peers, and TURN
+connectivity remain separate acceptance. Success tests server authentication,
+not universal peer connectivity. No release was published by this task.
+
+## Change-based CI
+
+PR check selection and gate enforcement are implemented in `scripts/ci-plan.mjs`, with regression cases in `scripts/ci-plan.test.mjs` and `scripts/workflows.test.mjs`. The gate must reject failed/cancelled/missing jobs and any skip not explicitly selected as unnecessary. Unknown paths and dependency/workflow configuration changes select every check. Release validation and nightly CI always run the full suite.
+
+`VEIL_NETWORK_MODE=smoke pnpm test:network` checks one direct and one forced-relay guest, staged fallback, selected ICE paths, concurrent document convergence, presence, session cleanup and TURN allocation cleanup. Run again with `VEIL_TURN_TRANSPORT=tcp` for TURN TCP. Ordinary networking PRs run both transports. The default `pnpm test:network` retains the full six-peer handover/recovery/load/capacity/outage suite; nightly and release validation explicitly use `VEIL_NETWORK_MODE=full`. These are loopback/container tests, not real-internet acceptance.
+
+## Overlay defaults and slider verification - 10 October 2026
+
+Capture exclusion now defaults on for new preferences and legacy files without `captureExclusion`; explicitly saved on/off choices remain unchanged. Overlay range inputs no longer inherit text-field padding, borders or backgrounds, so the 100% opacity track fills to its endpoint. The native capture regression checks the default and slider layout; compositor acceptance explicitly disables capture exclusion before measuring overlay pixels.
+
+`pnpm check`, `pnpm build`, and `pnpm test` passed (18 TypeScript and 24 Rust tests, with two packaged-artifact tests intentionally ignored). The final full test run used `RUST_TEST_THREADS=1`; earlier runs encountered existing updater slow-download/cancellation timing failures while other builds were running. Focused overlay and host Rust tests also passed. Browser and native WebView2 screenshots at 100% were visually inspected.
+
+After rebuilding the debug executable, `pnpm test:capture` passed the enabled default, native affinity, real GDI/DXGI exclusion output, administration isolation, style changes and saved on/off preferences across restart. Evidence: `target/capture-acceptance/run-lZTet8/`, including `opacity-100.png`. The existing installed Veil retained its recovery shortcut, so global shortcut/click-through activation and the full native overlay script were not rerun; control-panel recovery passed. Other capture modes and platform limitations remain as documented in [capture compatibility](capture-compatibility.md). No release was published.
+
 ## Create, Share, Join verification — 10 October 2026
 
 The desktop creates an offline temporary document before hosting, keeps configuration in Settings, and shares one reusable version-4 `veil://join/...` link. Browser and overlay share light/dark/System tokens and accessible dialogs. The compatible public server is coordinated in [server PR #3](https://github.com/ahmad-fatayerji/veil-server/pull/3).

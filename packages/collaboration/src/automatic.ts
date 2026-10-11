@@ -412,10 +412,12 @@ export class AutomaticSession {
   private async send(link: Link, signal: Signal) {
     const generation = link.generation;
     const operation = this.output.then(async () => {
-      if (this.stopped || this.ended) return;
+      if (!this.active(link)) return;
       if (!this.socketOnline)
         throw new Error('Signaling is unavailable; pending document edits remain local.');
-      await this.transport.send(await link.cipher.seal(this.role, generation, signal));
+      const envelope = await link.cipher.seal(this.role, generation, signal);
+      if (!this.active(link)) return;
+      await this.transport.send(envelope);
     });
     this.output = operation.catch(() => {});
     return operation;
@@ -455,12 +457,14 @@ export class AutomaticSession {
     if (message.kind === 'left' && this.role === 'host') {
       const link = this.links.get(identity(message.inviteId));
       if (link) {
+        this.links.delete(link.invite.inviteId);
+        this.bootstraps.delete(link.invite.inviteId);
         clearTimeout(link.timer);
         clearTimeout(link.refresh);
         if (link.connectionId) this.session.provider.automaticClose(link.connectionId);
         if (link.previous) this.session.provider.automaticClose(link.previous);
-        this.links.delete(link.invite.inviteId);
-        this.bootstraps.delete(link.invite.inviteId);
+        if (![...this.links.values()].some((remaining) => remaining.remoteId !== undefined))
+          this.notice('No guests connected. Waiting for someone to join.');
       }
       return;
     }
@@ -606,8 +610,14 @@ export class AutomaticSession {
       { urls: relay.urls, username: relay.username, credential: relay.credential },
     ];
   }
+  private active(link: Link) {
+    return !this.stopped && !this.ended && this.links.get(link.invite.inviteId) === link;
+  }
+  private current(link: Link, connectionId: string) {
+    return this.active(link) && link.connectionId === connectionId;
+  }
   private async begin(link: Link, phase: Link['phase'], migrate = false) {
-    if (this.stopped || this.ended || this.role !== 'host' || link.remoteId === undefined) return;
+    if (!this.active(link) || this.role !== 'host' || link.remoteId === undefined) return;
     clearTimeout(link.timer);
     clearTimeout(link.refresh);
     const previous = link.connectionId;
@@ -627,8 +637,7 @@ export class AutomaticSession {
       }, RELAY_TIMEOUT_MS);
     try {
       const servers = await this.servers(link);
-      if (this.stopped || link.generation !== generation || link.connectionId !== connectionId)
-        return;
+      if (!this.current(link, connectionId) || link.generation !== generation) return;
       const pending: RTCIceCandidateInit[] = [];
       let announced = false;
       const callbacks = this.callbacks(link, connectionId, (candidate) => {
@@ -646,6 +655,10 @@ export class AutomaticSession {
         servers,
         callbacks,
       );
+      if (!this.current(link, connectionId) || link.generation !== generation) {
+        this.session.provider.automaticClose(connectionId);
+        return;
+      }
       await this.send(link, {
         kind: 'offer',
         phase,
@@ -657,7 +670,7 @@ export class AutomaticSession {
       announced = true;
       for (const candidate of pending) await this.sendCandidate(link, connectionId, candidate);
     } catch (error) {
-      if (link.generation !== generation || this.stopped) return;
+      if (!this.current(link, connectionId) || link.generation !== generation) return;
       if (link.previous) {
         this.cancelMigration(link);
         this.notice('Replacement connection failed; the existing relay remains active.');
@@ -670,10 +683,11 @@ export class AutomaticSession {
     }
   }
   private async sendCandidate(link: Link, connectionId: string, candidate: RTCIceCandidateInit) {
-    if (link.connectionId !== connectionId || this.stopped) return;
+    if (!this.current(link, connectionId)) return;
     try {
       await this.send(link, { kind: 'candidate', connectionId, candidate });
     } catch {
+      if (!this.current(link, connectionId)) return;
       this.notice(
         'Signaling is unavailable. Connection recovery will resume when the server returns.',
       );
@@ -687,9 +701,10 @@ export class AutomaticSession {
     return {
       candidate,
       failed: () => {
-        if (link.connectionId === connectionId) void this.failed(link, connectionId);
+        if (this.current(link, connectionId)) void this.failed(link, connectionId);
       },
       authenticated: () => {
+        if (!this.current(link, connectionId)) return;
         this.notice('Synchronizing' + '\u2026');
         if (link.connectionId === connectionId) {
           clearTimeout(link.timer);
@@ -699,7 +714,7 @@ export class AutomaticSession {
         }
       },
       synced: () => {
-        if (link.connectionId !== connectionId) return;
+        if (!this.current(link, connectionId)) return;
         clearTimeout(link.timer);
         link.timer = undefined;
         link.ready = true;
@@ -716,7 +731,7 @@ export class AutomaticSession {
     };
   }
   private async failed(link: Link, connectionId: string) {
-    if (this.stopped || this.ended || link.connectionId !== connectionId) return;
+    if (!this.current(link, connectionId)) return;
     clearTimeout(link.timer);
     if (this.role === 'guest') {
       if (link.migrating && link.previous) {
@@ -768,6 +783,7 @@ export class AutomaticSession {
     }
   }
   private cancelMigration(link: Link) {
+    if (!this.active(link)) return;
     if (link.connectionId) this.session.provider.automaticClose(link.connectionId);
     link.connectionId = link.previous;
     link.previous = undefined;
@@ -779,7 +795,7 @@ export class AutomaticSession {
   }
   private schedulePeer(link: Link) {
     clearTimeout(link.timer);
-    if (this.stopped || this.ended || ++link.retryCount > 5) return;
+    if (!this.active(link) || ++link.retryCount > 5) return;
     link.timer = setTimeout(
       () => {
         if (this.socketOnline) void this.begin(link, 'direct');
@@ -812,8 +828,9 @@ export class AutomaticSession {
   }
   private refreshRelay(link: Link) {
     clearTimeout(link.refresh);
-    if (!link.ready || link.phase !== 'relay' || this.stopped) return;
+    if (!this.active(link) || !link.ready || link.phase !== 'relay') return;
     link.refresh = setTimeout(() => {
+      if (!this.active(link)) return;
       // Refresh credentials only if the actual selected path uses TURN.
       if (
         !this.session.provider
@@ -832,7 +849,13 @@ export class AutomaticSession {
     }, 480_000);
   }
   private async migrate(link: Link) {
-    if (!link.ready || link.phase !== 'relay' || Date.now() - link.lastMigration < 300_000) return;
+    if (
+      !this.active(link) ||
+      !link.ready ||
+      link.phase !== 'relay' ||
+      Date.now() - link.lastMigration < 300_000
+    )
+      return;
     link.lastMigration = Date.now();
     await this.begin(link, 'direct', true);
   }

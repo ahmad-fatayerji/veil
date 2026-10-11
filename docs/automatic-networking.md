@@ -24,6 +24,24 @@ Pasted legacy `veil-invite:v2:` codes remain supported with their original ten-m
 single-use semantics. Older `veil-p2p:v1:` codes are incompatible. Forget saved host credential
 removes it locally; operators revoke server authorization separately.
 
+Saving a new or replacement host credential automatically tests it before either
+the credential or server address is saved. A failed check keeps the entered values
+available for correction and leaves existing saved settings intact. Saving with an
+empty field requires a credential already stored for that exact origin; it reuses
+that credential without requiring another online test.
+
+Hosting server settings also include **Test connection**. It checks the entered server
+and credential before saving; an empty credential field uses the credential already
+stored for that exact server origin. Changing either field clears the previous result.
+The native test checks reusable-sharing support, creates a temporary authenticated
+registration, and immediately deletes it. It does not save settings, publish an
+invitation, open signaling, request TURN, or disturb an active document. Tests count
+against the server's session-creation rate limit. Connection/certificate errors,
+rejected credentials, unavailable capacity, and failed cleanup are reported in Settings.
+Success confirms server authentication; peer and relay connectivity still require a
+shared-session test. If a response is lost, server expiry cleans up any registration
+that the client could not identify or delete.
+
 ## Per-connection state machine
 
 Admission → direct negotiation (STUN only, six seconds) → temporary TURN grant
@@ -43,6 +61,12 @@ Reconnect and observes a five-minute cooldown. The old transport remains until t
 replacement authenticates and exchanges state vectors. Failed replacements retain
 working relay connections. Credential renewal similarly replaces only an active
 measured relay link. Healthy unrelated links are never restarted for fallback.
+
+Unused invitations do not negotiate or request TURN credentials. When a guest leaves,
+its link is removed before transports close; pending setup results, queued signals,
+callbacks and retry/renewal timers cannot restart that link. After the last guest
+leaves, the host reports that it is waiting for someone to join. Recovery remains
+available for admitted guests during temporary connection loss.
 
 Signaling outages preserve healthy data channels. New joins/recovery wait for the
 server. Restart loses registrations; authorization rejection ends transport and

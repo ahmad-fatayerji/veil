@@ -107,7 +107,11 @@ async function command(page, name, args) {
 }
 const snapshot = (page) => command(page, 'overlay_snapshot');
 async function close() {
-  native('Close', {}, 'main');
+  const main = browser
+    .contexts()
+    .flatMap((context) => context.pages())
+    .find((page) => !page.url().includes('?overlay'));
+  await main.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
   await waitFor(() => app.exitCode !== null, 'clean exit');
   await browser.close();
   browser = undefined;
@@ -179,14 +183,26 @@ try {
     console.log(
       'Recovery shortcut occupied: testing control-panel recovery; global shortcut/click-through activation remain unverified.',
     );
-  assert.equal((await snapshot(main)).settings.captureExclusion, false, 'Opt-in by default');
-  assert.equal((await snapshot(main)).capture.status, 'disabled');
+  assert.equal((await snapshot(main)).settings.captureExclusion, true, 'Enabled by default');
+  assert.equal((await snapshot(main)).capture.status, 'applied');
   assert.equal((await snapshot(main)).capabilities.captureExclusion, 'supported');
   const checkbox = main.getByLabel('Exclude overlay from compatible captures', { exact: true });
   await main.getByRole('button', { name: 'Capture compatibility test', exact: true }).click();
   await main.getByRole('button', { name: 'Show test card', exact: true }).click();
   await overlay.getByLabel('Capture test card').waitFor();
   await command(main, 'overlay_update', { patch: { opacity: 1, alwaysOnTop: true } });
+  const opacitySlider = main.getByRole('slider', { name: /Opacity/ });
+  assert.deepEqual(
+    await opacitySlider.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return [style.paddingLeft, style.paddingRight, style.borderWidth];
+    }),
+    ['0px', '0px', '0px'],
+    'Range track has no text-field padding or border at maximum opacity.',
+  );
+  await main.locator('label[for="overlay-opacity"]').screenshot({
+    path: resolve(directory, 'opacity-100.png'),
+  });
   native('Move', { X: 100, Y: 100 });
   native('Move', { X: 900, Y: 100 }, 'main');
   underlay = spawn(

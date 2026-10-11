@@ -106,7 +106,11 @@ async function launch() {
 }
 async function close() {
   const stopped = new Promise((done) => app.once('exit', done));
-  native('Close', {}, 'main');
+  const main = browser
+    .contexts()
+    .flatMap((context) => context.pages())
+    .find((page) => !page.url().includes('?overlay'));
+  await main.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
   await Promise.race([
     stopped,
     delay(10000).then(() => {
@@ -176,6 +180,12 @@ try {
     .getByRole('region', { name: 'Overlay controls' })
     .getByRole('button', { name: 'Settings', exact: true })
     .click();
+  // Compositor pixel checks need the overlay included in screenshots.
+  await main.getByLabel('Exclude overlay from compatible captures', { exact: true }).uncheck();
+  await waitFor(
+    async () => !(await snapshot(main)).settings.captureExclusion,
+    'capture exclusion disabled for compositor checks',
+  );
   await dragRange(main, 'Opacity');
   await waitFor(async () => (await snapshot(main)).settings.opacity === 1, 'drag opacity saved');
   assert.equal(native('Probe').alpha, 255);
@@ -253,12 +263,43 @@ try {
   const authorActivity = guest.locator(
     '[data-participant-name="Desktop author"] .participant-activity',
   );
+  const overlayGuestActivity = overlay.locator(
+    '[data-participant-name="Browser guest"] .participant-activity',
+  );
+  await waitFor(
+    async () =>
+      (await overlay.getByRole('list', { name: 'Participants' }).getByRole('listitem').count()) ===
+      2,
+    'overlay receives participant roster',
+  );
+  await guestEditor.press('Control+End');
+  await guest.keyboard.insertText(' Guest activity.');
+  await waitFor(
+    async () => (await overlayGuestActivity.textContent()).startsWith('Typing'),
+    'overlay shows remote typing',
+  );
+  await waitFor(
+    async () => (await overlayGuestActivity.textContent()) === 'In document',
+    'overlay typing settles after idle',
+  );
+  await guestEditor.press('Control+a');
+  await waitFor(
+    async () => (await overlayGuestActivity.textContent()) === 'Selecting text',
+    'overlay shows remote selection activity',
+  );
+  await guestEditor.press('ArrowRight');
+  // The guest uses headless Chromium, so native window activation cannot blur it.
+  await guest.getByRole('button', { name: 'Settings', exact: true }).focus();
   native('Focus', {}, 'main');
   await controlEditor.press('Control+End');
   await main.keyboard.insertText(' Main view.');
   await waitFor(
     async () => (await authorActivity.textContent()).startsWith('Typing'),
     'control-panel typing presence',
+  );
+  await waitFor(
+    async () => (await overlayGuestActivity.textContent()) === 'Away from document',
+    'overlay shows remote away activity',
   );
   await waitFor(
     async () =>
@@ -346,6 +387,7 @@ try {
     .getByRole('button', { name: 'Leave session', exact: true })
     .click();
   await waitFor(async () => (await overlayEditor.count()) === 0, 'leaving clears overlay');
+  assert.equal(await overlay.getByRole('list', { name: 'Participants' }).count(), 0);
   await main.getByRole('button', { name: 'Join session', exact: true }).click();
   await waitFor(
     async () => (await overlayEditor.textContent()) === (await guestEditor.textContent()),
@@ -353,6 +395,10 @@ try {
   );
   await guestBrowser.close();
   guestBrowser = undefined;
+  await waitFor(
+    async () => (await overlay.locator('[data-participant-name="Browser guest"]').count()) === 0,
+    'departing participant disappears from overlay',
+  );
   console.log(
     'PASS: shared desktop/overlay/browser editing, one identity, cursor/selection, concurrent edits, disconnect/reconnect, leave/rejoin',
   );
@@ -629,7 +675,7 @@ try {
       .catch((error) => error),
   );
   assert.equal(rejection.code, 'UNSUPPORTED');
-  native('Close', {}, 'main', conflictingApp.pid);
+  await other.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
   await waitFor(() => conflictingApp.exitCode !== null, 'conflict instance clean exit');
   await conflictingBrowser.close();
   conflictingBrowser = undefined;

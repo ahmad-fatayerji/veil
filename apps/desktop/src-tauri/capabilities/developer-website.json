@@ -1,0 +1,18 @@
+{
+  "identifier": "developer-website",
+  "description": "The control panel can open the developer's website in the default browser.",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://ahmadfatayerji.com"
+        },
+        {
+          "url": "https://ahmadfatayerji.com/"
+        }
+      ]
+    }
+  ]
+}

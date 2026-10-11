@@ -16,6 +16,7 @@ pub struct Settings {
     pub capture_exclusion: bool,
     pub font_size: u32,
     pub visible: bool,
+    pub close_behavior: crate::lifecycle::CloseBehavior,
 }
 
 impl Default for Settings {
@@ -29,9 +30,10 @@ impl Default for Settings {
             opacity: 0.85,
             always_on_top: true,
             click_through: false,
-            capture_exclusion: false,
+            capture_exclusion: true,
             font_size: 20,
             visible: false,
+            close_behavior: crate::lifecycle::CloseBehavior::Tray,
         }
     }
 }
@@ -108,16 +110,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn capture_preference_is_opt_in_and_legacy_settings_still_load() {
+    fn capture_preference_defaults_on_and_preserves_saved_choices() {
         let old = serde_json::json!({"version": 1, "opacity": 0.65, "fontSize": 24});
         let mut settings: Settings = serde_json::from_value(old).unwrap();
         settings.validate().unwrap();
-        assert!(!settings.capture_exclusion);
+        assert!(Settings::default().capture_exclusion);
+        assert!(settings.capture_exclusion);
+        assert_eq!(
+            settings.close_behavior,
+            crate::lifecycle::CloseBehavior::Tray
+        );
         let folder = tempfile::tempdir().unwrap();
         let path = folder.path().join("overlay.json");
+        settings.capture_exclusion = false;
+        save(&path, &settings).unwrap();
+        assert!(!load(&path).unwrap().capture_exclusion);
         settings.capture_exclusion = true;
+        settings.close_behavior = crate::lifecycle::CloseBehavior::Quit;
         save(&path, &settings).unwrap();
         assert!(load(&path).unwrap().capture_exclusion);
+        assert_eq!(
+            load(&path).unwrap().close_behavior,
+            crate::lifecycle::CloseBehavior::Quit
+        );
         assert_eq!(load(&path).unwrap().opacity, 0.65);
     }
 

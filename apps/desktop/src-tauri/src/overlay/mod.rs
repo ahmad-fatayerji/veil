@@ -112,6 +112,7 @@ pub struct Patch {
     click_through: Option<bool>,
     font_size: Option<u32>,
     capture_exclusion: Option<bool>,
+    close_behavior: Option<crate::lifecycle::CloseBehavior>,
 }
 
 fn snapshot(app: &AppHandle) -> Snapshot {
@@ -119,6 +120,7 @@ fn snapshot(app: &AppHandle) -> Snapshot {
 }
 
 fn notify(app: &AppHandle, updated: Snapshot) {
+    crate::lifecycle::refresh_overlay_label(app, updated.settings.visible);
     let state = app.state::<OverlayState>();
     let _ = state.save_requests.send(updated.settings.clone());
     let _ = app.emit("overlay-changed", updated);
@@ -379,6 +381,22 @@ fn toggle_visible(app: &AppHandle) -> Result<(), OverlayError> {
     set_visible(app, !snapshot(app).settings.visible)
 }
 
+pub fn is_visible(app: &AppHandle) -> bool {
+    snapshot(app).settings.visible
+}
+
+pub fn close_behavior(app: &AppHandle) -> crate::lifecycle::CloseBehavior {
+    app.try_state::<OverlayState>()
+        .map(|state| state.model.lock().unwrap().settings.close_behavior)
+        .unwrap_or_default()
+}
+
+pub fn tray_toggle(app: &AppHandle) {
+    if let Err(error) = toggle_visible(app) {
+        modify(app, |model| model.warning = Some(error.message));
+    }
+}
+
 fn recover_controls(app: &AppHandle) -> Result<(), OverlayError> {
     let overlay = window(app)?;
     platform::click_through(&overlay, false)?;
@@ -434,6 +452,9 @@ pub fn overlay_update(
     }
     if let Some(value) = patch.capture_exclusion {
         next.capture_exclusion = value;
+    }
+    if let Some(value) = patch.close_behavior {
+        next.close_behavior = value;
     }
     next.validate()?;
     // Reapply the appearance after toolkit style changes replace the extended styles.

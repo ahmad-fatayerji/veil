@@ -1,9 +1,10 @@
 // Real Windows/WebView2 document lifecycle and reusable sharing acceptance.
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { createServer } from 'node:net';
 import { chromium, expect } from '@playwright/test';
 
 assert.equal(process.platform, 'win32');
@@ -12,7 +13,18 @@ const serverRoot = resolve(process.env.VEIL_SERVER_SOURCE || resolve(root, '../V
 await mkdir(resolve(root, 'target/create-share-join'), { recursive: true });
 const directory = await mkdtemp(resolve(root, 'target/create-share-join/run-'));
 const binary = resolve(serverRoot, 'target/debug/veil-server.exe');
-const server = 'http://127.0.0.1:18089';
+async function unusedPort() {
+  const listener = createServer();
+  await new Promise((done, reject) => {
+    listener.once('error', reject);
+    listener.listen(0, '127.0.0.1', done);
+  });
+  const port = listener.address().port;
+  await new Promise((done) => listener.close(done));
+  return port;
+}
+const serverPort = await unusedPort();
+const server = `http://127.0.0.1:${serverPort}`;
 await writeFile(resolve(directory, 'turn-secret'), randomBytes(32).toString('hex'));
 await writeFile(resolve(directory, 'metrics-secret'), randomBytes(32).toString('hex'));
 const serverEnv = {
@@ -22,7 +34,7 @@ const serverEnv = {
   METRICS_SECRET_FILE: resolve(directory, 'metrics-secret'),
   STUN_URLS: 'stun:127.0.0.1:3479',
   TURN_URLS: 'turn:127.0.0.1:3479',
-  LISTEN: '127.0.0.1:18089',
+  LISTEN: `127.0.0.1:${serverPort}`,
 };
 const credential = execFileSync(binary, ['issue', 'ux-test'], {
   env: serverEnv,
@@ -53,13 +65,20 @@ async function waitFor(check, label, timeout = 30_000) {
 async function app(index) {
   const profile = resolve(directory, `app-${index}`);
   await mkdir(profile);
-  const endpoint = `http://127.0.0.1:${9240 + index}`;
-  launch(resolve(root, 'target/debug/veil-desktop.exe'), [], {
-    ...process.env,
-    VEIL_TEST_SETTINGS_DIR: profile,
-    WEBVIEW2_USER_DATA_FOLDER: resolve(profile, 'webview'),
-    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${9240 + index}`,
-  });
+  const debugPort = await unusedPort();
+  const endpoint = `http://127.0.0.1:${debugPort}`;
+  launch(
+    resolve(
+      process.env.VEIL_SHARING_DESKTOP_BINARY || resolve(root, 'target/debug/veil-desktop.exe'),
+    ),
+    [],
+    {
+      ...process.env,
+      VEIL_TEST_SETTINGS_DIR: profile,
+      WEBVIEW2_USER_DATA_FOLDER: resolve(profile, 'webview'),
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}`,
+    },
+  );
   await waitFor(
     async () => (await fetch(`${endpoint}/json/version`).catch(() => null))?.ok,
     'WebView2',
@@ -127,8 +146,78 @@ try {
   let dialog = host.getByRole('dialog', { name: 'Settings', exact: true });
   await expect(dialog.getByRole('heading', { name: 'Hosting server' })).toBeVisible();
   await dialog.getByLabel('Server address').fill(server);
+  const testConnection = dialog.getByRole('button', { name: 'Test connection', exact: true });
+  const testResult = dialog.locator('form').getByRole('status');
+  const saveAndShare = dialog.getByRole('button', { name: 'Save and share', exact: true });
+  async function assertUnsaved() {
+    assert.equal(
+      (await invoke(host, 'network_preferences')).server,
+      '',
+      'failed save preserves preferences',
+    );
+    await assert.rejects(
+      invoke(host, 'network_test', { server, credential: null }),
+      /Enter an operator-issued host credential/,
+      'failed save stores no credential',
+    );
+    await expect(dialog).toBeVisible();
+  }
+  await saveAndShare.click();
+  await expect(testResult).toContainText('Enter an operator-issued host credential');
+  await assertUnsaved();
+  await dialog.getByLabel('Host access credential').fill('a'.repeat(64));
+  await saveAndShare.click();
+  await expect(testResult).toContainText('Host credential rejected');
+  await assertUnsaved();
   await dialog.getByLabel('Host access credential').fill(credential);
-  await dialog.getByRole('button', { name: 'Save and share' }).click();
+  await dialog.getByLabel('Server address').fill('http://127.0.0.1:1');
+  await saveAndShare.click();
+  await expect(testResult).toHaveText('Server unavailable or HTTPS certificate invalid.');
+  await assertUnsaved();
+  await dialog.getByLabel('Server address').fill(server);
+  await dialog.getByLabel('Host access credential').fill('');
+
+  await testConnection.click();
+  await expect(testResult).toContainText('Enter an operator-issued host credential');
+  await dialog.getByLabel('Host access credential').fill('a'.repeat(64));
+  await expect(testResult).toBeEmpty();
+  await testConnection.click();
+  await expect(testResult).toContainText('Host credential rejected');
+  await dialog.getByLabel('Host access credential').fill('bad-format');
+  await testConnection.click();
+  await expect(testResult).toHaveText('Invalid operator-issued host credential.');
+  await dialog.getByLabel('Host access credential').fill(credential);
+  await dialog.getByLabel('Server address').fill('http://127.0.0.1:1');
+  await testConnection.click();
+  await expect(testResult).toHaveText('Server unavailable or HTTPS certificate invalid.');
+  await dialog.getByLabel('Server address').fill(server);
+  await dialog.getByLabel('Host access credential').fill(credential);
+  await testConnection.click();
+  await expect(testResult).toHaveText('Connection successful. Host credential accepted.');
+  assert.equal(
+    (await invoke(host, 'network_preferences')).server,
+    '',
+    'test does not save settings',
+  );
+  assert.equal(
+    (await dialog.getByLabel('Host access credential').inputValue()) === credential,
+    true,
+    'test preserves entered credential',
+  );
+  const metrics = await fetch(`${server}/v2/metrics`, {
+    headers: {
+      Authorization: `Bearer ${await readFile(resolve(directory, 'metrics-secret'), 'utf8')}`,
+    },
+  }).then((response) => response.json());
+  assert.equal(metrics.sessions, 0, 'temporary test registration is removed');
+  assert.equal(metrics.relayGrants, 0, 'credential testing allocates no relay');
+  await screenshot(host, 'server-test-success');
+  await dialog.getByLabel('Host access credential').fill('a'.repeat(64));
+  await saveAndShare.click();
+  await expect(testResult).toContainText('Host credential rejected');
+  await assertUnsaved();
+  await dialog.getByLabel('Host access credential').fill(credential);
+  await saveAndShare.click();
   const share = host.getByRole('dialog', { name: 'Share document', exact: true });
   await expect(share).toBeVisible();
   const link = await share.getByLabel('Session link').inputValue();
@@ -168,6 +257,33 @@ try {
   await other.getByRole('textbox', { name: 'Shared document' }).press('Control+End');
   await other.keyboard.insertText(' After sharing stopped.');
   await expect(editor).toContainText('After sharing stopped.');
+  dialog = await settings(host, 'Hosting server');
+  await dialog.getByLabel('Host access credential').fill('a'.repeat(64));
+  await dialog.getByRole('button', { name: 'Save settings', exact: true }).click();
+  await expect(dialog.locator('form').getByRole('status')).toContainText(
+    'Host credential rejected',
+  );
+  assert.equal(
+    (await invoke(host, 'network_preferences')).server,
+    server,
+    'failed replacement preserves origin',
+  );
+  await dialog.getByLabel('Host access credential').fill('');
+  await assert.rejects(
+    invoke(host, 'network_configure', {
+      server: 'http://127.0.0.1:1',
+      credential: null,
+    }),
+    /Enter an operator-issued host credential/,
+    'a new origin cannot reuse another origin credential',
+  );
+
+  await dialog.getByRole('button', { name: 'Test connection', exact: true }).click();
+  await expect(dialog.locator('form').getByRole('status')).toHaveText(
+    'Connection successful. Host credential accepted.',
+  );
+  await dialog.getByRole('button', { name: 'Close Settings' }).click();
+  await expect(editor).toContainText('After sharing stopped.');
   dialog = await settings(host, 'Appearance');
   await dialog.getByLabel('Theme').selectOption('dark');
   await dialog.getByRole('button', { name: 'Close Settings' }).click();
@@ -179,6 +295,10 @@ try {
     .find((page) => page.url().includes('?overlay'));
   await expect(overlay.getByRole('textbox', { name: 'Shared document' })).toContainText(
     'After sharing stopped.',
+  );
+  await assert.rejects(
+    invoke(overlay, 'network_test', { server, credential: null }),
+    /Only the control panel can manage networking/,
   );
   await waitFor(
     () => overlay.evaluate(() => document.documentElement.dataset.theme === 'dark'),

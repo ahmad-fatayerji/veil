@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import * as Y from 'yjs';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
-import type { DemoConnection } from '@veil/collaboration';
+import { readParticipants, type DemoConnection, type Participant } from '@veil/collaboration';
 import { SharedEditor, type EditorConnection } from '@veil/editor';
 import { errorMessage, invoke } from './api';
 
@@ -11,6 +11,7 @@ type Message =
   | { kind: 'closed' }
   | { kind: 'session'; id: string; update: number[]; user: Record<string, unknown> }
   | { kind: 'update'; id: string; update: number[] }
+  | { kind: 'participants'; id: string; participants: Participant[] }
   | { kind: 'presence'; id: string; cursor: unknown; activity: unknown };
 const relayOrigin = Symbol('desktop document relay');
 const send = (message: Message) => invoke('document_relay', { message });
@@ -80,7 +81,16 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
           update: Array.from(Y.encodeStateAsUpdate(connection.doc)),
           user: connection.provider.awareness.getLocalState()?.user ?? {},
         });
+        participants();
       } else dispatch({ kind: 'closed' });
+    };
+    const participants = () => {
+      if (connection)
+        dispatch({
+          kind: 'participants',
+          id: String(connection.doc.clientID),
+          participants: readParticipants(connection),
+        });
     };
     const update = (bytes: Uint8Array) => {
       if (connection)
@@ -91,6 +101,7 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
         });
     };
     connection?.doc.on('update', update);
+    connection?.provider.awareness.on('change', participants);
     const subscription = listen<Message>('desktop-document', ({ payload }) => {
       if (!active || current.current !== connection) return;
       if (payload.kind === 'request') initial();
@@ -116,6 +127,7 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
     return () => {
       active = false;
       connection?.doc.off('update', update);
+      connection?.provider.awareness.off('change', participants);
       if (connection) dispatch({ kind: 'closed' });
       void subscription.then((unlisten) => unlisten()).catch(() => {});
     };
@@ -129,6 +141,7 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
 
 export function useOverlayDocument() {
   const [connection, setConnection] = useState<EditorConnection | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
@@ -150,12 +163,14 @@ export function useOverlayDocument() {
       if (payload.kind === 'closed') {
         clear();
         setConnection(null);
+        setParticipants([]);
       } else if (payload.kind === 'session') {
         if (session?.id === payload.id) {
           Y.applyUpdate(session.connection.doc, new Uint8Array(payload.update), relayOrigin);
           return;
         }
         clear();
+        setParticipants([]);
         const doc = new Y.Doc();
         Y.applyUpdate(doc, new Uint8Array(payload.update), relayOrigin);
         const awareness = new Awareness(doc);
@@ -191,6 +206,8 @@ export function useOverlayDocument() {
         setConnection(connection);
       } else if (payload.kind === 'update' && session?.id === payload.id) {
         Y.applyUpdate(session.connection.doc, new Uint8Array(payload.update), relayOrigin);
+      } else if (payload.kind === 'participants' && session?.id === payload.id) {
+        setParticipants(payload.participants);
       }
     });
     void subscription
@@ -206,5 +223,5 @@ export function useOverlayDocument() {
       void subscription.then((unlisten) => unlisten()).catch(() => {});
     };
   }, []);
-  return { connection, error };
+  return { connection, participants, error };
 }

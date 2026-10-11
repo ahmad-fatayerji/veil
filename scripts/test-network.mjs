@@ -7,6 +7,12 @@ import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import WebSocket from 'ws';
 
+const mode = process.env.VEIL_NETWORK_MODE || 'full';
+assert.ok(['full', 'smoke'].includes(mode), 'Unknown networking test mode');
+const smoke = mode === 'smoke';
+const guestCount = smoke ? 2 : 5;
+const directCount = smoke ? 1 : 3;
+const relayCount = guestCount - directCount;
 const root = resolve(import.meta.dirname, '..');
 const serverRoot = resolve(process.env.VEIL_SERVER_SOURCE || resolve(root, '../Veil-server'));
 await mkdir(resolve(root, 'target/network-acceptance'), { recursive: true });
@@ -39,6 +45,9 @@ const children = [];
 const sockets = new Set();
 const notices = [];
 let browser;
+const pages = [];
+let relayRequests = 0;
+const relayEvents = [];
 const turnName = `veil-test-${randomBytes(6).toString('hex')}`;
 async function waitFor(check, label, timeout = 40_000) {
   const deadline = Date.now() + timeout;
@@ -116,14 +125,15 @@ try {
     'Vite startup',
   );
   browser = await chromium.launch();
-  const pages = [];
-  let relayRequests = 0;
   async function participant(index) {
     const context = await browser.newContext();
     const page = await context.newPage();
     let socket;
     await page.exposeBinding('networkRequest', async (_, path, method, body, ticket) => {
-      if (path === '/v2/relay') relayRequests++;
+      if (path === '/v2/relay') {
+        relayRequests++;
+        relayEvents.push({ participant: index, at: Date.now() });
+      }
       const response = await fetch(`${server}${path}`, {
         method,
         headers: {
@@ -191,7 +201,7 @@ try {
       },
       {
         module: `/@fs/${resolve(root, 'packages/collaboration/src/automatic.ts').replaceAll('\\', '/')}`,
-        forceRelay: index >= 4,
+        forceRelay: index > directCount,
       },
     );
     pages.push(page);
@@ -208,7 +218,7 @@ try {
     );
   }, server);
   const sharedLink = await host.evaluate(() => window.active.enableSharing());
-  for (let index = 1; index <= 5; index++) {
+  for (let index = 1; index <= guestCount; index++) {
     const page = await participant(index);
     const invitation = sharedLink;
     const started = Date.now();
@@ -228,7 +238,7 @@ try {
       () => page.evaluate(() => window.active.session.provider.synced),
       `friend ${index} synchronized`,
     );
-    if (index <= 3) {
+    if (index <= directCount) {
       assert.equal(relayRequests, 0, 'direct peers never obtain TURN credentials');
       assert.equal(allocations(await turnMetrics()), 0, 'direct peers create no TURN allocations');
     } else
@@ -237,82 +247,87 @@ try {
         'fallback waits six seconds without definite failure',
       );
   }
-  const newcomer = await participant(-1);
-  await host.evaluate(() => window.active.stopSharing());
-  assert.equal(
-    await newcomer.evaluate(async (invitation) => {
-      try {
-        await window.automatic.joinShareLink(
-          invitation,
-          'Blocked',
-          window.transport,
-          window.notice,
-          true,
-        );
-        return false;
-      } catch {
-        return true;
-      }
-    }, sharedLink),
-    true,
-    'stopped link rejects admission',
-  );
-  const resetLink = await host.evaluate(() => window.active.enableSharing(true));
-  assert.notEqual(resetLink, sharedLink);
-  assert.equal(
-    await newcomer.evaluate(async (invitation) => {
-      try {
-        await window.automatic.joinShareLink(
-          invitation,
-          'Old link',
-          window.transport,
-          window.notice,
-          true,
-        );
-        return false;
-      } catch {
-        return true;
-      }
-    }, sharedLink),
-    true,
-    'reset link rejects previous capability',
-  );
-  await newcomer.evaluate(async (invitation) => {
-    window.active = await window.automatic.joinShareLink(
-      invitation,
-      'New link',
-      window.transport,
-      window.notice,
+  if (!smoke) {
+    const newcomer = await participant(-1);
+    await host.evaluate(() => window.active.stopSharing());
+    assert.equal(
+      await newcomer.evaluate(async (invitation) => {
+        try {
+          await window.automatic.joinShareLink(
+            invitation,
+            'Blocked',
+            window.transport,
+            window.notice,
+            true,
+          );
+          return false;
+        } catch {
+          return true;
+        }
+      }, sharedLink),
       true,
+      'stopped link rejects admission',
     );
-  }, resetLink);
-  await waitFor(
-    () => newcomer.evaluate(() => window.active.session.provider.synced),
-    'new sharing link admits guest',
-  );
-  await newcomer.evaluate(() => window.active.close());
-  pages.pop();
-  console.log(
-    'PASS: reusable link admits five guests; stop/reset protect new admission and keep existing links.',
-  );
+    const resetLink = await host.evaluate(() => window.active.enableSharing(true));
+    assert.notEqual(resetLink, sharedLink);
+    assert.equal(
+      await newcomer.evaluate(async (invitation) => {
+        try {
+          await window.automatic.joinShareLink(
+            invitation,
+            'Old link',
+            window.transport,
+            window.notice,
+            true,
+          );
+          return false;
+        } catch {
+          return true;
+        }
+      }, sharedLink),
+      true,
+      'reset link rejects previous capability',
+    );
+    await newcomer.evaluate(async (invitation) => {
+      window.active = await window.automatic.joinShareLink(
+        invitation,
+        'New link',
+        window.transport,
+        window.notice,
+        true,
+      );
+    }, resetLink);
+    await waitFor(
+      () => newcomer.evaluate(() => window.active.session.provider.synced),
+      'new sharing link admits guest',
+    );
+    await newcomer.evaluate(() => window.active.close());
+    pages.pop();
+    console.log(
+      'PASS: reusable link admits five guests; stop/reset protect new admission and keep existing links.',
+    );
+  }
   await waitFor(
     () =>
-      host.evaluate(() => {
-        const paths = window.active.session.provider.summaries().map((peer) => peer.path);
-        return (
-          paths.filter((path) => path === 'direct').length === 3 &&
-          paths.filter((path) => path === 'relay').length === 2
-        );
-      }),
-    'three direct and two measured relay paths',
+      host.evaluate(
+        ({ directCount, relayCount }) => {
+          const paths = window.active.session.provider.summaries().map((peer) => peer.path);
+          return (
+            paths.filter((path) => path === 'direct').length === directCount &&
+            paths.filter((path) => path === 'relay').length === relayCount
+          );
+        },
+        { directCount, relayCount },
+      ),
+    'measured direct and relay paths',
   );
   assert.equal(
     relayRequests,
-    4,
-    'only the two fallback links request TURN, one grant per endpoint',
+    relayCount * 2,
+    'only fallback links request TURN, one grant per endpoint',
   );
   assert.ok(
-    allocations(await turnMetrics()) >= 2,
+    allocations(await turnMetrics()) >= relayCount,
     'affected links create actual relay allocations',
   );
   await Promise.all(
@@ -329,8 +344,8 @@ try {
         page.evaluate(() => window.active.session.doc.getText('acceptance').toString()),
       ),
     );
-    return new Set(values).size === 1 && values[0].length === 18;
-  }, 'six-way concurrent document convergence');
+    return new Set(values).size === 1 && values[0].length === (guestCount + 1) * 3;
+  }, 'concurrent document convergence');
   await waitFor(
     async () =>
       (
@@ -339,189 +354,209 @@ try {
             page.evaluate(() => window.active.session.provider.awareness.getStates().size),
           ),
         )
-      ).every((size) => size === 6),
-    'six-way presence',
+      ).every((size) => size === guestCount + 1),
+    'participant presence',
   );
-  const healthy = await host.evaluate(() =>
-    window.active.session.provider
-      .summaries()
-      .filter((peer) => peer.path === 'direct')
-      .map((peer) => peer.id),
-  );
-  const healthyRelay = await pages[5].evaluate(
-    () => window.active.session.provider.summaries().find((peer) => peer.path === 'relay').id,
-  );
-  await pages[4].evaluate(() => {
-    window.forceRelay = false;
-  });
-  await host.evaluate(() => window.active.reconnect());
-  await waitFor(
-    () =>
-      pages[4].evaluate(() =>
-        window.active.session.provider
-          .summaries()
-          .some((peer) => peer.path === 'direct' && peer.state === 'connected'),
-      ),
-    'relay-to-direct handover',
-  );
-  assert.deepEqual(
-    await host.evaluate(
-      (healthy) =>
-        window.active.session.provider
-          .summaries()
-          .filter((peer) => peer.path === 'direct' && peer.id)
-          .map((peer) => peer.id)
-          .filter((id) => healthy.includes(id)),
-      healthy,
-    ),
-    healthy,
-  );
-  // Drop this transport and force its replacement through the staged fallback.
-  await pages[4].evaluate(() => {
-    window.forceRelay = true;
-    for (const peer of window.active.session.provider.peers.values()) peer.channel.close();
-    window.active.session.doc.getText('recovery').insert(0, 'retained local edits');
-  });
-  await waitFor(
-    () =>
-      pages[4].evaluate(() =>
-        window.active.session.provider
-          .summaries()
-          .some((peer) => peer.path === 'relay' && peer.state === 'connected'),
-      ),
-    'direct-to-relay recovery',
-  );
-  await waitFor(
-    () =>
-      host.evaluate(
-        () => window.active.session.doc.getText('recovery').toString() === 'retained local edits',
-      ),
-    'pending edits resynchronize across replacement',
-  );
-  assert.ok(
-    await pages[5].evaluate(
-      (id) =>
-        window.active.session.provider
-          .summaries()
-          .some((peer) => peer.id === id && peer.state === 'connected'),
-      healthyRelay,
-    ),
-    'failed direct migration preserves the healthy relay',
-  );
-  const beforeCooldown = await host.evaluate(() =>
-    window.active.session.provider.summaries().map((peer) => peer.id),
-  );
-  await host.evaluate(() => window.active.reconnect());
-  assert.deepEqual(
-    await host.evaluate(() => window.active.session.provider.summaries().map((peer) => peer.id)),
-    beforeCooldown,
-    'migration cooldown suppresses repeated replacements',
-  );
-  const startedLoad = Date.now();
-  await pages[5].evaluate(() =>
-    window.active.session.doc.getText('large').insert(0, 'x'.repeat(256 * 1024)),
-  );
-  await waitFor(
-    async () =>
-      (
-        await Promise.all(
-          pages
-            .slice(0, 6)
-            .map((page) => page.evaluate(() => window.active.session.doc.getText('large').length)),
-        )
-      ).every((length) => length === 256 * 1024),
-    'large incremental change under bandwidth ceilings',
-  );
-  const loadMilliseconds = Date.now() - startedLoad;
-  const snapshot = await turnMetrics();
-  const resources = JSON.parse(
-    execFileSync('docker', ['stats', '--no-stream', '--format', '{{json .}}', turnName], {
-      encoding: 'utf8',
-    }),
-  );
-  await writeFile(
-    resolve(directory, 'measurements.json'),
-    JSON.stringify(
-      {
-        transport: process.env.VEIL_TURN_TRANSPORT || 'udp',
-        loadBytes: 256 * 1024,
-        loadMilliseconds,
-        allocations: allocations(snapshot),
-        resources,
-        metrics: snapshot,
-      },
-      null,
-      2,
-    ),
-  );
-  const blocked = await participant(6);
-  const blockedInvitation = await host.evaluate(() => window.active.createInvitation());
-  await blocked.evaluate(async (invitation) => {
-    window.active = await window.automatic.joinAutomatic(
-      invitation,
-      'Capacity test',
-      window.transport,
-      window.notice,
-      true,
+  if (!smoke) {
+    const healthy = await host.evaluate(() =>
+      window.active.session.provider
+        .summaries()
+        .filter((peer) => peer.path === 'direct')
+        .map((peer) => peer.id),
     );
-    window.active.session.doc.getText('capacity').insert(0, 'local only');
-  }, blockedInvitation);
-  await waitFor(
-    () => notices.some((notice) => notice.includes('/v2/relay: 429')),
-    'explicit relay exhaustion',
-  );
-  assert.equal(
-    await blocked.evaluate(() => window.active.session.doc.getText('capacity').toString()),
-    'local only',
-  );
-  await host.evaluate(() =>
-    window.active.session.doc.getText('healthy').insert(0, 'still running'),
-  );
-  await waitFor(
-    () =>
-      pages[1].evaluate(
-        () => window.active.session.doc.getText('healthy').toString() === 'still running',
+    const healthyRelay = await pages[5].evaluate(
+      () => window.active.session.provider.summaries().find((peer) => peer.path === 'relay').id,
+    );
+    await pages[4].evaluate(() => {
+      window.forceRelay = false;
+    });
+    await host.evaluate(() => window.active.reconnect());
+    await waitFor(
+      () =>
+        pages[4].evaluate(() =>
+          window.active.session.provider
+            .summaries()
+            .some((peer) => peer.path === 'direct' && peer.state === 'connected'),
+        ),
+      'relay-to-direct handover',
+    );
+    assert.deepEqual(
+      await host.evaluate(
+        (healthy) =>
+          window.active.session.provider
+            .summaries()
+            .filter((peer) => peer.path === 'direct' && peer.id)
+            .map((peer) => peer.id)
+            .filter((id) => healthy.includes(id)),
+        healthy,
       ),
-    'healthy direct links survive exhaustion',
-  );
-  await blocked.evaluate(() => window.active.close());
-  const counters = await metrics();
-  assert.equal(counters.relayCredentialsIssued, 4);
-  console.log(
-    'PASS: six peers, lazy TURN, mixed paths, convergence, awareness and authenticated handover.',
-  );
-  // Drop signaling while leaving the document transports open.
-  children[0].kill();
-  for (const socket of sockets) socket.close();
-  await pages[5].evaluate(() =>
-    window.active.session.doc.getText('acceptance').insert(0, 'offline-signaling'),
-  );
-  await waitFor(
-    () =>
-      host.evaluate(() =>
+      healthy,
+    );
+    // Drop this transport and force its replacement through the staged fallback.
+    await pages[4].evaluate(() => {
+      window.forceRelay = true;
+      for (const peer of window.active.session.provider.peers.values()) peer.channel.close();
+      window.active.session.doc.getText('recovery').insert(0, 'retained local edits');
+    });
+    await waitFor(
+      () =>
+        pages[4].evaluate(() =>
+          window.active.session.provider
+            .summaries()
+            .some((peer) => peer.path === 'relay' && peer.state === 'connected'),
+        ),
+      'direct-to-relay recovery',
+    );
+    await waitFor(
+      () =>
+        host.evaluate(
+          () => window.active.session.doc.getText('recovery').toString() === 'retained local edits',
+        ),
+      'pending edits resynchronize across replacement',
+    );
+    assert.ok(
+      await pages[5].evaluate(
+        (id) =>
+          window.active.session.provider
+            .summaries()
+            .some((peer) => peer.id === id && peer.state === 'connected'),
+        healthyRelay,
+      ),
+      'failed direct migration preserves the healthy relay',
+    );
+    const beforeCooldown = await host.evaluate(() =>
+      window.active.session.provider.summaries().map((peer) => peer.id),
+    );
+    await host.evaluate(() => window.active.reconnect());
+    assert.deepEqual(
+      await host.evaluate(() => window.active.session.provider.summaries().map((peer) => peer.id)),
+      beforeCooldown,
+      'migration cooldown suppresses repeated replacements',
+    );
+    const startedLoad = Date.now();
+    await pages[5].evaluate(() =>
+      window.active.session.doc.getText('large').insert(0, 'x'.repeat(256 * 1024)),
+    );
+    await waitFor(
+      async () =>
+        (
+          await Promise.all(
+            pages
+              .slice(0, 6)
+              .map((page) =>
+                page.evaluate(() => window.active.session.doc.getText('large').length),
+              ),
+          )
+        ).every((length) => length === 256 * 1024),
+      'large incremental change under bandwidth ceilings',
+    );
+    const loadMilliseconds = Date.now() - startedLoad;
+    const snapshot = await turnMetrics();
+    const resources = JSON.parse(
+      execFileSync('docker', ['stats', '--no-stream', '--format', '{{json .}}', turnName], {
+        encoding: 'utf8',
+      }),
+    );
+    await writeFile(
+      resolve(directory, 'measurements.json'),
+      JSON.stringify(
+        {
+          transport: process.env.VEIL_TURN_TRANSPORT || 'udp',
+          loadBytes: 256 * 1024,
+          loadMilliseconds,
+          allocations: allocations(snapshot),
+          resources,
+          metrics: snapshot,
+        },
+        null,
+        2,
+      ),
+    );
+    const blocked = await participant(6);
+    const blockedInvitation = await host.evaluate(() => window.active.createInvitation());
+    await blocked.evaluate(async (invitation) => {
+      window.active = await window.automatic.joinAutomatic(
+        invitation,
+        'Capacity test',
+        window.transport,
+        window.notice,
+        true,
+      );
+      window.active.session.doc.getText('capacity').insert(0, 'local only');
+    }, blockedInvitation);
+    await waitFor(
+      () => notices.some((notice) => notice.includes('/v2/relay: 429')),
+      'explicit relay exhaustion',
+    );
+    assert.equal(
+      await blocked.evaluate(() => window.active.session.doc.getText('capacity').toString()),
+      'local only',
+    );
+    await host.evaluate(() =>
+      window.active.session.doc.getText('healthy').insert(0, 'still running'),
+    );
+    await waitFor(
+      () =>
+        pages[1].evaluate(
+          () => window.active.session.doc.getText('healthy').toString() === 'still running',
+        ),
+      'healthy direct links survive exhaustion',
+    );
+    await blocked.evaluate(() => window.active.close());
+    const counters = await metrics();
+    assert.equal(counters.relayCredentialsIssued, 4);
+    console.log(
+      'PASS: six peers, lazy TURN, mixed paths, convergence, awareness and authenticated handover.',
+    );
+    // Drop signaling while leaving the document transports open.
+    children[0].kill();
+    for (const socket of sockets) socket.close();
+    await pages[5].evaluate(() =>
+      window.active.session.doc.getText('acceptance').insert(0, 'offline-signaling'),
+    );
+    await waitFor(
+      () =>
+        host.evaluate(() =>
+          window.active.session.doc.getText('acceptance').toString().includes('offline-signaling'),
+        ),
+      'healthy document links survive signaling outage',
+    );
+    assert.ok(
+      await pages[5].evaluate(() =>
         window.active.session.doc.getText('acceptance').toString().includes('offline-signaling'),
       ),
-    'healthy document links survive signaling outage',
-  );
-  assert.ok(
-    await pages[5].evaluate(() =>
-      window.active.session.doc.getText('acceptance').toString().includes('offline-signaling'),
-    ),
-  );
-  launch(binary, [], { env });
-  await waitFor(
-    async () => (await fetch(`${server}/health`).catch(() => null))?.ok,
-    'signaling restart',
-  );
-  await waitFor(
-    () => notices.some((notice) => notice.includes('Session authorization is no longer valid')),
-    'restart ends admission visibly',
-  );
-  assert.ok(
-    await host.evaluate(() =>
-      window.active.session.doc.getText('acceptance').toString().includes('offline-signaling'),
-    ),
-  );
+    );
+    launch(binary, [], { env });
+    await waitFor(
+      async () => (await fetch(`${server}/health`).catch(() => null))?.ok,
+      'signaling restart',
+    );
+    await waitFor(
+      () => notices.some((notice) => notice.includes('Session authorization is no longer valid')),
+      'restart ends admission visibly',
+    );
+    assert.ok(
+      await host.evaluate(() =>
+        window.active.session.doc.getText('acceptance').toString().includes('offline-signaling'),
+      ),
+    );
+  } else {
+    await writeFile(
+      resolve(directory, 'measurements.json'),
+      JSON.stringify(
+        {
+          mode,
+          transport: process.env.VEIL_TURN_TRANSPORT || 'udp',
+          guests: guestCount,
+          relayRequests,
+          allocations: allocations(await turnMetrics()),
+        },
+        null,
+        2,
+      ),
+    );
+    console.log('PASS: direct/relay connections, staged fallback, convergence and presence.');
+  }
   await Promise.all(pages.slice(1).map((page) => page.evaluate(() => window.active.close())));
   await host.evaluate(() => window.active.close());
   assert.equal((await metrics()).sessions, 0);
@@ -531,9 +566,36 @@ try {
     15_000,
   );
   await writeFile(resolve(directory, 'cleanup-metrics.txt'), await turnMetrics());
-  console.log(
-    'PASS: signaling process outage preserves peer traffic and local content; restart has no stored sessions.',
+  console.log('PASS: all sessions and TURN allocations cleaned up.');
+} catch (error) {
+  const peers = await Promise.all(
+    pages.map(async (page, participant) => {
+      try {
+        return {
+          participant,
+          peers: await page.evaluate(() => window.active?.session.provider.summaries()),
+        };
+      } catch {
+        return { participant, unavailable: true };
+      }
+    }),
   );
+  await writeFile(
+    resolve(directory, 'failure.json'),
+    JSON.stringify(
+      {
+        mode,
+        transport: process.env.VEIL_TURN_TRANSPORT || 'udp',
+        relayRequests,
+        relayEvents,
+        peers,
+        error: error.message,
+      },
+      null,
+      2,
+    ),
+  );
+  throw error;
 } finally {
   for (const socket of sockets) socket.terminate();
   await browser?.close();

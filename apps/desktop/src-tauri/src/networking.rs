@@ -1,5 +1,5 @@
 //! Narrow, control-panel-only networking. No general-purpose HTTP proxy or
-//! remote origin is added to the WebView CSP. Host credentials never reach JS.
+//! remote origin is added to the WebView CSP. Saved host credentials never reach JS.
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -84,6 +84,12 @@ fn path_allowed(path: &str, method: &str) -> bool {
             && pieces[4] == "invitations"
             && method == "POST")
 }
+fn valid_credential(secret: &str) -> bool {
+    secret.len() == 64
+        && secret
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+}
 fn entry(server: &str) -> Result<keyring::Entry, String> {
     keyring::Entry::new("dev.veil.desktop.networking", server)
         .map_err(|_| "Credential store is unavailable.".into())
@@ -127,19 +133,18 @@ pub async fn network_configure(
 ) -> Result<Preferences, String> {
     authorize(&caller)?;
     let server = server_url(&server)?.origin().ascii_serialization();
-    if let Some(secret) = credential {
-        if !secret.is_empty() {
-            if secret.len() != 64
-                || !secret
-                    .bytes()
-                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
-            {
-                return Err("Invalid operator-issued host credential.".into());
-            }
-            entry(&server)?
-                .set_password(&secret)
-                .map_err(|_| "Cannot save the host credential securely.")?;
-        }
+    let credential_store = entry(&server)?;
+    if let Some(secret) = credential.filter(|secret| !secret.is_empty()) {
+        // Authenticate before changing either Credential Manager or preferences.
+        // This also prevents an invalid replacement from overwriting a working key.
+        test_credentials(&server, secret.clone()).await?;
+        credential_store
+            .set_password(&secret)
+            .map_err(|_| "Cannot save the host credential securely.")?;
+    } else {
+        credential_store
+            .get_password()
+            .map_err(|_| "Enter an operator-issued host credential before saving settings.")?;
     }
     let directory = settings_directory(&app)?;
     std::fs::create_dir_all(&directory).map_err(|_| "Cannot create settings directory.")?;
@@ -175,12 +180,22 @@ pub async fn network_request(
     ticket: Option<String>,
 ) -> Result<Value, String> {
     authorize(&caller)?;
-    if !path_allowed(&path, &method) {
+    request(&server, &path, &method, body, ticket, None).await
+}
+async fn request(
+    server: &str,
+    path: &str,
+    method: &str,
+    body: Value,
+    ticket: Option<String>,
+    host_credential: Option<String>,
+) -> Result<Value, String> {
+    if !path_allowed(path, method) {
         return Err("Unsupported network operation.".into());
     }
-    let origin = server_url(&server)?;
+    let origin = server_url(server)?;
     let url = origin
-        .join(&path)
+        .join(path)
         .map_err(|_| "Invalid network operation.")?;
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
@@ -194,9 +209,12 @@ pub async fn network_request(
         url,
     );
     if path == "/v2/sessions" && method == "POST" {
-        let credential = entry(&origin.origin().ascii_serialization())?
-            .get_password()
-            .map_err(|_| "Configure an operator-issued host credential first.")?;
+        let credential = match host_credential {
+            Some(secret) => secret,
+            None => entry(&origin.origin().ascii_serialization())?
+                .get_password()
+                .map_err(|_| "Configure an operator-issued host credential first.")?,
+        };
         request = request.bearer_auth(credential);
     } else if let Some(ticket) = ticket {
         if ticket.len() != 64 || !ticket.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -238,6 +256,76 @@ pub async fn network_request(
         .into());
     }
     serde_json::from_slice(&bytes).map_err(|_| "Invalid server response.".into())
+}
+// Probe authentication with a short-lived registration; never opens a socket,
+// publishes an invitation, changes preferences, or replaces stored credentials.
+async fn test_credentials(server: &str, credential: String) -> Result<(), String> {
+    if !valid_credential(&credential) {
+        return Err("Invalid operator-issued host credential.".into());
+    }
+    let capabilities = request(server, "/v2/capabilities", "GET", Value::Null, None, None).await?;
+    if capabilities.get("groupSharing").and_then(Value::as_u64) != Some(1) {
+        return Err("This server needs an update to support reusable sharing links.".into());
+    }
+    let registration = request(
+        server,
+        "/v2/sessions",
+        "POST",
+        serde_json::json!({"clientId": 0}),
+        None,
+        Some(credential),
+    )
+    .await
+    .map_err(|error| match error.as_str() {
+        "Server authorization rejected or session ended." => {
+            "Host credential rejected. Check it with your server operator.".into()
+        }
+        "Server or relay capacity unavailable." => {
+            "Server capacity or rate limit reached. Wait briefly and retry.".into()
+        }
+        _ => error,
+    })?;
+    let session = registration
+        .get("sessionId")
+        .and_then(Value::as_str)
+        .filter(|value| identity(value))
+        .ok_or("Invalid server test registration.")?;
+    let ticket = registration
+        .get("ticket")
+        .and_then(Value::as_str)
+        .filter(|value| valid_credential(value))
+        .ok_or("Invalid server test authorization.")?;
+    let cleanup_error = "Credential accepted, but the temporary test registration could not be removed. Retry later.";
+    let cleanup = request(
+        server,
+        &format!("/v2/sessions/{session}"),
+        "DELETE",
+        Value::Null,
+        Some(ticket.to_string()),
+        None,
+    )
+    .await
+    .map_err(|_| cleanup_error.to_string())?;
+    if cleanup.get("ok").and_then(Value::as_bool) != Some(true) {
+        return Err(cleanup_error.into());
+    }
+    Ok(())
+}
+#[tauri::command]
+pub async fn network_test(
+    caller: WebviewWindow,
+    server: String,
+    credential: Option<String>,
+) -> Result<(), String> {
+    authorize(&caller)?;
+    let origin = server_url(&server)?.origin().ascii_serialization();
+    let credential = match credential.filter(|secret| !secret.is_empty()) {
+        Some(secret) => secret,
+        None => entry(&origin)?.get_password().map_err(|_| {
+            "Enter an operator-issued host credential or save one for this server first."
+        })?,
+    };
+    test_credentials(&origin, credential).await
 }
 #[tauri::command]
 pub async fn network_connect(

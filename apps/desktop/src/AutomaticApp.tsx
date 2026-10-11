@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
+import { listen } from '@tauri-apps/api/event';
 import {
   createPeerSession,
   joinShareLink,
@@ -15,17 +17,25 @@ import {
   PeoplePanel,
   hasDocumentContent,
   useAppearance,
-  roadmap,
+  DeveloperCredit,
+  AppVersion,
   type Appearance,
 } from '@veil/ui';
 import { nativeSignaling } from './networking';
 import { DesktopEditor, SessionBridge } from './overlay/session';
 import { OverlayControls } from './overlay/Controls';
 import { Updates } from './Updates';
-import { errorMessage, invoke, useOverlay } from './overlay/api';
+import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
 
-type Section = 'Appearance' | 'Hosting server' | 'Overlay' | 'Updates' | 'About';
-const sections: Section[] = ['Appearance', 'Hosting server', 'Overlay', 'Updates', 'About'];
+type Section = 'General' | 'Appearance' | 'Hosting server' | 'Overlay' | 'Updates' | 'About';
+const sections: Section[] = [
+  'General',
+  'Appearance',
+  'Hosting server',
+  'Overlay',
+  'Updates',
+  'About',
+];
 export function AutomaticApp() {
   const [document, setDocument] = useState<PeerSession | null>(null);
   const documentRef = useRef<PeerSession | null>(null);
@@ -35,6 +45,9 @@ export function AutomaticApp() {
   const [server, setServer] = useState('');
   const [savedServer, setSavedServer] = useState('');
   const [credential, setCredential] = useState('');
+  const [serverTest, setServerTest] = useState('');
+  const [testingServer, setTestingServer] = useState(false);
+  const [savingServer, setSavingServer] = useState(false);
   const [name, setName] = useState('');
   const [invitation, setInvitation] = useState('');
   const [link, setLink] = useState('');
@@ -46,17 +59,26 @@ export function AutomaticApp() {
   const [development, setDevelopment] = useState(false);
   const [people, setPeople] = useState(() => window.innerWidth >= 900);
   const [settings, setSettings] = useState(false);
-  const [section, setSection] = useState<Section>('Appearance');
+  const [section, setSection] = useState<Section>('General');
   const [shareOpen, setShareOpen] = useState(false);
   const [resumeShare, setResumeShare] = useState(false);
   const [pendingLink, setPendingLink] = useState('');
   const [confirmExit, setConfirmExit] = useState(false);
+  const [confirmQuit, setConfirmQuit] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [connected, setConnected] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
   const { appearance, setAppearance } = useAppearance();
   const overlay = useOverlay();
   const onUpdateBusy = useCallback((value: boolean) => setUpdating(value), []);
+  useEffect(() => {
+    const unlisten = listen('app-quit-requested', () => setConfirmQuit(true));
+    const unlistenFailure = listen<string>('app-quit-failed', (event) => setError(event.payload));
+    return () => {
+      void unlisten.then((stop) => stop()).catch(() => {});
+      void unlistenFailure.then((stop) => stop()).catch(() => {});
+    };
+  }, []);
   useEffect(() => {
     void invoke<{ server: string; development: boolean }>('network_preferences')
       .then((p) => {
@@ -175,7 +197,7 @@ export function AutomaticApp() {
       throw e;
     }
   }
-  function openSettings(next: Section = 'Appearance') {
+  function openSettings(next: Section = 'General') {
     setSection(next);
     setSettings(true);
   }
@@ -205,11 +227,34 @@ export function AutomaticApp() {
     setNotice('');
     setServiceOnline(network.current.serviceOnline);
   }
+  async function testServer() {
+    setTestingServer(true);
+    setServerTest('Testing connection...');
+    try {
+      await invoke('network_test', { server, credential: credential || null });
+      setServerTest('Connection successful. Host credential accepted.');
+    } catch (e) {
+      setServerTest(errorMessage(e));
+    } finally {
+      setTestingServer(false);
+    }
+  }
   async function saveServer() {
-    const saved = await invoke<{ server: string }>('network_configure', {
-      server,
-      credential: credential || null,
-    });
+    setSavingServer(true);
+    setServerTest('Checking settings before saving...');
+    let saved: { server: string };
+    try {
+      saved = await invoke<{ server: string }>('network_configure', {
+        server,
+        credential: credential || null,
+      });
+    } catch (e) {
+      setServerTest(errorMessage(e));
+      return;
+    } finally {
+      setSavingServer(false);
+    }
+    setServerTest('');
     setServer(saved.server);
     setSavedServer(saved.server);
     setCredential('');
@@ -518,6 +563,41 @@ export function AutomaticApp() {
             ))}
           </nav>
           <div className="settings-content">
+            <section hidden={section !== 'General'}>
+              <h3>Window and app</h3>
+              <label htmlFor="close-behavior">When closing the main window</label>
+              <select
+                id="close-behavior"
+                value={overlay.state?.settings.closeBehavior ?? 'tray'}
+                disabled={!overlay.state || busy || updating}
+                onChange={(event) => {
+                  const closeBehavior = event.target.value;
+                  void run(async () => {
+                    overlay.setState(
+                      await invoke<OverlaySnapshot>('overlay_update', {
+                        patch: { closeBehavior },
+                      }),
+                    );
+                  });
+                }}
+              >
+                <option value="tray">Minimize to tray</option>
+                <option value="quit">Quit app</option>
+              </select>
+              <p>
+                Minimize to tray keeps your document, connections and visible overlay active. Quit
+                app closes Veil and its overlay immediately. You can reopen Veil, show or hide the
+                overlay, or quit from the tray menu.
+              </p>
+              <button
+                className="danger-button"
+                disabled={busy || updating}
+                onClick={() => setConfirmQuit(true)}
+              >
+                Quit Veil
+              </button>
+              <p className="muted">Fully closes Veil and its overlay, ending your session.</p>
+            </section>
             <section hidden={section !== 'Appearance'}>
               <h3>Appearance</h3>
               <p>Make this space feel like yours.</p>
@@ -567,7 +647,10 @@ export function AutomaticApp() {
                   placeholder="https://signal.example.com"
                   autoComplete="off"
                   disabled={busy}
-                  onChange={(e) => setServer(e.target.value)}
+                  onChange={(e) => {
+                    setServer(e.target.value);
+                    setServerTest('');
+                  }}
                 />
                 <label htmlFor="automatic-credential">Host access credential</label>
                 <input
@@ -577,11 +660,26 @@ export function AutomaticApp() {
                   placeholder="Leave empty to keep your saved credential"
                   autoComplete="off"
                   disabled={busy}
-                  onChange={(e) => setCredential(e.target.value)}
+                  onChange={(e) => {
+                    setCredential(e.target.value);
+                    setServerTest('');
+                  }}
                 />
                 <div className="form-actions">
                   <button className="primary-button" disabled={busy || !server.trim()}>
-                    {resumeShare ? 'Save and share' : 'Save settings'}
+                    {savingServer
+                      ? 'Checking and saving...'
+                      : resumeShare
+                        ? 'Save and share'
+                        : 'Save settings'}
+                  </button>
+                  <button
+                    type="button"
+                    className="quiet-button"
+                    disabled={busy || !server.trim()}
+                    onClick={() => void run(testServer)}
+                  >
+                    {testingServer ? 'Testing...' : 'Test connection'}
                   </button>
                   <button
                     type="button"
@@ -591,6 +689,7 @@ export function AutomaticApp() {
                       void run(async () => {
                         await invoke('network_forget', { server: savedServer });
                         setCredential('');
+                        setServerTest('');
                         setNotice('Saved host credential removed.');
                       })
                     }
@@ -598,6 +697,9 @@ export function AutomaticApp() {
                     Forget credential
                   </button>
                 </div>
+                <p role="status" aria-live="polite">
+                  {serverTest}
+                </p>
               </form>
               <p className="muted">
                 Your server operator provides the address and credential. Changes apply when you
@@ -614,21 +716,15 @@ export function AutomaticApp() {
             </section>
             <section hidden={section !== 'About'}>
               <h3>About Veil</h3>
-              <p>A shared document, close at hand.</p>
-              <p>
-                Documents live in memory. Closing the host loses the document. Copy anything you
-                want to keep.
-              </p>
-              <h4>Roadmap</h4>
-              <ol className="about-roadmap">
-                {roadmap.map((m) => (
-                  <li key={m.id}>
-                    <strong>{m.title}</strong>
-                    <span className="muted">{m.status}</span>
-                    <p>{m.detail}</p>
-                  </li>
-                ))}
-              </ol>
+              <AppVersion />
+              <DeveloperCredit
+                onVisit={(event) => {
+                  event.preventDefault();
+                  void openUrl('https://ahmadfatayerji.com').catch((cause) => {
+                    setError(errorMessage(cause));
+                  });
+                }}
+              />
             </section>
             {notice && <p role="status">{notice}</p>}
             {error && (
@@ -707,6 +803,36 @@ export function AutomaticApp() {
           </>
         )}
         {notice && <p role="status">{notice}</p>}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+      </Dialog>
+      <Dialog
+        open={confirmQuit}
+        title="Quit Veil?"
+        locked={updating || busy}
+        onClose={() => setConfirmQuit(false)}
+      >
+        <p>
+          Veil and the overlay will close.
+          {document &&
+            ' This document is temporary. Copy any text you want to keep before quitting.'}
+          {document && !guest && session && ' Everyone will be disconnected.'}
+        </p>
+        <div className="form-actions">
+          <button className="secondary-button" onClick={() => setConfirmQuit(false)}>
+            Cancel
+          </button>
+          <button
+            className="danger-button"
+            disabled={busy || updating}
+            onClick={() => void run(() => invoke('app_quit'))}
+          >
+            Quit Veil
+          </button>
+        </div>
         {error && (
           <p className="error" role="alert">
             {error}
