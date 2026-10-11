@@ -1,0 +1,52 @@
+{
+  "name": "veil",
+  "version": "0.3.0",
+  "private": true,
+  "packageManager": "pnpm@10.30.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev:host": "cargo run -p veil-host",
+    "dev:web": "pnpm --filter @veil/web dev",
+    "dev:desktop": "pnpm --filter @veil/desktop tauri dev",
+    "build": "pnpm --filter @veil/web build && pnpm --filter @veil/desktop build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write . && cargo fmt --all",
+    "format:check": "prettier --check . && cargo fmt --all -- --check",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && cargo check --workspace && cargo clippy --workspace --all-targets -- -D warnings",
+    "test": "vitest run && cargo test --workspace",
+    "test:e2e": "playwright test",
+    "test:overlay": "node scripts/test-overlay.mjs",
+    "test:capture": "node scripts/test-capture.mjs",
+    "test:host": "node scripts/test-host.mjs",
+    "test:peer": "node scripts/test-peer.mjs",
+    "test:network": "node scripts/test-network.mjs",
+    "package:windows": "node scripts/build-installer.mjs",
+    "test:installer": "node scripts/test-installer.mjs",
+    "test:release": "node --test scripts/*.test.mjs",
+    "test:updates": "node scripts/test-updates.mjs",
+    "release:verify": "node scripts/gitflow.mjs verify",
+    "test:sharing": "node scripts/test-create-share-join.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.58.0",
+    "@types/node": "^22.19.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "conventional-commits-parser": "^7.1.3",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.7.0",
+    "semver": "^7.8.5",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vite": "^7.3.7",
+    "vitest": "^4.0.0",
+    "ws": "^8.22.0",
+    "yaml": "^2.9.1"
+  }
+}

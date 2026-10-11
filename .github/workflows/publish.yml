@@ -1,0 +1,103 @@
+name: Build and publish signed Windows release
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+      artifact:
+        required: true
+        type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: true
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+concurrency:
+  group: public-release-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'ahmad-fatayerji/veil' && vars.RELEASE_PUBLICATION_ENABLED == 'true'
+    runs-on: windows-latest
+    env:
+      RELEASE_PUBLICATION_ENABLED: ${{ vars.RELEASE_PUBLICATION_ENABLED }}
+      CARGO_PROFILE_DEV_DEBUG: 1
+      CARGO_PROFILE_TEST_DEBUG: 1
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target/verifier
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: windows-release-verifier-v1
+          workspaces: . -> target/verifier
+      - run: pnpm install --frozen-lockfile
+      - name: Record build environment and cache hit
+        env:
+          NATIVE_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+          NATIVE_CACHE_NAMESPACE: windows-release-verifier-v1
+        run: node scripts/native-build-diagnostics.mjs
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.artifact }}
+          path: target/native-build
+      - name: Verify same-run executable provenance
+        run: node scripts/native-build-artifact.mjs restore target/native-build
+      - name: Validate release source before signing
+        env:
+          RELEASE_BRANCH: ${{ inputs.branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-release.mjs preflight
+      - name: Bundle and sign the validated executable without recompiling
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm --filter @veil/desktop exec -- tauri bundle --bundles nsis
+      - name: Generate verified release assets
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem target/release/bundle/nsis/*-setup.exe)
+          if ($installers.Count -ne 1) { throw 'Expected exactly one Windows installer.' }
+          node scripts/release-manifest.mjs $installers[0].FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Release manifest generation failed.' }
+          $env:VEIL_TEST_INSTALLER = $installers[0].FullName
+          cargo test -p veil-release-verifier --test signature --locked --timings -- --ignored
+          if ($LASTEXITCODE -ne 0) { throw 'Updater signature verification failed.' }
+      - name: Publish complete release and advance beta feed
+        env:
+          RELEASE_BRANCH: ${{ inputs.branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish-release.mjs publish
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-release-assets-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/release/share/
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: release-verifier-timings-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/verifier/cargo-timings/
+            target/build-diagnostics/
+          retention-days: 7

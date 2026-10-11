@@ -1,0 +1,60 @@
+name: Publish beta
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: release/version or hotfix/name with an open draft release PR
+        required: true
+        type: string
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: read
+concurrency:
+  group: release-management
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: github.ref == 'refs/heads/main' && github.repository == 'ahmad-fatayerji/veil' && vars.RELEASE_PUBLICATION_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.candidate.outputs.sha }}
+      branch: ${{ steps.candidate.outputs.branch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ inputs.branch }}
+        run: node scripts/gitflow.mjs beta "$BRANCH"
+  validate:
+    needs: candidate
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.candidate.outputs.sha }}
+      candidate: true
+  build:
+    needs: candidate
+    uses: ./.github/workflows/build-release.yml
+    with:
+      ref: ${{ needs.candidate.outputs.sha }}
+  publish:
+    needs: [candidate, validate, build]
+    uses: ./.github/workflows/publish.yml
+    with:
+      ref: ${{ needs.candidate.outputs.sha }}
+      branch: ${{ needs.candidate.outputs.branch }}
+      artifact: ${{ needs.build.outputs.artifact }}
+    secrets: inherit

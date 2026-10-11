@@ -1,0 +1,283 @@
+.overlay-controls {
+  max-width: 1210px;
+  margin: 22px auto -16px;
+  padding: 0 32px;
+}
+.overlay-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.overlay-controls-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+.overlay-controls-status {
+  color: var(--muted);
+  font-size: 11px;
+  margin-right: auto;
+}
+.overlay-controls .outline-button {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+}
+.overlay-settings {
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+}
+.overlay-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 36px;
+  max-width: 640px;
+}
+.overlay-range {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  font-size: 12px;
+}
+.overlay-range output {
+  color: var(--muted);
+}
+.overlay-range input {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+  accent-color: var(--text);
+}
+.overlay-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.overlay-check input {
+  accent-color: var(--text);
+  width: auto;
+  margin: 0;
+  flex: 0 0 auto;
+}
+.overlay-settings-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 16px -10px 0;
+}
+.overlay-settings-actions span {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+.overlay-help {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin: 8px 0 0;
+}
+.overlay-help kbd {
+  font: inherit;
+  color: var(--text);
+}
+.overlay-error {
+  font-size: 12px;
+  color: #a44e40;
+  line-height: 1.6;
+}
+.capture-settings {
+  border-top: 1px solid var(--border);
+  margin-top: 18px;
+  padding-top: 18px;
+}
+.capture-compatibility {
+  max-width: 720px;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.capture-compatibility h3 {
+  font-size: 13px;
+  margin: 0;
+}
+.capture-compatibility ol {
+  padding-left: 20px;
+}
+.capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.capture-test-card {
+  margin: 12px 20px;
+  padding: 24px;
+  border: 6px solid #174faf;
+  background: #fff36c;
+  color: #151515;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.capture-test-card strong {
+  font-size: 22px;
+}
+.capture-test-card span {
+  font-size: 12px;
+}
+html.overlay-mode,
+.overlay-mode body,
+.overlay-mode #root {
+  background: transparent;
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.overlay-surface {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 100%;
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  overflow: hidden;
+}
+.overlay-drag-handle {
+  flex-shrink: 0;
+  padding: 14px 18px 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  cursor: move;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.overlay-preview-tag {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.overlay-recovery-hint {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.overlay-document {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  line-height: 1.6;
+}
+.overlay-document .document-editor {
+  font-size: inherit;
+  line-height: inherit;
+  min-height: 100%;
+  padding: 8px 24px 24px;
+}
+.overlay-document .document-editor p {
+  margin: 0 0 0.6em;
+}
+.overlay-empty {
+  padding: 8px 24px 24px;
+  font-size: 14px;
+}
+.overlay-empty p + p {
+  color: var(--muted);
+  font-size: 12px;
+}
+.overlay-surface.is-click-through .overlay-drag-handle {
+  cursor: default;
+}
+.overlay-resize {
+  position: absolute;
+}
+.overlay-resize-north {
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 6px;
+  cursor: n-resize;
+}
+.overlay-resize-south {
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 6px;
+  cursor: s-resize;
+}
+.overlay-resize-east {
+  right: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 6px;
+  cursor: e-resize;
+}
+.overlay-resize-west {
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 6px;
+  cursor: w-resize;
+}
+.overlay-resize-northEast {
+  right: 0;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  cursor: ne-resize;
+}
+.overlay-resize-northWest {
+  left: 0;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nw-resize;
+}
+.overlay-resize-southEast {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  cursor: se-resize;
+}
+.overlay-resize-southWest {
+  left: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  cursor: sw-resize;
+}
+@media (max-width: 650px) {
+  .overlay-controls {
+    padding: 0 18px;
+  }
+  .overlay-settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .overlay-settings-actions {
+    flex-wrap: wrap;
+  }
+}
+
+.overlay-surface {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+.overlay-drag-handle {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.overlay-document .document-editor {
+  min-height: 100%;
+  padding: 16px 24px 24px;
+}

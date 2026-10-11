@@ -1,0 +1,11 @@
+node_modules/
+dist/
+target/
+test-results/
+playwright-report/
+.env
+*.key
+*.pem
+password.txt
+*.log
+apps/desktop/src-tauri/gen/

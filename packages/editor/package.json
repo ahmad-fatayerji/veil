@@ -1,0 +1,21 @@
+{
+  "name": "@veil/editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.tsx"
+  },
+  "dependencies": {
+    "@veil/collaboration": "workspace:*",
+    "@tiptap/extension-collaboration": "^3.31.4",
+    "@tiptap/extension-collaboration-caret": "3.31.4",
+    "@tiptap/react": "^3.31.4",
+    "@tiptap/starter-kit": "^3.31.4",
+    "@tiptap/y-tiptap": "^3.0.0",
+    "@veil/protocol": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "yjs": "^13.6.27"
+  }
+}

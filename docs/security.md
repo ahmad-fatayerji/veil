@@ -1,0 +1,27 @@
+> Normal desktop sessions now use [automatic networking](automatic-networking.md). The older LAN/manual sections below describe debug regression infrastructure.
+
+## Automatic signaling and relay boundary
+
+Production server selection requires an HTTPS origin, with no bundled service. Host credentials are saved in Windows Credential Manager scoped to that origin; main-window-only Rust commands perform allowlisted, bounded HTTPS/WSS operations. Credential reads never return to frontend JavaScript. CSP does not permit arbitrary remote WebSockets. Active document sessions prevent updater installation.
+
+Ten-minute single-use invitations derive independent admission and directional encryption keys using HKDF-SHA-256. Signaling uses AES-GCM with authenticated session, invitation, role, generation and sequence. Nonces combine a fixed random sender prefix with a monotonically increasing sequence; receivers reject replay and prefix changes. Authenticate descriptions before trusting DTLS fingerprints; authenticate expected participant identity before Yjs/awareness traffic. The server cannot silently substitute a peer, but can deny service and observe metadata.
+
+Operators approve/revoke hosts locally. Only credential hashes/configuration persist. Neither server nor desktop persists documents. TURN grants are issued lazily to admitted fallback links and renew only selected relay paths, with bounded per-host identities/rates and coturn global/per-credential quotas. Destination exclusions deny private, loopback, link-local and multicast peers. Metrics require separate operator access; TURN metrics bind to loopback. Never log secrets, decrypted signaling or document contents.
+
+Allocation expiry is distinct from credential expiry. Explicitly close old transports after authenticated synchronization and after leaving; verify coturn cleanup using allocation metrics. Capacity failures keep local edits and healthy direct connections. Public deployment/protocol/security documentation is in [veil-server](https://github.com/ahmad-fatayerji/veil-server). Real internet acceptance and an independent security audit remain separate from local automated checks.
+
+# M2 security boundary
+
+Desktop P2P now uses WebRTC DTLS, exchanged fingerprint-bound offer/answer codes and a session-bound credential check before collaboration messages. It opens no HTTP session listener. Manual codes must travel through a trusted channel. Optional STUN/TURN servers receive metadata; TURN relays encrypted traffic and must use authenticated access. Transport queues/fragments/timeouts are bounded; this is not a complete malicious-collaborator or whole-document resource policy. See [P1 security and networking](p2p.md). The remaining sections apply to retained LAN/browser hosting.
+
+Embedded sessions default to loopback. Trusted LAN exposure is explicit, restricted to a selected RFC1918 IPv4 address, and requires acknowledgement of plaintext HTTP. This is intended only for trusted networks. The app does not configure firewall rules or enable public internet access.
+
+Each start creates a cryptographically random UUID session ID and a high-entropy invitation credential made from two random UUIDs (with UUID version/variant bits fixed). Any invite holder can edit. Authentication occurs before WebSocket upgrade and before document access. Native administration is separate: only the main Tauri control window can invoke hosting lifecycle commands. Ending a session invalidates its invitation and closes existing clients. Individual roles, kicking participants and invite regeneration are deferred.
+
+Host headers must match a configured numeric listener. Sensitive requests require an exact allowed Origin; CORS allows only those origins. Invitations use fragments rather than request URLs; the browser removes the fragment after reading it. Credentials are sent in a JSON join body and requested WebSocket subprotocol, never echoed in the selected subprotocol, persisted in preferences or logged by the application. Authentication responses are not cached. Static assets use a restrictive CSP, no-referrer, nosniff, and exact compiled-path lookup. Tauri's CSP permits local numeric loopback connections; native operations remain isolated from shared React.
+
+Join requests have a 4 KiB body limit and a room-wide 30-attempt/second guard. Binary frames are limited to 256 KiB, fan-out to 128 queued broadcasts per subscriber, sends to five seconds, and incoming connections to 200 frames/second. Slow consumers disconnect and must resynchronize. These resource safeguards are not participant caps. Admission defaults to no application-level count limit.
+
+These measures do not protect against a malicious invite holder, network packet interception on a LAN, malicious local processes, a compromised allowed frontend or a compromised host. Awareness names are self-reported; they do not prove identity. Rich text uses the editor schema; raw HTML import and links are disabled, and presence names/colors are sanitized for rendering. M5 must review independent edit/awareness/auth rate limits, direct upgrade throttling, document-size safeguards, origin configuration, invitation management and HTTPS/WSS before remote use. This is not a reviewed internet deployment.
+
+The standalone M0 demo has a trusted-origin credential bootstrap for development only. That route does not exist in embedded sessions. No capture-exclusion guarantee, signing key, updater or public listener is configured.

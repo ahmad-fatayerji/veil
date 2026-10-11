@@ -1,0 +1,65 @@
+name: Compile unsigned Windows release
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+    outputs:
+      artifact:
+        description: Same-run executable and provenance artifact
+        value: ${{ jobs.build.outputs.artifact }}
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: 1
+      CARGO_PROFILE_TEST_DEBUG: 1
+    outputs:
+      artifact: ${{ steps.artifact.outputs.name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: windows-desktop-release-v1
+          workspaces: . -> target
+      - run: pnpm install --frozen-lockfile
+      - name: Record build environment and cache hit
+        env:
+          NATIVE_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+          NATIVE_CACHE_NAMESPACE: windows-desktop-release-v1
+        run: node scripts/native-build-diagnostics.mjs
+      - name: Compile production executable without signing or bundling
+        run: pnpm --filter @veil/desktop exec -- tauri build --no-bundle -- --locked --timings
+      - name: Record executable provenance
+        run: node scripts/native-build-artifact.mjs create target/native-build
+      - id: artifact
+        shell: pwsh
+        run: '"name=windows-native-build-${{ github.run_id }}-${{ github.run_attempt }}" >> $env:GITHUB_OUTPUT'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: target/native-build/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: release-build-timings-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/cargo-timings/
+            target/build-diagnostics/
+          retention-days: 7

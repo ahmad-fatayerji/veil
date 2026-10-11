@@ -1,0 +1,43 @@
+name: Finalize release
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: release/version or hotfix/name with an open draft release PR
+        required: true
+        type: string
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+concurrency:
+  group: release-management
+  cancel-in-progress: false
+jobs:
+  finalize:
+    if: github.ref == 'refs/heads/main' && github.repository == 'ahmad-fatayerji/veil' && vars.RELEASE_PUBLICATION_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ inputs.branch }}
+        run: node scripts/gitflow.mjs finalize "$BRANCH"
+      - name: Explicitly dispatch validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.candidate.outputs.branch }}
+          SHA: ${{ steps.candidate.outputs.sha }}
+        run: gh workflow run ci.yml --ref "$BRANCH" -f "ref=$SHA"

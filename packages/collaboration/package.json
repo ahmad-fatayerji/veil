@@ -1,0 +1,16 @@
+{
+  "name": "@veil/collaboration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@veil/protocol": "workspace:*",
+    "lib0": "^0.2.119",
+    "y-protocols": "^1.0.7",
+    "y-websocket": "3.0.0",
+    "yjs": "^13.6.27"
+  }
+}

@@ -1,0 +1,334 @@
+name: CI
+on:
+  pull_request:
+    branches: [main, develop, 'release/**', 'hotfix/**']
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Exact source commit to validate
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      candidate:
+        default: false
+        type: boolean
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  checks: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || inputs.ref || github.ref }}
+  cancel-in-progress: true
+jobs:
+  plan:
+    name: Select checks
+    runs-on: ubuntu-24.04
+    outputs:
+      formatting: ${{ steps.select.outputs.formatting }}
+      javascript: ${{ steps.select.outputs.javascript }}
+      release: ${{ steps.select.outputs.release }}
+      rust: ${{ steps.select.outputs.rust }}
+      desktop: ${{ steps.select.outputs.desktop }}
+      integration: ${{ steps.select.outputs.integration }}
+      networking: ${{ steps.select.outputs.networking }}
+      extended: ${{ steps.select.outputs.extended }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FULL_VALIDATION: ${{ inputs.candidate || github.event_name != 'pull_request' }}
+        run: node scripts/ci-plan.mjs
+  policy:
+    name: Branch policy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/gitflow.mjs verify
+      - if: ${{ !inputs.candidate }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATE_REF: ${{ inputs.ref || github.sha }}
+        run: node scripts/gitflow.mjs policy
+  formatting:
+    name: Formatting
+    needs: plan
+    if: needs.plan.outputs.formatting == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --check .
+  release:
+    name: Workflow and release tests
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:release
+  javascript:
+    needs: plan
+    if: needs.plan.outputs.javascript == 'true'
+    name: JavaScript checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --check .
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm exec vitest run
+      - run: pnpm test:release
+      - run: pnpm build
+  rust:
+    needs: plan
+    if: needs.plan.outputs.rust == 'true'
+    name: Windows Rust checks
+    runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: 1
+      CARGO_PROFILE_TEST_DEBUG: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: windows-rust-checks-v1
+          save-if: ${{ github.event_name != 'pull_request' }}
+          workspaces: . -> target
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Record build environment and cache hit
+        env:
+          NATIVE_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+          NATIVE_CACHE_NAMESPACE: windows-rust-checks-v1
+        run: node scripts/native-build-diagnostics.mjs
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked --timings -- -D warnings
+      - run: cargo test --workspace --locked --timings
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: rust-check-timings-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/cargo-timings/
+            target/build-diagnostics/
+          retention-days: 7
+  desktop:
+    needs: plan
+    if: needs.plan.outputs.desktop == 'true'
+    name: Windows desktop build
+    runs-on: windows-latest
+    env:
+      CARGO_PROFILE_DEV_DEBUG: 1
+      CARGO_PROFILE_TEST_DEBUG: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: windows-desktop-debug-v1
+          save-if: ${{ github.event_name != 'pull_request' }}
+          workspaces: . -> target
+      - run: pnpm install --frozen-lockfile
+      - name: Record build environment and cache hit
+        env:
+          NATIVE_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+          NATIVE_CACHE_NAMESPACE: windows-desktop-debug-v1
+        run: node scripts/native-build-diagnostics.mjs
+      - run: pnpm --filter @veil/desktop exec -- tauri build --debug --no-bundle -- --locked --timings
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: desktop-debug-timings-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/cargo-timings/
+            target/build-diagnostics/
+          retention-days: 7
+  integration:
+    needs: plan
+    if: needs.plan.outputs.integration == 'true'
+    name: Browser integration
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux-browser-host-v1
+          save-if: ${{ github.event_name != 'pull_request' }}
+          workspaces: . -> target
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @veil/web build
+      - run: cargo build -p veil-host --locked
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+  networking:
+    needs: plan
+    if: needs.plan.outputs.networking == 'true'
+    name: Signaling and selective relay regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VEIL_NETWORK_MODE: ${{ needs.plan.outputs.extended == 'true' && 'full' || 'smoke' }}
+      VEIL_SERVER_SOURCE: ${{ github.workspace }}/target/server-source
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/checkout@v7
+        with:
+          repository: ahmad-fatayerji/veil-server
+          ref: 0441fb8ea2d8ef48376d232877fd774355110e2c
+          path: target/server-source
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux-signaling-v1
+          save-if: ${{ github.event_name != 'pull_request' }}
+          workspaces: target/server-source -> target
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: Require identical public protocol fixture
+        run: cmp packages/protocol/fixtures/signaling-v2.json target/server-source/fixtures/signaling-v2.json
+      - run: cargo build --manifest-path target/server-source/Cargo.toml --locked
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:network
+      - run: pnpm test:network
+        env:
+          VEIL_TURN_TRANSPORT: tcp
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: network-measurements-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/network-acceptance/**/failure.json
+            target/network-acceptance/**/measurements.json
+            target/network-acceptance/**/cleanup-metrics.txt
+          retention-days: 7
+  gate:
+    name: ${{ inputs.candidate && 'Candidate validation' || 'CI gate' }}
+    if: always()
+    needs: [plan, policy, formatting, javascript, release, rust, desktop, integration, networking]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Require selected checks to succeed
+        env:
+          FULL_VALIDATION: ${{ inputs.candidate || github.event_name != 'pull_request' || github.event.pull_request.base.ref == 'main' }}
+          RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci-plan.mjs gate
