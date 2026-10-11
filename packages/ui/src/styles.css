@@ -1041,6 +1041,14 @@ p {
 .app-notice.error {
   background: color-mix(in srgb, var(--danger) 10%, var(--surface));
 }
+.repository-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.repository-button svg {
+  flex-shrink: 0;
+}
 .developer-credit {
   border-top: 1px solid var(--border);
   margin-top: 24px;
