@@ -186,6 +186,16 @@ test('unified publication is opt-in, feed merges use trusted main and PR CI has 
   assert.doesNotMatch(JSON.stringify(publish), /secrets.RELEASES_TOKEN/);
   assert.doesNotMatch(JSON.stringify(workflow('ci')), /secrets\./);
   const feed = workflow('merge-update-feed');
+  assert.ok(feed.on.workflow_dispatch.inputs.sha.required);
+  assert.match(feed.jobs.merge.if, /github.ref == 'refs\/heads\/main'/);
+  const dispatcher = workflow('ci').jobs['dispatch-feed-merge'];
+  assert.equal(dispatcher.permissions.actions, 'write');
+  assert.equal(
+    dispatcher.steps.some((step) => step.uses),
+    false,
+  );
+  assert.match(dispatcher.if, /head.repo.full_name == github.repository/);
+  assert.match(dispatcher.steps[0].run, /merge-update-feed.yml --ref main/);
   assert.equal(feed.jobs.merge.steps[0].with.ref, 'main');
   assert.match(feed.jobs.merge.if, /head_repository.full_name == github.repository/);
   assert.match(feed.jobs.merge.if, /conclusion == 'success'/);
