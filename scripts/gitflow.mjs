@@ -417,7 +417,15 @@ async function main() {
     git('push', 'origin', `HEAD:refs/heads/${source}`);
     output('version', version);
   } else if (command === 'finalize') {
-    git('merge-base', '--is-ancestor', 'origin/main', 'HEAD');
+    // Checked feed PRs advance main during beta testing. Preserve that history
+    // in the candidate before final review; conflicts stop without a push.
+    try {
+      git('merge-base', '--is-ancestor', 'origin/main', 'HEAD');
+    } catch {
+      git('config', 'user.name', 'github-actions[bot]');
+      git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com');
+      git('merge', '--no-ff', '--no-edit', 'origin/main');
+    }
     const mainBaseline = JSON.parse(git('show', 'origin/main:.release/baseline.json'));
     if (!semver.gt(candidate.targetVersion, mainBaseline.version))
       throw new Error(
