@@ -21,6 +21,7 @@ let app;
 let browser;
 let underlay;
 const errors = [];
+const startupOnly = process.argv.includes('--startup-only');
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
 async function waitFor(check, name, timeout = 15000) {
   const deadline = Date.now() + timeout;
@@ -621,7 +622,8 @@ try {
     ['0px', '0px', '0px'],
     'Range track has no text-field padding or border at maximum opacity.',
   );
-  native('Move', { X: 100, Y: 100 });
+  // Keep the full overlay crop inside the underlay's client area, below its title bar.
+  native('Move', { X: 100, Y: 130 });
   native('Move', { X: 900, Y: 100 }, 'main');
   underlay = spawn(
     'powershell.exe',
@@ -661,14 +663,14 @@ try {
   async function captureExcluded(phase) {
     for (const mode of modes) {
       const result = await capture(mode, phase);
+      results.push(result);
+      await writeFile(resolve(directory, 'capture-results.json'), JSON.stringify(results, null, 2));
       assert.equal(result.bounds.affinity, 0x11);
       assert.ok(result.yellow < 100, `${mode}: card excluded during ${phase}`);
       assert.ok(
         result.blue / (result.bounds.width * result.bounds.height) > 0.97,
         `${mode}: underlying app visible without a black box during ${phase}`,
       );
-      results.push(result);
-      await writeFile(resolve(directory, 'capture-results.json'), JSON.stringify(results, null, 2));
     }
   }
   // Check the default-on path before any off/on transition can repair it (#22).
@@ -681,7 +683,7 @@ try {
     path: resolve(directory, 'opacity-100.png'),
   });
   await captureExcluded('appearance-default-on');
-  await cursorAcceptance(main, overlay, recoveryAvailable);
+  if (!startupOnly) await cursorAcceptance(main, overlay, recoveryAvailable);
   for (const mode of modes) {
     if (await checkbox.isChecked()) await checkbox.click();
     await waitFor(async () => (await snapshot(main)).capture.status === 'disabled', 'disabled');
@@ -696,7 +698,7 @@ try {
     assert.ok(on.yellow < 100, `${mode}: card excluded in captured output`);
     assert.ok(on.blue > 10000, `${mode}: underlying app captured, not a black overlay`);
     results.push(off, on);
-    if (!mode.startsWith('obs-')) {
+    if (!mode.startsWith('obs-') && !startupOnly) {
       results.push(
         await captureGesture(mode, false, overlay),
         await captureGesture(mode, true, overlay),
@@ -722,7 +724,7 @@ try {
   }
   await command(main, 'overlay_visibility', { visible: false });
   await command(main, 'overlay_visibility', { visible: true });
-  if (recoveryAvailable) native('Recover');
+  if (recoveryAvailable && !startupOnly) native('Recover');
   else await command(main, 'overlay_recover');
   await waitFor(async () => (await snapshot(main)).settings.visible, 'recovered');
   assert.equal(native('Probe').affinity, 0x11);
@@ -746,17 +748,20 @@ try {
   for (const excluded of [true, false]) {
     await command(main, 'overlay_update', { patch: { captureExclusion: excluded, opacity: 1 } });
     await overlay.locator('.tiptap').fill(`Editing works with exclusion ${excluded}.`);
-    if (excluded) await captureGesture(null, true, overlay, 'southEast', 'release', 'editor');
+    if (excluded && !startupOnly)
+      await captureGesture(null, true, overlay, 'southEast', 'release', 'editor');
     await waitFor(
       async () => (await main.locator('.tiptap').textContent())?.includes(`exclusion ${excluded}`),
       'overlay editing sync',
     );
-    native('Focus');
-    assert.equal(
-      (await pointAtEditor(overlay)).name,
-      'text',
-      'Idle editing retains actual Windows text cursor',
-    );
+    if (!startupOnly) {
+      native('Focus');
+      assert.equal(
+        (await pointAtEditor(overlay)).name,
+        'text',
+        'Idle editing retains actual Windows text cursor',
+      );
+    }
   }
   await command(main, 'overlay_update', { patch: { captureExclusion: true } });
   await main.getByRole('button', { name: 'Close document', exact: true }).click();
@@ -798,7 +803,8 @@ try {
           '\n',
         )[0],
         results,
-        globalShortcutAndClickThroughVerified: recoveryAvailable,
+        globalShortcutAndClickThroughVerified: recoveryAvailable && !startupOnly,
+        startupOnly,
       },
       null,
       2,
