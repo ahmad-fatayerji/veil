@@ -31,3 +31,15 @@ After migration, Prepare release proposes a new version. Publish beta, test a re
 Keep `Veil-source` private and unarchived until actual upgrade acceptance succeeds. Failed validation stops publication; existing assets are never overwritten, and feeds never move backwards. After a public release, recovery means completing/retrying that immutable release or preparing a newer repair release, not rolling feeds back or re-enabling two publishers.
 
 For the existing per-user test installation, run `node scripts/test-release-upgrade.mjs beta <beta-version>` and then `node scripts/test-release-upgrade.mjs stable <stable-version>`. This uses the real public feed and signed installer, refuses to start while any Veil process is active, backs up preferences privately, checks the active-document gate and preference retention, and restores the prior update channel. It upgrades the existing installation; it does not uninstall it or replace a clean-VM acceptance run.
+
+## Completed cutover (2026-10-11)
+
+Private preparation PR [Veil-source #27](https://github.com/ahmad-fatayerji/Veil-source/pull/27) passed its CI gate and merged. Public import PR [veil #1](https://github.com/ahmad-fatayerji/veil/pull/1) passed its CI gate and merged at `63984f216e01d1f14fa2ab0cb440c3a6116893bf`. The application tree in that import matches approved source `7d74ec6259c68c86ad78039c5dae55d200444461`; unreleased application features were excluded.
+
+Public `develop` was created at `db9d42669750d0b1a5d2df6ba410a3d55d2a9a41`, preserving the audited source development application tree and incorporating the reviewed public migration history. It is the default branch. Both protected branches require the CI gate, up-to-date PRs and resolved conversations, with no bypass actors. [Full public development validation](https://github.com/ahmad-fatayerji/veil/actions/runs/38114489243) passed before publication was enabled.
+
+The final history scan included merge resolutions (`--all --full-history -m`); every reported key was an independently reproduced deterministic protocol fixture. Commit/tag metadata scans were clean. All eight original release records and canonical tag objects were preserved; all 45 historical assets were re-downloaded from their original URLs after cutover and matched the private pre-migration SHA-256 inventory. The beta feed remained byte-for-byte unchanged during import. Conflicting source tags were retained as `legacy-source/v*`, with the release baseline pinned to `legacy-source/v0.3.0`.
+
+The existing signing identity was copied securely to the unified publisher. Private publication workflows were disabled before public publication was enabled. Signing credentials remain limited to publication jobs, and unsigned PR/build validation receives none. Private Git bundles, asset copies, inventories, preferences and native evidence remain outside all checkouts.
+
+At the user's request, installed upgrade acceptance uses this Windows machine; no Windows VM is used. Clean-install and direct stable-to-stable acceptance remain unverified. Hosted CI and an unsigned production build do not establish those results.
