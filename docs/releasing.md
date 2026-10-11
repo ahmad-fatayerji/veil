@@ -89,7 +89,7 @@ Request a beta only when you want testers to receive one:
 gh workflow run beta.yml --ref main -f branch=release/0.2.0
 ```
 
-The action allocates the first unused numbered beta, validates its exact source SHA, builds a signed installer, verifies its signature and tamper rejection, and publishes a GitHub prerelease. Uploads remain a draft until downloaded assets match their local bytes. Only then does `updates/beta.json` advance. Every candidate carries reviewed notes, source SHA, workflow run/attempt, package checksum and signed manifest. A beta never becomes stable latest.
+The action allocates the first unused numbered beta, validates its exact source SHA, builds a signed installer, verifies its signature and tamper rejection, and publishes a GitHub prerelease. Uploads remain a draft until downloaded assets match their local bytes. Only then is a checked `automation/update-feed-*` PR proposed for `updates/beta.json`. Its CI explicitly dispatches the trusted `main` feed merger, which waits for exact-head completed CI and protected merge readiness. A held bot PR run still requires maintainer execution approval. The workflow-run trigger is a secondary path; token-triggered CI must not depend on it. Every candidate carries reviewed notes, source SHA, workflow run/attempt, package checksum and signed manifest. A beta never becomes stable latest.
 
 Draft release PRs intentionally cannot pass the final stable branch-policy check while their version has a beta suffix. Beta publication uses a separately named candidate validation gate. After testing, finalize:
 
