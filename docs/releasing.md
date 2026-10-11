@@ -6,10 +6,14 @@ The authorized consolidation moves audited MIT source, installers, signed update
 
 `main` contains approved release source; `develop` integrates the next release and is the repository's default branch for new checkouts and PRs. Agents follow the task procedure in [AGENTS.md](../AGENTS.md). Both branches require PRs, a successful **CI gate**, resolved conversations and an up-to-date branch. Direct pushes, force pushes and deletion are blocked, with no administrator bypass. External approvals are zero while there is one contributor. Select `main` when manually running the Gitflow management Actions, even though the default branch is `develop`.
 
+Start in the original `Veil-app/Veil` checkout. All task worktrees must be direct
+siblings inside `Veil-app`, including release stabilization and hotfix work. Verify
+the destination parent before creation, as required by [AGENTS.md](../AGENTS.md).
+
 ```powershell
-git switch develop
-git pull --ff-only
-git switch -c feature/reconnect
+git fetch origin
+git worktree add -b feature/reconnect ../Veil-reconnect origin/develop
+Set-Location ../Veil-reconnect
 # Make changes, run the relevant tests, and commit.
 git add .
 git commit -m "fix: reconnect after losing connection"
@@ -105,10 +109,12 @@ Stable publication builds the final version; it does not relabel a beta installe
 
 For an urgent compatible fix, branch from `main`, commit the fix and prepare that existing branch:
 
+From the original `Veil-app/Veil` checkout:
+
 ```powershell
-git switch main
-git pull --ff-only
-git switch -c hotfix/reconnect
+git fetch origin
+git worktree add -b hotfix/reconnect ../Veil-hotfix-reconnect origin/main
+Set-Location ../Veil-hotfix-reconnect
 # Fix and test.
 git add .
 git commit -m "fix: restore reconnect"
