@@ -1,5 +1,13 @@
 # Verification record
 
+## Main document width (issue #23) — 11 October 2026
+
+The desktop workspace now fills the usable window width, with the existing People sidebar and responsive drawer retained. Real Windows/WebView2 local-document acceptance reproduced the previous 393-pixel editor and measured 829 pixels after the fix at a 1,180-pixel viewport (1,165 usable pixels after the scrollbar); closing People measured 1,101 pixels. The before/after screenshots were visually inspected.
+
+WebView viewport emulation at 800, 960, 1,180 and 1,600 pixels verified full workspace width, no horizontal overflow, the 240-pixel sidebar at larger sizes, People hide/show, and retained editable document contents. At 800 pixels, the existing 320-pixel People drawer remains usable. Evidence: `target/editor-width-acceptance/run-2vNfve/` (viewport emulation) and `target/editor-width-acceptance/run-w5WUIq/` (native initial viewport). The native resize helper did not change the observed viewport, so real native resizing and multiple DPI/monitor configurations remain unverified.
+
+Both production frontend builds, the debug Windows executable and all 27 TypeScript tests passed. No release was published.
+
 ## General settings quit cleanup ? 11 October 2026
 
 General no longer shows the standalone **Quit Veil** button or its explanatory line. The existing native **Quit app** close path exits immediately without a confirmation, including with a temporary document and visible overlay. Default tray behavior and tray quit confirmation remain unchanged.
