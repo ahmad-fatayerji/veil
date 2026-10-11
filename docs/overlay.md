@@ -16,6 +16,12 @@ Native window-setting commands require the `main` window. The overlay can read s
 
 ## Verification
 
+The overlay has square corners and a **×** button in its header to hide it without
+ending the document or session. Show it again from the control panel, the tray,
+or Ctrl+Alt+Shift+V. Ctrl+Alt+V also restores interaction. In click-through mode,
+use these recovery controls before clicking the button. The overlay can hide
+itself; showing it and changing settings remain control-panel operations.
+
 ```powershell
 pnpm --filter @veil/desktop tauri build --debug --no-bundle
 pnpm test:overlay

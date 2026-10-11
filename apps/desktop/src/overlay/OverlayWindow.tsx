@@ -97,11 +97,31 @@ export function OverlayWindow() {
             {state?.settings.clickThrough ? 'click-through' : 'document'}
           </span>
         </span>
-        {hint ? (
-          <span className="overlay-gesture-hint">{hints[hint]}</span>
-        ) : (
-          <span className="overlay-recovery-hint">Ctrl+Alt+V to restore controls</span>
-        )}
+        <div className="overlay-header-actions">
+          {hint ? (
+            <span className="overlay-gesture-hint">{hints[hint]}</span>
+          ) : (
+            <span className="overlay-recovery-hint">Ctrl+Alt+V to restore controls</span>
+          )}
+          <button
+            type="button"
+            className="overlay-close"
+            aria-label="Hide overlay"
+            title="Hide overlay (Ctrl+Alt+Shift+V to show again)"
+            disabled={!interactive}
+            onPointerEnter={() => setHovered(null)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => {
+              void invoke('overlay_visibility', { visible: false }).catch((failure: unknown) =>
+                setError(errorMessage(failure)),
+              );
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </button>
+        </div>
       </header>
       <article className="overlay-document" aria-label="Overlay document">
         {state?.captureTest && (
