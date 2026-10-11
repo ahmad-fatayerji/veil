@@ -1016,6 +1016,15 @@ p {
   width: 36px;
   border-radius: 6px;
 }
+.dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex-shrink: 0;
+}
 .settings-layout {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
