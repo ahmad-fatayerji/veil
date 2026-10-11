@@ -91,8 +91,6 @@ Found a bug or have an idea? [Open an issue](https://github.com/ahmad-fatayerji/
 
 ## Star history
 
-If Veil is useful to you, give the repository a star and help others discover it.
-
 <a href="https://www.star-history.com/?repos=ahmad-fatayerji%2Fveil&type=date&legend=top-left">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ahmad-fatayerji/veil&amp;type=Date&amp;theme=dark" />
