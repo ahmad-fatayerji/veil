@@ -99,8 +99,6 @@ Found a bug or have an idea? [Open an issue](https://github.com/ahmad-fatayerji/
   </picture>
 </a>
 
-[**View Veil on Star History →**](https://www.star-history.com/?repos=ahmad-fatayerji%2Fveil&type=date&legend=top-left)
-
 ## License
 
 [MIT](LICENSE) © Ahmad Fatayerji. Free to use, modify, and distribute, including commercially, with the copyright and license notice retained.
