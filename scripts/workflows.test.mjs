@@ -2,34 +2,62 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { checkNames, planChecks } from './ci-plan.mjs';
 import { parse } from 'yaml';
 
 const workflow = (name) => parse(readFileSync(`.github/workflows/${name}.yml`, 'utf8'));
-test('the actual aggregate workflow rejects failed, cancelled, skipped and missing jobs', () => {
+test('the aggregate gate rejects unexpected skips and accepts only explicit omissions', () => {
   const ci = workflow('ci');
-  assert.deepEqual(ci.jobs.gate.needs.sort(), [
-    'integration',
-    'javascript',
-    'networking',
-    'policy',
-    'rust',
-  ]);
+  assert.deepEqual(ci.jobs.gate.needs.slice().sort(), ['plan', 'policy', ...checkNames].sort());
   assert.equal(ci.jobs.gate.if, 'always()');
-  const code = ci.jobs.gate.steps[0].run.match(/-e '([\s\S]+)'/)[1];
-  const run = (results) =>
-    spawnSync(process.execPath, ['--input-type=module', '-e', code], {
-      env: { ...process.env, RESULTS: JSON.stringify(results) },
+  assert.equal(ci.jobs.gate.steps.at(-1).run, 'node scripts/ci-plan.mjs gate');
+  const run = (results, full = false) =>
+    spawnSync(process.execPath, ['scripts/ci-plan.mjs', 'gate'], {
+      env: { ...process.env, RESULTS: JSON.stringify(results), FULL_VALIDATION: String(full) },
     }).status;
-  const success = Object.fromEntries(
-    ci.jobs.gate.needs.map((name) => [name, { result: 'success' }]),
-  );
+  const results = (paths, full) => {
+    const plan = planChecks(paths, full);
+    return {
+      plan: {
+        result: 'success',
+        outputs: Object.fromEntries(
+          Object.entries(plan).map(([name, value]) => [name, String(value)]),
+        ),
+      },
+      policy: { result: 'success' },
+      ...Object.fromEntries(
+        checkNames.map((name) => [name, { result: plan[name] ? 'success' : 'skipped' }]),
+      ),
+    };
+  };
+  const success = results([], true);
   assert.equal(run(success), 0);
-  for (const result of ['failure', 'cancelled', 'skipped'])
-    assert.equal(run({ ...success, rust: { result } }), 1);
-  assert.equal(run({ ...success, networking: { result: 'skipped' } }), 1);
+  for (const name of ci.jobs.gate.needs) {
+    for (const result of ['failure', 'cancelled', 'skipped'])
+      assert.equal(run({ ...success, [name]: { result } }), 1);
+    const missing = { ...success };
+    delete missing[name];
+    assert.equal(run(missing), 1);
+  }
+  const docs = results(['docs/testing.md'], false);
+  assert.equal(run(docs), 0);
+  assert.equal(run(docs, true), 1);
+  assert.equal(run(success, true), 0);
+  const incomplete = structuredClone(success);
+  delete incomplete.plan.outputs.extended;
+  assert.equal(run(incomplete), 1);
+  assert.equal(run({ ...docs, rust: { result: 'failure' } }), 1);
+  assert.equal(run({ ...docs, formatting: { result: 'skipped' } }), 1);
   assert.equal(run({}), 1);
+  for (const name of checkNames) {
+    assert.equal(ci.jobs[name].needs, 'plan');
+    assert.equal(ci.jobs[name].if, `needs.plan.outputs.${name} == 'true'`);
+    assert.equal(ci.jobs.plan.outputs[name], '${{ steps.select.outputs.' + name + ' }}');
+  }
   assert.equal(JSON.stringify(ci).includes('secrets.'), false);
   assert.match(ci.jobs.gate.name, /Candidate validation/);
+  assert.ok(ci.on.schedule.length);
+  assert.match(ci.jobs.networking.env.VEIL_NETWORK_MODE, /extended/);
 });
 test('signing waits for exact-source validation and stable release excludes feature merges', () => {
   for (const name of ['beta', 'release']) {
@@ -92,7 +120,7 @@ test('Windows jobs use purpose-specific caches, reduced CI debug info and timing
   const ci = workflow('ci');
   const jobs = [
     ci.jobs.rust,
-    ci.jobs.integration,
+    ci.jobs.desktop,
     workflow('build-release').jobs.build,
     workflow('publish').jobs.publish,
   ];
@@ -129,7 +157,7 @@ test('Windows jobs use purpose-specific caches, reduced CI debug info and timing
     ci.jobs.rust.steps.some((step) => step.run?.includes('clippy --workspace --all-targets')),
   );
   assert.equal(
-    ci.jobs.integration.steps.some((step) => step.run === 'pnpm build'),
+    ci.jobs.desktop.steps.some((step) => step.run === 'pnpm build'),
     false,
   );
   assert.equal(
@@ -137,4 +165,31 @@ test('Windows jobs use purpose-specific caches, reduced CI debug info and timing
       .with.workspaces,
     '. -> target/verifier',
   );
+});
+
+test('unified publication is opt-in, feed merges use trusted main and PR CI has no signing secrets', () => {
+  for (const [name, job] of [
+    ['release', 'source'],
+    ['beta', 'candidate'],
+    ['prepare-release', 'prepare'],
+    ['finalize-release', 'finalize'],
+    ['publish', 'publish'],
+  ]) {
+    const condition = workflow(name).jobs[job].if;
+    assert.match(condition, /github.repository == 'ahmad-fatayerji\/veil'/);
+    assert.match(condition, /RELEASE_PUBLICATION_ENABLED == 'true'/);
+  }
+  const publish = workflow('publish');
+  assert.equal(publish.on.workflow_call.secrets.RELEASES_TOKEN, undefined);
+  assert.equal(publish.permissions['pull-requests'], 'write');
+  assert.equal(publish.permissions.actions, 'write');
+  assert.doesNotMatch(JSON.stringify(publish), /secrets.RELEASES_TOKEN/);
+  assert.doesNotMatch(JSON.stringify(workflow('ci')), /secrets\./);
+  const feed = workflow('merge-update-feed');
+  assert.equal(feed.jobs.merge.steps[0].with.ref, 'main');
+  assert.match(feed.jobs.merge.if, /head_repository.full_name == github.repository/);
+  assert.match(feed.jobs.merge.if, /conclusion == 'success'/);
+  const coordinator = readFileSync('scripts/gitflow.mjs', 'utf8');
+  assert.match(coordinator, /pull.base.ref === 'main' && isReleaseBranch\(pull.head.ref\)/);
+  assert.doesNotMatch(JSON.stringify(feed), /release\.yml|secrets\./);
 });

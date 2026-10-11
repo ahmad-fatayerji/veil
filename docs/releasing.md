@@ -1,6 +1,6 @@
 # Gitflow and Windows releases (M6)
 
-Source stays private in `ahmad-fatayerji/Veil-source`. Installers, signed update packages, public release notes and tester instructions live in [ahmad-fatayerji/veil](https://github.com/ahmad-fatayerji/veil). GitHub distributes the app; it does not handle peer signaling. No purchased domain is needed.
+The authorized consolidation moves audited MIT source, installers, signed update packages, release notes and tester instructions into [ahmad-fatayerji/veil](https://github.com/ahmad-fatayerji/veil). GitHub distributes the app; it does not handle peer signaling. No purchased domain is needed.
 
 ## Everyday work and merges
 
@@ -28,14 +28,18 @@ gh workflow run merge-pr.yml --ref main -f number=123
 GitHub may hold the ordinary PR run for execution approval when a bot creates or updates a PR. Explicitly dispatched validation still runs, but it does not satisfy a pending check on GitHub's PR merge commit. Before merging, inspect the current PR head and workflow changes, then approve that specific PR run with the authenticated maintainer account and wait for its **CI gate**. Approval permits the checks to execute; it does not bypass the protected merge requirements.
 
 ```powershell
-gh run list --repo ahmad-fatayerji/Veil-source --branch release/0.2.0
+gh run list --repo ahmad-fatayerji/veil --branch release/0.2.0
 # Use the current PR run marked action_required, after inspecting its source:
-gh api --method POST repos/ahmad-fatayerji/Veil-source/actions/runs/RUN_ID/approve
+gh api --method POST repos/ahmad-fatayerji/veil/actions/runs/RUN_ID/approve
 ```
 
 GitHub's native merge buttons can also be used: squash feature PRs and use **Create a merge commit** for release/hotfix/back-merge PRs. Rules restrict `main` to merge commits. `develop` allows squash and merge because GitHub cannot enforce different methods based on the source branch; the Merge Gitflow PR action selects correctly. Rebase merging is disabled. Automatic back-merges use `backmerge/<version>` branches based on `develop`, with `main` merged into them. This satisfies strict up-to-date checks without bringing unreleased features into `main`. If develop advances, update the back-merge branch before merging.
 
-CI separates JavaScript checks/unit tests/builds, Windows Rust formatting/Clippy/tests, and the Windows Tauri build/browser integration tests. Clippy checks every workspace target, so CI does not also run standalone `cargo check`. Its aggregate gate rejects failed, cancelled, skipped or missing required jobs. Superseded PR runs cancel; dependencies are cached and browser failure artifacts retained. PR checks never receive signing secrets. Interactive overlay/P2P/update acceptance runs locally.
+CI selects checks from the complete PR diff against its base. Documentation runs formatting and branch policy; application code adds JavaScript lint/types/unit tests and relevant browser integration on Linux. Collaboration/protocol changes also run direct/relay smoke tests with UDP and TCP. Native Rust changes add Windows formatting/Clippy/tests and a separate Tauri build; updater/verifier changes also select release-tool tests. Workflow, dependency, configuration and unknown paths conservatively select all checks. Each run explains its selection in the Actions summary.
+
+The required **CI gate** accepts a skipped job only when the successful selector explicitly marked it unnecessary. Missing outputs/jobs, failures, cancellations and unexpected skips fail the gate. PR metadata edits can reuse a successful gate from the identical merge commit in this repository's CI workflow; branch/title policy still runs again. If prior validation cannot be confirmed, selected checks run normally. Changing the base never uses metadata reuse.
+
+Full validation runs for PRs into `main`, protected branch pushes, explicit dispatches, release workflow calls and the nightly schedule (02:23 UTC on the default branch). It includes both transports and the extended six-peer handover, recovery, capacity and signaling outage suite. Draft release PRs still cannot satisfy stable merge policy until finalized; beta publication uses **Candidate validation**. Browser tests compile the embedded host separately before starting Playwright, avoiding compilation within its startup deadline. PR Rust caches restore but do not upload; protected branch/full runs maintain the shared caches. Superseded runs cancel and browser failure artifacts are retained. PR checks never receive signing secrets. Interactive overlay/P2P/update acceptance remains separate.
 
 ## Build performance and release gates
 
@@ -51,7 +55,7 @@ Linux jobs pin `ubuntu-24.04` rather than following `ubuntu-latest` image migrat
 
 Each Windows job uploads Cargo HTML timing reports and `build-diagnostics/environment.json`, including cache-hit status, source SHA, toolchain and runner details. An exact cache miss can still restore a compatible fallback cache. Use the GitHub step durations to compare cache restore/save overhead as well as compilation; timing artifacts are retained for seven days.
 
-Baseline: [the last legacy release run](https://github.com/ahmad-fatayerji/Veil-source/actions/runs/37902133850) took 29m 27s, including 11m 31s of optimized Rust compilation and 3m 24s saving a 1.11 GB compressed Rust cache. Its Rust cache restore reported no cache found. The new workflow's cold/warm hosted durations and end-to-end GitHub publication remain pending until actual runs; no new version is published solely for benchmarking.
+Baseline: [the last legacy release run](https://github.com/ahmad-fatayerji/veil/actions/runs/37902133850) took 29m 27s, including 11m 31s of optimized Rust compilation and 3m 24s saving a 1.11 GB compressed Rust cache. Its Rust cache restore reported no cache found. The new workflow's cold/warm hosted durations and end-to-end GitHub publication remain pending until actual runs; no new version is published solely for benchmarking.
 
 ## Prepare and test a release
 
@@ -93,7 +97,7 @@ Draft release PRs intentionally cannot pass the final stable branch-policy check
 gh workflow run finalize-release.yml --ref main -f branch=release/0.2.0
 ```
 
-Finalization requires current `main` to be included, removes the beta suffix, refreshes notes and the next baseline, and marks the PR ready. Review the final version, notes and CI. Merge the release PR with a merge commit to approve stable publication. The exact merged source is validated again; signing follows successful checks. The source tag points to that merged private commit. Public tags belong to the separate downloads repository, so `release-metadata.json` is the source provenance record.
+Finalization requires current `main` to be included, removes the beta suffix, refreshes notes and the next baseline, and marks the PR ready. Review the final version, notes and CI. Merge the release PR with a merge commit to approve stable publication. The exact merged source is validated again; signing follows successful checks. New release tags point to the exact merged source commit in the unified repository. Historical distribution tags remain unchanged; imported source tags use `legacy-source/v*`. `release-metadata.json` remains the source provenance record.
 
 Stable publication builds the final version; it does not relabel a beta installer. The workflow uploads and verifies a draft, then publishes it and marks it stable latest when newer. It advances the beta feed to the stable version unless that feed already contains a newer candidate. It opens a `backmerge/<version> → develop` PR carrying main's history: merge that with a merge commit before preparing another release. **Back-merge main** can request this PR separately if needed. Closed release branches may be deleted once their source tags and merge history are retained.
 
@@ -124,7 +128,7 @@ Retries may complete an unpublished draft. A published version must match its re
 
 The release-by-tag API can return 404 for a newly created draft. Publication falls back to the authenticated paginated release list and uses the draft's numeric release ID to verify uploads. It checks that the release is still a draft before replacing draft assets or proceeding to publication; authentication failures and ambiguous tag matches remain fatal.
 
-The migration baseline is source `0f008872ed112fbb339ae37dd5f950891affb154` at `0.1.2`. Public `v0.1.2` is reserved; this migration does not publish or replace it. Subsequent baselines refer to private stable source tags. The initial beta feed points to the current stable release until a beta is requested.
+The migration baseline is source `0f008872ed112fbb339ae37dd5f950891affb154` at `0.1.2`. Public `v0.1.2` is reserved; this migration does not publish or replace it. Subsequent baselines refer to legacy source tags. The initial beta feed points to the current stable release until a beta is requested.
 
 ## Updater channels and signing
 
@@ -138,9 +142,8 @@ Download throttling uses `Retry-After` (seconds or HTTP date), and `x-ratelimit-
 
 Before launching the passive Windows installer, Veil atomically saves `update-receipt.json` containing the previous and intended versions. On the next launch it compares the running version to the intended version: an exact match shows a success notice above the collapsed update panel; any other version shows an incomplete-update notice. Feedback remains until dismissed, including across restarts. An installer launch error removes the pending receipt and keeps the control panel available. This confirms the version that actually launched; it does not monitor an installer after Veil exits, provide automatic rollback, or recover documents. If installation fails without relaunching, the notice appears when Veil can next be opened.
 
-Existing private source Actions secrets remain:
+The unified repository uses its scoped `GITHUB_TOKEN` for repository and release operations. The old cross-repository `RELEASES_TOKEN` is not used by the new publisher. Signing secrets remain:
 
-- `RELEASES_TOKEN`: public `veil` Contents read/write only.
 - `TAURI_SIGNING_PRIVATE_KEY`: encrypted updater private key.
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: its password.
 
@@ -153,3 +156,11 @@ For local packaging, `pnpm package:windows` builds the per-user x64 NSIS install
 Run `pnpm check`, `pnpm test`, `pnpm test:release` and `pnpm test:e2e`. After Cargo tests, rebuild with `pnpm --filter @veil/desktop tauri build --debug --no-bundle`, then run `pnpm test:updates` for real WebView2 channel persistence and authorization. Other native overlay/host/P2P scripts remain separate from hosted CI.
 
 The previous real HTTPS upgrade from 0.1.0 to 0.1.1 was verified locally. The new Gitflow pipeline and beta-to-stable upgrade need a real candidate release to verify end to end; unit/workflow checks alone do not establish that. Clean Windows VM/WebView2 bootstrap, SmartScreen, different-network peers and self-hosted TURN remain separate manual acceptance.
+
+## Consolidation and publication controls
+
+See [repository consolidation](repository-consolidation.md) for the audit and cutover record. Publication is disabled unless the repository is `ahmad-fatayerji/veil` and its Actions variable `RELEASE_PUBLICATION_ENABLED` is `true`. Disable the private publisher before enabling this variable publicly. Migration does not change an application version or publish a package. Existing public tags and assets are immutable.
+
+Beta-feed advancement creates an `automation/update-feed-<version>` PR into protected `main`, never a direct push. CI requires exactly one modified file, `updates/beta.json`, strict version advancement, the exact published manifest, installer SHA-256, signature-file equality, and matching canonical source tag. The publisher has already cryptographically verified the installer before publication. A successful exact-head CI gate triggers **Merge verified update feed**, which uses Gitflow merge without bypassing protection and never invokes stable publication. Failed checks leave the previous feed intact; rerunning publication resumes the same proposal. If `main` advances, merge it into the feed branch without force-pushing and rerun CI before merging.
+
+The sole `migration/source-import` route into `main` preserves a merge commit, requires the pinned approved source ancestor, unchanged application source and beta feed, and a `legacy-source/v0.3.0` baseline. It cannot be used after the initial import because its baseline/source pin no longer matches future release state. Ordinary features continue to target `develop`; only `release/*` or `hotfix/*` merges can dispatch stable publication. Fork feature PRs run unsigned CI; management PRs must originate in the unified repository.

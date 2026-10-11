@@ -46,7 +46,7 @@ pnpm dev:web
 
 Open **http://127.0.0.1:5173** in two browser windows. Enter different names and click **Join local session** in both. Write in either editor; both receive changes. Each collaborator has a named cursor and colored text selection. The People panel shows who is typing, selecting text, in the document, or away. **Disconnect** pauses one replica; edit both independently, then **Reconnect** to merge missing updates. Browser BroadcastChannel synchronization is disabled, so all remote changes travel through the Rust host.
 
-Open **Settings > About > Development roadmap** to see what is built and what remains. See the [development roadmap](docs/roadmap.md) for the same milestone overview.
+Open **Settings > About** for app information and a link to developer [Ahmad Fatayerji](https://ahmadfatayerji.com). See the [development roadmap](docs/roadmap.md) for milestone progress.
 
 In a third terminal, optionally run the native shell:
 
@@ -89,7 +89,7 @@ pnpm test:peer
 pnpm test:installer
 ```
 
-`test:e2e` starts missing host and browser dev servers; locally it reuses servers already running on ports 4444 and 5173. Use an expendable demo session: tests replace its document. CI always starts fresh servers. Independent Chromium contexts verify simultaneous inserts, concurrent offline edits, reconnect convergence, late joins, awareness removal, authentication, named cursors, selections, activity, and the roadmap. `pnpm format` formats the repository.
+`test:e2e` starts missing host and browser dev servers; locally it reuses servers already running on ports 4444 and 5173. Use an expendable demo session: tests replace its document. CI always starts fresh servers. Independent Chromium contexts verify simultaneous inserts, concurrent offline edits, reconnect convergence, late joins, awareness removal, authentication, named cursors, selections, activity, and the About developer credit. `pnpm format` formats the repository.
 
 `test:overlay` requires an interactive Windows desktop and a freshly built desktop debug executable. Close other Veil instances; leave ports 4445/9223/9224 free, and avoid moving the mouse during the test. It starts an embedded session through the real control panel and joins through the bundled browser editor. It uses actual WebView2 windows, OS input, a Chromium collaborator, and a separate test application. Preferences and screenshots are isolated under `target/overlay-acceptance`; normal settings are untouched.
 
@@ -110,3 +110,7 @@ Use `pnpm package:windows` to build the production NSIS installer and updater si
 - `docs`: architecture, security boundaries, networking, and test notes.
 
 See [architecture](docs/architecture.md) for the protocol decision and [testing](docs/testing.md) for verification. Durable documents and permissions remain later work; different-network/relay and broader capture-mode acceptance are still needed. M6 installers and signed updates are available for testing; clean-VM acceptance remains manual.
+
+## License
+
+Veil is licensed under the [MIT license](LICENSE). Third-party dependencies retain their own licenses and notices. Source, installers, and updates are being consolidated into [ahmad-fatayerji/veil](https://github.com/ahmad-fatayerji/veil); see [the migration procedure](docs/repository-consolidation.md).

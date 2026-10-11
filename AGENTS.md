@@ -31,9 +31,9 @@ Set-Location ../Veil-reconnect
 git add path/to/changed-file
 git commit -m "fix: reconnect after losing connection"
 git push -u origin feature/reconnect
-gh pr create --repo ahmad-fatayerji/Veil-source --base develop --title "fix: reconnect after losing connection" --body-file pr-body.md
+gh pr create --repo ahmad-fatayerji/veil --base develop --title "fix: reconnect after losing connection" --body-file pr-body.md
 # Only when merging is authorized and the required checks pass:
-gh workflow run merge-pr.yml --repo ahmad-fatayerji/Veil-source --ref main -f number=123
+gh workflow run merge-pr.yml --repo ahmad-fatayerji/veil --ref main -f number=123
 ```
 
 Write the PR body to a temporary file outside the checkout; `pr-body.md` above stands for that file's path. Do not commit temporary PR text or credentials.
@@ -52,5 +52,6 @@ Write the PR body to a temporary file outside the checkout; `pr-body.md` above s
 - Feature merges do not publish installers. Do not manually bump application versions, create release tags, edit updater feeds, or publish assets during ordinary tasks. The release coordinator owns synchronized versions and release metadata.
 - Only perform release actions when requested. Follow [docs/releasing.md](docs/releasing.md): **Prepare release** proposes a draft; **Publish beta** explicitly requests a candidate; **Finalize release** removes the beta suffix and opens final review; merging the finalized release PR into `main` triggers stable publication. Draft candidates intentionally fail the stable merge policy until finalized.
 - Use **Back-merge main** and merge its PR with a merge commit after a stable release. Resolve conflicts while preserving both the released fixes and unreleased development work.
-- Source is private in `ahmad-fatayerji/Veil-source`. Public `ahmad-fatayerji/veil` contains distribution assets and update metadata only. Never copy private source or signing credentials there, reuse a published version, or replace published assets. Do not request or print token/key values; use the existing Actions secrets.
+- The authorized consolidation imports audited source into public `ahmad-fatayerji/veil` under MIT. `Veil-source` remains private until migration and upgrade acceptance finish. Never publish unaudited history or signing credentials, reuse a published version, or replace published assets. Do not request or print token/key values; use the existing Actions secrets.
+- `automation/update-feed-*` PRs into `main` change only `updates/beta.json`, require verified published assets and the CI gate, and merge with a merge commit. They never publish installers. The one-time `migration/source-import` route joins approved source and distribution history without publication.
 - Read `docs/releasing.md` before changing CI, release tooling, updater behavior or branch policy. In the handoff, include the branch/PR, validation results, and any remaining work; explicitly state if an authorized action published a release.

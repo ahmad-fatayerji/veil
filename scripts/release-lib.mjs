@@ -1,5 +1,8 @@
 import { CommitParser } from 'conventional-commits-parser';
 import semver from 'semver';
+export const isFeedBranch = (branch) =>
+  /^automation\/update-feed-[0-9]+\.[0-9]+\.[0-9]+(?:-beta\.[0-9]+)?$/.test(branch);
+export const isReleaseBranch = (branch) => /^(release|hotfix)\//.test(branch);
 
 export const parser = new CommitParser();
 export function proposeVersion(current, messages, hotfix = false) {
@@ -62,7 +65,8 @@ export function assertBranchPolicy({ base, head, title, mergeMethod, version }) 
   const allowed =
     (ordinary && (base === 'develop' || /^(release|hotfix)\//.test(base))) ||
     (candidate && base === 'main') ||
-    backmerge;
+    backmerge ||
+    (base === 'main' && (isFeedBranch(head) || head === 'migration/source-import'));
   if (!allowed) throw new Error(`Unsupported Gitflow route: ${head} -> ${base}.`);
   if (
     ordinary &&

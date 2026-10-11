@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import semver from 'semver';
-import { assertPublication, shouldAdvanceFeed } from './release-lib.mjs';
+import { proposeFeedUpdate, distributionRepository } from './update-feed.mjs';
+import { assertPublication } from './release-lib.mjs';
 import { readJson, verifyVersions } from './release-files.mjs';
 import { findReleaseByTag } from './github-release.mjs';
 import {
@@ -12,7 +13,9 @@ import {
   assertUploadedAssets,
 } from './release-assets.mjs';
 
-const repo = 'ahmad-fatayerji/veil';
+const repo = distributionRepository;
+if (process.env.GITHUB_REPOSITORY !== repo || process.env.RELEASE_PUBLICATION_ENABLED !== 'true')
+  throw new Error('Publication is disabled outside the enabled unified repository.');
 const run = (file, args) =>
   execFileSync(file, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const git = (...args) => run('git', args);
@@ -185,20 +188,6 @@ if (process.argv[2] === 'preflight') {
   const publishedDir = mkdtempSync(join(tmpdir(), 'veil-feed-'));
   gh('release', 'download', tag, '--repo', repo, '--pattern', 'latest.json', '--dir', publishedDir);
   const publishedManifest = readJson(join(publishedDir, 'latest.json'));
-  const current = optionalApi(`repos/${repo}/contents/updates/beta.json?ref=main`);
-  const currentManifest = current
-    ? JSON.parse(Buffer.from(current.content, 'base64').toString('utf8'))
-    : null;
-  if (shouldAdvanceFeed(currentManifest?.version, version)) {
-    const body = {
-      message: `Update beta feed to ${version}`,
-      branch: 'main',
-      content: Buffer.from(`${JSON.stringify(publishedManifest, null, 2)}\n`).toString('base64'),
-      ...(current ? { sha: current.sha } : {}),
-    };
-    const request = join(publishedDir, 'feed-request.json');
-    writeFileSync(request, JSON.stringify(body));
-    gh('api', `repos/${repo}/contents/updates/beta.json`, '--method', 'PUT', '--input', request);
-  }
+  proposeFeedUpdate(publishedManifest);
   console.log(`Published ${tag}; existing published packages were preserved.`);
 } else throw new Error('Use preflight or publish.');

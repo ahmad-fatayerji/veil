@@ -24,7 +24,7 @@ writeFileSync(
 );
 writeFileSync(
   resolve(directory, 'release-metadata.json'),
-  `${JSON.stringify({ version: config.version, sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceRepository: 'ahmad-fatayerji/Veil-source', workflowRun: process.env.GITHUB_RUN_ID ?? null, workflowAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null, installer: name, sha256: createHash('sha256').update(readFileSync(installer)).digest('hex') }, null, 2)}\n`,
+  `${JSON.stringify({ version: config.version, sourceSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), sourceRepository: process.env.GITHUB_REPOSITORY ?? 'ahmad-fatayerji/veil', workflowRun: process.env.GITHUB_RUN_ID ?? null, workflowAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null, installer: name, sha256: createHash('sha256').update(readFileSync(installer)).digest('hex') }, null, 2)}\n`,
 );
 writeFileSync(
   resolve(directory, 'SHA256SUMS.txt'),
