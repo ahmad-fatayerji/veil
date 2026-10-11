@@ -56,7 +56,16 @@ function commit(message) {
 }
 function messagesSince(ref) {
   git('merge-base', '--is-ancestor', ref, 'HEAD');
-  return git('log', '--no-merges', '--format=%B%x00', `${ref}..HEAD`)
+  const distributionBase = existsSync('.release/migration.json')
+    ? readJson('.release/migration.json').publicBase
+    : null;
+  return git(
+    'log',
+    '--no-merges',
+    '--format=%B%x00',
+    `${ref}..HEAD`,
+    ...(distributionBase ? ['--not', distributionBase] : []),
+  )
     .split('\0')
     .map((item) => item.trim())
     .filter(Boolean)
