@@ -1,4 +1,4 @@
-# Gitflow and Windows releases (M6)
+# Gitflow and Windows releases
 
 The authorized consolidation moves audited MIT source, installers, signed update packages, release notes and tester instructions into [ahmad-fatayerji/veil](https://github.com/ahmad-fatayerji/veil). GitHub distributes the app; it does not handle peer signaling. No purchased domain is needed.
 
@@ -55,7 +55,7 @@ Linux jobs pin `ubuntu-24.04` rather than following `ubuntu-latest` image migrat
 
 Each Windows job uploads Cargo HTML timing reports and `build-diagnostics/environment.json`, including cache-hit status, source SHA, toolchain and runner details. An exact cache miss can still restore a compatible fallback cache. Use the GitHub step durations to compare cache restore/save overhead as well as compilation; timing artifacts are retained for seven days.
 
-Baseline: [the last legacy release run](https://github.com/ahmad-fatayerji/veil/actions/runs/37902133850) took 29m 27s, including 11m 31s of optimized Rust compilation and 3m 24s saving a 1.11 GB compressed Rust cache. Its Rust cache restore reported no cache found. The new workflow's cold/warm hosted durations and end-to-end GitHub publication remain pending until actual runs; no new version is published solely for benchmarking.
+Baseline: [the last legacy release run](https://github.com/ahmad-fatayerji/Veil-source/actions/runs/37902133850) took 29m 27s, including 11m 31s of optimized Rust compilation and 3m 24s saving a 1.11 GB compressed Rust cache. Its Rust cache restore reported no cache found. The new workflow's cold/warm hosted durations and end-to-end GitHub publication remain pending until actual runs; no new version is published solely for benchmarking.
 
 ## Prepare and test a release
 
@@ -89,7 +89,7 @@ Request a beta only when you want testers to receive one:
 gh workflow run beta.yml --ref main -f branch=release/0.2.0
 ```
 
-The action allocates the first unused numbered beta, validates its exact source SHA, builds a signed installer, verifies its signature and tamper rejection, and publishes a GitHub prerelease. Uploads remain a draft until downloaded assets match their local bytes. Only then does `updates/beta.json` advance. Every candidate carries reviewed notes, source SHA, workflow run/attempt, package checksum and signed manifest. A beta never becomes stable latest.
+The action allocates the first unused numbered beta, validates its exact source SHA, builds a signed installer, verifies its signature and tamper rejection, and publishes a GitHub prerelease. Uploads remain a draft until downloaded assets match their local bytes. Only then is a checked `automation/update-feed-*` PR proposed for `updates/beta.json`. Its CI explicitly dispatches the trusted `main` feed merger, which waits for exact-head completed CI and protected merge readiness. A held bot PR run still requires maintainer execution approval. The workflow-run trigger is a secondary path; token-triggered CI must not depend on it. Every candidate carries reviewed notes, source SHA, workflow run/attempt, package checksum and signed manifest. A beta never becomes stable latest.
 
 Draft release PRs intentionally cannot pass the final stable branch-policy check while their version has a beta suffix. Beta publication uses a separately named candidate validation gate. After testing, finalize:
 

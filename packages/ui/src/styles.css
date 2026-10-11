@@ -455,110 +455,13 @@ input::placeholder {
 .collaboration-selection {
   border-radius: 1px;
 }
-.roadmap-dialog {
-  width: min(600px, calc(100vw - 32px));
-  max-height: calc(100dvh - 60px);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 30px;
-  color: var(--text);
-  box-shadow: 0 15px 65px #00000018;
-}
-.roadmap-dialog::backdrop {
-  background: #00000035;
-  backdrop-filter: blur(2px);
-}
-.roadmap-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
+
 .overline {
   font-size: 9px;
   letter-spacing: 1.2px;
   color: var(--muted);
 }
-.roadmap-heading h2 {
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: -0.5px;
-  margin: 8px 0 0;
-}
-.roadmap-intro {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.7;
-  margin: 14px 0 28px;
-}
-.roadmap-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.roadmap-list li {
-  display: grid;
-  grid-template-columns: 32px 1fr;
-  gap: 14px;
-  padding: 0 0 23px;
-}
-.milestone-marker {
-  display: grid;
-  place-items: center;
-  width: 31px;
-  height: 29px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 10px;
-  color: var(--muted);
-}
-.marker-built {
-  color: #3b7356;
-  border-color: #d6e6db;
-  background: #f2f7f3;
-}
-.marker-next {
-  color: var(--text);
-  border-color: #bdbdbd;
-}
-.milestone-heading {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-}
-.milestone-heading h3 {
-  font-size: 12px;
-  margin: 5px 0 7px;
-  font-weight: 600;
-}
-.milestone-status {
-  color: var(--muted);
-  font-size: 10px;
-}
-.milestone-status.built {
-  color: #3b7356;
-}
-.milestone-status.next {
-  color: var(--text);
-}
-.roadmap-list p {
-  font-size: 11px;
-  line-height: 1.65;
-  color: var(--muted);
-  margin: 0;
-}
-.roadmap-note {
-  border-top: 1px solid var(--border);
-  padding-top: 18px;
-  font-size: 10px;
-  color: var(--muted);
-  line-height: 1.8;
-  margin-bottom: 0;
-}
-.roadmap-note code {
-  font-size: 10px;
-  color: var(--muted);
-}
+
 @media (max-width: 850px) {
   .workspace.with-sidebar {
     gap: 22px;
@@ -605,9 +508,6 @@ input::placeholder {
   }
   .document-editor {
     padding: 30px 22px 60px;
-  }
-  .roadmap-dialog {
-    padding: 24px 20px;
   }
 }
 /* Session management belongs above the collaborative workspace. */
@@ -1189,10 +1089,7 @@ p {
   width: 100%;
   margin-top: 24px;
 }
-.roadmap-dialog {
-  background: var(--surface);
-  color: var(--text);
-}
+
 @media (max-width: 900px) {
   .welcome {
     grid-template-columns: minmax(0, 480px);

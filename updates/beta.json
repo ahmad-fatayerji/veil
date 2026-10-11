@@ -1,0 +1,11 @@
+{
+  "version": "0.4.0-beta.1",
+  "notes": "# Veil 0.4.0-beta.1\n\n## Other changes\n\n- build: prepare MIT repository consolidation and checked update feeds\n- test: include real installed HTTPS upgrade acceptance\n- test: wait for the hidden overlay before authorization checks\n- test: verify updater receipts against the running version\n- build: record audited import provenance and legacy baseline\n- build: prepare audited MIT source import\n- ci: select checks by changed paths and split network acceptance\n\n## Fixes\n\n- fix: retain checked beta feed history during finalization\n- fix: omit historical distribution commits from release proposals\n- fix: enable capture exclusion by default and fill opacity slider\n- fix(network): stop recovery for departed guests\n\n## Features\n\n- feat: show participant activity in the overlay\n- feat: configure close behavior and tray overlay controls\n- feat: validate hosting credentials before saving settings\n- feat: show version and developer information in About\n- feat: redesign document creation and reusable sharing\n- feat(overlay): add Windows capture compatibility controls\n",
+  "pub_date": "2026-10-11T05:43:33.146Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDBXOVdybnR0MHJ0NGdxZjhCcTZ5dDlqY1pHeDkzWFpZMjZIeHpYN1ZrZUtVMmM5WmE4STJURGFnQllibkVSMFlGREtpM0RIZXJpdUc4M0IxYXJuUVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjk3NDEyCWZpbGU6VmVpbF8wLjQuMC1iZXRhLjFfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuNC4wLWJldGEuMQo1N1JxaHgwbGJQZ3h6RTdEb2FzMXNRbkpDMjdxSy9Sa1JOTWo0WVE4elo2cUNBdFBHc2x1bHIyMkl0MlgxTG9sVnFEeWJBREdtdHc4S2JlWnVVaFJCdz09Cg==",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.4.0-beta.1/Veil_0.4.0-beta.1_x64-setup.exe"
+    }
+  }
+}
