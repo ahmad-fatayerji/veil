@@ -177,6 +177,13 @@ try {
     'Dismissal survives restart',
   );
   assert.equal(await page.getByLabel('Update channel').inputValue(), 'beta');
+  await invoke(page, 'overlay_visibility', { visible: true });
+  await waitFor(() =>
+    browser
+      .contexts()
+      .flatMap((context) => context.pages())
+      .some((item) => item.url().includes('?overlay')),
+  );
   const overlay = browser
     .contexts()
     .flatMap((context) => context.pages())
