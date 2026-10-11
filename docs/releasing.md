@@ -1,4 +1,4 @@
-# Gitflow and Windows releases (M6)
+# Gitflow and Windows releases
 
 The authorized consolidation moves audited MIT source, installers, signed update packages, release notes and tester instructions into [ahmad-fatayerji/veil](https://github.com/ahmad-fatayerji/veil). GitHub distributes the app; it does not handle peer signaling. No purchased domain is needed.
 

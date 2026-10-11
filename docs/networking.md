@@ -1,6 +1,6 @@
 > Historical development documentation. Normal desktop networking now uses [automatic signaling and selective relay](automatic-networking.md). Legacy modes are debug regression tools only.
 
-# M2 networking
+# Legacy LAN/browser networking
 
 Desktop P2P is now the primary mode; see [P1 networking](p2p.md). The remainder describes the separately retained **LAN / browser** mode, whose listener restrictions remain unchanged.
 
@@ -12,6 +12,6 @@ The browser address serves bundled production assets. Credentials are never embe
 
 `POST /join` validates the session ID and credential, exact Host/Origin, and a bounded JSON body before returning protocol metadata. `/ws/{sessionId}` additionally requires `veil.v1` and the credential in the requested WebSocket subprotocol. Only `veil.v1` is selected in the response. There is no public bootstrap route. Allowed origins are the configured listener addresses and exact local Tauri/development origins. Other Host headers are rejected even for static assets. `/health` contains no session secrets.
 
-The standalone M0 demo remains exclusively on `127.0.0.1:4444`, with Vite on `127.0.0.1:5173` and desktop Vite on `127.0.0.1:1420`. Its development-only `/bootstrap` and fixed `/ws/m0-demo` room are not mounted in the embedded host.
+The standalone development demo remains exclusively on `127.0.0.1:4444`, with Vite on `127.0.0.1:5173` and desktop Vite on `127.0.0.1:1420`. Its development-only `/bootstrap` and fixed `/ws/m0-demo` room are not mounted in the embedded host.
 
-Internet hosting, TLS, IPv6, port forwarding and CGNAT handling remain M5. Do not expose either M0 or M2 through a public proxy. The private-interface smoke test runs on one PC; a second physical device is still required for the full LAN acceptance criterion.
+These legacy listeners are not the automatic HTTPS/WebRTC sharing path. Do not expose the standalone demo or embedded LAN host through a public proxy. The private-interface smoke test runs on one PC; a second physical device is still required for the full LAN acceptance criterion.
