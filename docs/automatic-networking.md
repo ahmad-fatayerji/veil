@@ -24,6 +24,24 @@ Pasted legacy `veil-invite:v2:` codes remain supported with their original ten-m
 single-use semantics. Older `veil-p2p:v1:` codes are incompatible. Forget saved host credential
 removes it locally; operators revoke server authorization separately.
 
+Saving a new or replacement host credential automatically tests it before either
+the credential or server address is saved. A failed check keeps the entered values
+available for correction and leaves existing saved settings intact. Saving with an
+empty field requires a credential already stored for that exact origin; it reuses
+that credential without requiring another online test.
+
+Hosting server settings also include **Test connection**. It checks the entered server
+and credential before saving; an empty credential field uses the credential already
+stored for that exact server origin. Changing either field clears the previous result.
+The native test checks reusable-sharing support, creates a temporary authenticated
+registration, and immediately deletes it. It does not save settings, publish an
+invitation, open signaling, request TURN, or disturb an active document. Tests count
+against the server's session-creation rate limit. Connection/certificate errors,
+rejected credentials, unavailable capacity, and failed cleanup are reported in Settings.
+Success confirms server authentication; peer and relay connectivity still require a
+shared-session test. If a response is lost, server expiry cleans up any registration
+that the client could not identify or delete.
+
 ## Per-connection state machine
 
 Admission → direct negotiation (STUN only, six seconds) → temporary TURN grant

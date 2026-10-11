@@ -1,5 +1,63 @@
 # Verification record
 
+## Mandatory credential validation on save - 11 October 2026
+
+Saving a newly entered or replacement host credential now runs the native
+connection/authentication probe before writing Credential Manager or preferences.
+Failed checks preserve entered values, existing saved settings, and the pending
+Save and share flow. An empty credential requires a saved key for that exact
+origin; an unchanged saved key can be reused without another online check.
+
+`pnpm check` and `pnpm test` passed: 24 TypeScript tests and 24 Rust tests, with
+two signed-installer artifact tests intentionally skipped. Production frontend
+builds passed. The ordinary debug rebuild could not replace an already-running
+executable, which was left untouched. After Cargo tests, a separate embedded-assets
+debug binary was built with `cargo rustc -p veil-desktop --bin veil-desktop
+--features custom-protocol -- -o target/credential-save-validation/veil-desktop-save-check.exe`.
+The acceptance harness supports `VEIL_SHARING_DESKTOP_BINARY` for this isolated path.
+
+`pnpm test:sharing` passed on Windows/WebView2 using that binary and the compatible
+local server. It verified first-save rejection for missing/rejected credentials
+and an unreachable server, no saved origin or key after rejection, a fresh rejected
+save despite a prior successful manual test, successful automatic validation and
+Save and share, rejected replacement preserving the saved origin and working key,
+and denial of saved-key reuse for another origin. Manual testing, active-document
+retention, multiple collaborators, overlay scope, themes, and updater guards also
+passed. Redacted evidence is under `target/create-share-join/run-ZY3rI3/`; the
+credential form layout was visually inspected. After merging the current develop
+About-screen update, checks, tests, builds, and native acceptance passed again.
+Public HTTPS and unrelated-network
+peer/TURN acceptance remain separate. No release was published.
+
+## Hosting server credential test - 10 October 2026
+
+Hosting server Settings now tests the entered origin and credential before saving,
+or the saved credential for that exact origin when the field is empty. A scoped
+native command checks reusable-sharing support, creates an authenticated temporary
+registration, and verifies its deletion. It does not save settings or credentials,
+issue an invitation, request relay resources, or change an active document.
+
+Local validation passed `pnpm check`, all 18 TypeScript tests, 24 workspace Rust
+tests (two signed-installer artifact tests intentionally skipped), both production
+frontend builds, and the rebuilt debug Windows executable. Changed-file lint,
+Prettier, rustfmt, and `git diff --check` also passed.
+
+`pnpm test:sharing` passed against the compatible local group-sharing server with
+three isolated Windows/WebView2 profiles and dynamically assigned loopback ports.
+It checked missing, malformed, and rejected credentials; unreachable origin;
+successful unsaved-credential authentication; zero remaining test registrations
+and relay grants; unchanged preferences and entered credential; saved-credential
+retesting while sharing; retained document/collaborators; and overlay command denial.
+The existing create/share/join, edit convergence, reset/stop, themes, overlay, exit,
+and updater-session guard regression also passed. Redacted screenshots are under
+`target/create-share-join/run-JYczsq/`; the credential-test success layout was
+visually inspected. The initial run found an ambiguous test status selector, which
+was scoped to the credential form before the passing rerun.
+
+Public HTTPS/certificate failure paths, unrelated-network peers, and TURN
+connectivity remain separate acceptance. Success tests server authentication,
+not universal peer connectivity. No release was published by this task.
+
 ## Change-based CI
 
 PR check selection and gate enforcement are implemented in `scripts/ci-plan.mjs`, with regression cases in `scripts/ci-plan.test.mjs` and `scripts/workflows.test.mjs`. The gate must reject failed/cancelled/missing jobs and any skip not explicitly selected as unnecessary. Unknown paths and dependency/workflow configuration changes select every check. Release validation and nightly CI always run the full suite.

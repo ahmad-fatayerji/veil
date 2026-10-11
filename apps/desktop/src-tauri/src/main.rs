@@ -54,6 +54,7 @@ fn main() {
             networking::network_preferences,
             networking::network_configure,
             networking::network_forget,
+            networking::network_test,
             networking::network_request,
             networking::network_connect,
             networking::network_send,

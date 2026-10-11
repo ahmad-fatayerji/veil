@@ -37,6 +37,9 @@ export function AutomaticApp() {
   const [server, setServer] = useState('');
   const [savedServer, setSavedServer] = useState('');
   const [credential, setCredential] = useState('');
+  const [serverTest, setServerTest] = useState('');
+  const [testingServer, setTestingServer] = useState(false);
+  const [savingServer, setSavingServer] = useState(false);
   const [name, setName] = useState('');
   const [invitation, setInvitation] = useState('');
   const [link, setLink] = useState('');
@@ -207,11 +210,34 @@ export function AutomaticApp() {
     setNotice('');
     setServiceOnline(network.current.serviceOnline);
   }
+  async function testServer() {
+    setTestingServer(true);
+    setServerTest('Testing connection...');
+    try {
+      await invoke('network_test', { server, credential: credential || null });
+      setServerTest('Connection successful. Host credential accepted.');
+    } catch (e) {
+      setServerTest(errorMessage(e));
+    } finally {
+      setTestingServer(false);
+    }
+  }
   async function saveServer() {
-    const saved = await invoke<{ server: string }>('network_configure', {
-      server,
-      credential: credential || null,
-    });
+    setSavingServer(true);
+    setServerTest('Checking settings before saving...');
+    let saved: { server: string };
+    try {
+      saved = await invoke<{ server: string }>('network_configure', {
+        server,
+        credential: credential || null,
+      });
+    } catch (e) {
+      setServerTest(errorMessage(e));
+      return;
+    } finally {
+      setSavingServer(false);
+    }
+    setServerTest('');
     setServer(saved.server);
     setSavedServer(saved.server);
     setCredential('');
@@ -569,7 +595,10 @@ export function AutomaticApp() {
                   placeholder="https://signal.example.com"
                   autoComplete="off"
                   disabled={busy}
-                  onChange={(e) => setServer(e.target.value)}
+                  onChange={(e) => {
+                    setServer(e.target.value);
+                    setServerTest('');
+                  }}
                 />
                 <label htmlFor="automatic-credential">Host access credential</label>
                 <input
@@ -579,11 +608,26 @@ export function AutomaticApp() {
                   placeholder="Leave empty to keep your saved credential"
                   autoComplete="off"
                   disabled={busy}
-                  onChange={(e) => setCredential(e.target.value)}
+                  onChange={(e) => {
+                    setCredential(e.target.value);
+                    setServerTest('');
+                  }}
                 />
                 <div className="form-actions">
                   <button className="primary-button" disabled={busy || !server.trim()}>
-                    {resumeShare ? 'Save and share' : 'Save settings'}
+                    {savingServer
+                      ? 'Checking and saving...'
+                      : resumeShare
+                        ? 'Save and share'
+                        : 'Save settings'}
+                  </button>
+                  <button
+                    type="button"
+                    className="quiet-button"
+                    disabled={busy || !server.trim()}
+                    onClick={() => void run(testServer)}
+                  >
+                    {testingServer ? 'Testing...' : 'Test connection'}
                   </button>
                   <button
                     type="button"
@@ -593,6 +637,7 @@ export function AutomaticApp() {
                       void run(async () => {
                         await invoke('network_forget', { server: savedServer });
                         setCredential('');
+                        setServerTest('');
                         setNotice('Saved host credential removed.');
                       })
                     }
@@ -600,6 +645,9 @@ export function AutomaticApp() {
                     Forget credential
                   </button>
                 </div>
+                <p role="status" aria-live="polite">
+                  {serverTest}
+                </p>
               </form>
               <p className="muted">
                 Your server operator provides the address and credential. Changes apply when you
