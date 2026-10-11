@@ -1,5 +1,15 @@
 # Verification record
 
+## Normal cursor with local gesture hints — 11 October 2026
+
+With the saved capture-exclusion preference on, overlay move/resize handles use the normal arrow and show a compact Move/Resize direction badge inside the header. Active gestures take precedence over hover and retain the arrow over document content. Gesture completion/errors clear active state; native window-focus events supplement browser blur, and hiding/click-through clear hover. Handles prevent browser selection/drag-and-drop so repeated resizing cannot start a separate forbidden drag cursor. Idle editing and exclusion-off cursors remain ordinary. No global cursor settings or production native command interfaces changed.
+
+`pnpm check`, `pnpm test` (24 TypeScript and 25 Rust tests passed; two signed-package tests intentionally ignored), production frontend builds and the debug Windows build passed. The executable was rebuilt after Cargo tests. Full `pnpm test:capture` passed on Windows 10.0.26300 / FFmpeg 7.1. Actual `GetCursorInfo` probes verified header movement, all eight resize handles, hover hints, active precedence, completion, Escape, native focus loss, a real concurrent-gesture rejection, click-through/recovery and ordinary off/idle cursors. Cursor assertions compare Windows resource handles and respect the current system cursor theme. Editing synchronized with the control panel, including after resizing. The minimum-size header image was inspected; the badge fits without covering document text.
+
+GDI and DXGI both recorded with cursor capture enabled. During held movement and resizing, the arrow remained visible, test-card pixels were absent, the badge region showed only the underlying app, and no outline appeared across the overlay perimeter. Captured images were inspected. Affinity, authorization, appearance, hide/show and saved preference restart also passed. Evidence: `target/capture-acceptance/run-gUwawu/`, including `cursor-results.json`, capture frames/metrics and `header-hint-minimum-size.png`.
+
+Earlier runs exposed the browser drag cursor, missing browser blur during owned-window focus changes, and probes targeting scrolled-out editor coordinates; the final implementation/fixture addresses each. Moving-window OBS/Teams/Discord, multiple monitors/DPI and non-Windows runtime behavior remain unverified. No merge or release was performed.
+
 ## Capture-excluded overlay movement — 11 October 2026
 
 Windows overlay header and edge gestures now update the owned HWND without the system move/size loop or its separate capture-visible outline/snap preview. The native sizing border is disabled on Windows; the overlay's visible resize handles still work. Updates are posted to the UI thread so input polling can observe release and focus loss promptly. Escape restores starting bounds, and resizing preserves the scaled minimum size. The app does not change Windows' full-window dragging preference.

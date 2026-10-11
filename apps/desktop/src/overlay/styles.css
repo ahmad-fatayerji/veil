@@ -236,6 +236,7 @@ html.overlay-mode,
 }
 .overlay-resize {
   position: absolute;
+  user-select: none;
 }
 .overlay-resize-north {
   top: 0;
@@ -317,4 +318,25 @@ html.overlay-mode,
 .overlay-document .document-editor {
   min-height: 100%;
   padding: 16px 24px 24px;
+}
+.overlay-gesture-hint {
+  pointer-events: none;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.overlay-surface.is-capture-excluded .overlay-drag-handle,
+.overlay-surface.is-capture-excluded .overlay-resize {
+  cursor: default;
+}
+
+.overlay-surface.is-capture-excluded.is-gesturing,
+.overlay-surface.is-capture-excluded.is-gesturing * {
+  cursor: default !important;
 }

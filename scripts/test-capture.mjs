@@ -51,18 +51,22 @@ function native(action, args = {}, window = 'overlay', processId = app.pid) {
   return output ? JSON.parse(output) : undefined;
 }
 async function launch() {
-  app = spawn(resolve(root, 'target/debug/veil-desktop.exe'), [], {
-    cwd: root,
-    windowsHide: true,
-    env: {
-      ...process.env,
-      VEIL_TEST_SETTINGS_DIR: directory,
-      WEBVIEW2_USER_DATA_FOLDER: resolve(directory, 'webview'),
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:
-        '--remote-debugging-port=9225 --remote-debugging-address=127.0.0.1',
+  app = spawn(
+    resolve(process.env.VEIL_CAPTURE_TEST_EXE || resolve(root, 'target/debug/veil-desktop.exe')),
+    [],
+    {
+      cwd: root,
+      windowsHide: true,
+      env: {
+        ...process.env,
+        VEIL_TEST_SETTINGS_DIR: directory,
+        WEBVIEW2_USER_DATA_FOLDER: resolve(directory, 'webview'),
+        WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:
+          '--remote-debugging-port=9225 --remote-debugging-address=127.0.0.1',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  );
   app.stderr.on('data', (data) => process.stderr.write(data));
   await waitFor(async () => {
     try {
@@ -134,6 +138,8 @@ async function capture(mode, phase, held = false) {
       ? [
           '-f',
           'gdigrab',
+          '-draw_mouse',
+          '1',
           '-framerate',
           '5',
           '-offset_x',
@@ -149,7 +155,7 @@ async function capture(mode, phase, held = false) {
           '-f',
           'lavfi',
           '-i',
-          `ddagrab=framerate=5:draw_mouse=0:video_size=${bounds.width}x${bounds.height}:offset_x=${bounds.x}:offset_y=${bounds.y}`,
+          `ddagrab=framerate=5:draw_mouse=1:video_size=${bounds.width}x${bounds.height}:offset_x=${bounds.x}:offset_y=${bounds.y}`,
           '-vf',
           'hwdownload,format=bgra',
         ];
@@ -183,21 +189,70 @@ async function capture(mode, phase, held = false) {
       if (background) borderBlue++;
     }
   }
-  return { mode, phase, yellow, blue, borderBlue, borderPixels, imagePath, bounds };
+  const cursor = native('CursorProbe');
+  let cursorPixels = 0;
+  // The recorded pointer must remain visible on the otherwise plain blue background.
+  for (
+    let y = Math.max(0, cursor.y - bounds.y);
+    y < Math.min(bounds.height, cursor.y - bounds.y + 32);
+    y++
+  ) {
+    for (
+      let x = Math.max(0, cursor.x - bounds.x);
+      x < Math.min(bounds.width, cursor.x - bounds.x + 32);
+      x++
+    ) {
+      const [r, g, b] = pixels.subarray((y * bounds.width + x) * 3, (y * bounds.width + x) * 3 + 3);
+      if (Math.abs(r - 25) >= 30 || Math.abs(g - 65) >= 30 || Math.abs(b - 95) >= 30)
+        cursorPixels++;
+    }
+  }
+  return {
+    mode,
+    phase,
+    yellow,
+    blue,
+    borderBlue,
+    borderPixels,
+    cursor,
+    cursorPixels,
+    imagePath,
+    bounds,
+  };
 }
 
-async function captureGesture(mode, resize) {
-  native('Raise', {}, 'main', underlay.pid);
-  native('Focus');
-  native('Move', { X: 100, Y: 130 });
-  await delay(500);
-  const before = native('Probe');
-  // Stay inside the rounded corner's visible resize handle.
-  const x = resize ? before.x + before.width - 4 : before.x + 80;
-  const y = resize ? before.y + before.height - 4 : before.y + 16;
-  const phase = resize ? 'held-resize' : 'held-move';
-  const readyPath = resolve(directory, `${mode}-${phase}.ready`);
-  const input = spawn(
+const handles = {
+  move: ['Move', 'move'],
+  north: ['Resize ↕', 'vertical'],
+  south: ['Resize ↕', 'vertical'],
+  east: ['Resize ↔', 'horizontal'],
+  west: ['Resize ↔', 'horizontal'],
+  northEast: ['Resize ↗', 'nesw'],
+  southWest: ['Resize ↗', 'nesw'],
+  northWest: ['Resize ↘', 'nwse'],
+  southEast: ['Resize ↘', 'nwse'],
+};
+const handleLocator = (overlay, handle) =>
+  overlay.locator(handle === 'move' ? '.overlay-drag-handle' : `.overlay-resize-${handle}`);
+async function pointAt(overlay, handle) {
+  let point;
+  native('MovePointer', { X: 5, Y: 5 });
+  await waitFor(async () => {
+    const box = await handleLocator(overlay, handle).boundingBox();
+    const scale = await overlay.evaluate(() => devicePixelRatio);
+    const bounds = native('Probe');
+    point = {
+      X: Math.round(bounds.clientX + (box.x + (handle === 'move' ? 70 : box.width / 2)) * scale),
+      Y: Math.round(bounds.clientY + (box.y + box.height / 2) * scale),
+    };
+    native('MovePointer', point);
+    const cursor = native('CursorProbe');
+    return cursor.x === point.X && cursor.y === point.Y;
+  }, `pointer on ${handle}`);
+  return point;
+}
+function holdPointer(x, y, toX, toY, readyPath) {
+  return spawn(
     'powershell.exe',
     [
       '-NoProfile',
@@ -214,14 +269,67 @@ async function captureGesture(mode, resize) {
       '-Y',
       String(y),
       '-ToX',
-      String(x + 60),
+      String(toX),
       '-ToY',
-      String(y + 45),
+      String(toY),
       '-OutputPath',
       readyPath,
     ],
     { windowsHide: true, stdio: 'ignore' },
   );
+}
+async function pointAtEditor(overlay) {
+  let cursor;
+  await waitFor(async () => {
+    const editor = await overlay.locator('.tiptap').boundingBox();
+    const article = await overlay.locator('.overlay-document').boundingBox();
+    const left = Math.max(editor.x, article.x);
+    const top = Math.max(editor.y, article.y);
+    const right = Math.min(editor.x + editor.width, article.x + article.width);
+    const bottom = Math.min(editor.y + editor.height, article.y + article.height);
+    assert.ok(right > left && bottom > top, 'Editor has a visible area');
+    const scale = await overlay.evaluate(() => devicePixelRatio);
+    const before = native('Probe');
+    native('MovePointer', {
+      X: Math.round(before.clientX + (left + Math.min(40, (right - left) / 2)) * scale),
+      Y: Math.round(before.clientY + (top + Math.min(10, (bottom - top) / 2)) * scale),
+    });
+    cursor = native('CursorProbe');
+    const bounds = native('Probe');
+    return (
+      cursor.overTestWindow &&
+      (await overlay.evaluate(
+        ({ cursor, bounds }) =>
+          !!document
+            .elementFromPoint(
+              (cursor.x - bounds.clientX) / devicePixelRatio,
+              (cursor.y - bounds.clientY) / devicePixelRatio,
+            )
+            ?.closest('.tiptap'),
+        { cursor, bounds },
+      ))
+    );
+  }, 'pointer over visible editor');
+  return cursor;
+}
+async function captureGesture(
+  mode,
+  resize,
+  overlay,
+  handle = resize ? 'southEast' : 'move',
+  finish = 'release',
+  label = handle,
+) {
+  native('Raise', {}, 'main', underlay.pid);
+  native('Focus');
+  native('Move', { X: 100, Y: 130, Width: 520, Height: 320 });
+  await delay(500);
+  const before = native('Probe');
+  // Stay inside the rounded corner's visible resize handle.
+  const { X: x, Y: y } = await pointAt(overlay, handle);
+  const phase = `${label}-${finish}`;
+  const readyPath = resolve(directory, `${mode}-${phase}.ready`);
+  const input = holdPointer(x, y, x + 60, y + 45, readyPath);
   try {
     await waitFor(async () => {
       if (input.exitCode !== null) throw new Error(`HoldDrag exited: ${input.exitCode}`);
@@ -231,21 +339,77 @@ async function captureGesture(mode, resize) {
       );
     }, 'held native gesture');
     const during = native('Probe');
+    await waitFor(() => overlay.locator('.is-gesturing').count(), 'active gesture');
+    assert.equal(await overlay.locator('.overlay-gesture-hint').textContent(), handles[handle][0]);
+    const cursor = native('CursorProbe');
+    if (cursor.name !== 'arrow')
+      console.log({
+        handle,
+        cursor,
+        during,
+        classes: await overlay.locator('.overlay-surface').getAttribute('class'),
+      });
+    assert.equal(cursor.name, 'arrow', `${handle}: actual Windows arrow during gesture`);
+    assert.equal(cursor.visible, true);
     await writeFile(
       resolve(directory, `${mode}-${phase}-bounds.json`),
       JSON.stringify({ before, during }, null, 2),
     );
     assert.ok(
       resize
-        ? during.width > before.width + 40 && during.height > before.height + 25
+        ? during.width !== before.width || during.height !== before.height
         : during.x > before.x + 40 && during.y > before.y + 25,
       'Overlay updates before mouse release even with Windows outline-only dragging',
     );
+    // Pointer may leave its original handle, but the active badge must win over hover.
+    if (!mode) native('MovePointer', { X: during.x + 100, Y: during.y + 100 });
+    assert.equal(await overlay.locator('.overlay-gesture-hint').textContent(), handles[handle][0]);
+    assert.equal(native('CursorProbe').name, 'arrow', 'Arrow over content during gesture');
+    if (label === 'editor') {
+      const cursor = await pointAtEditor(overlay);
+      assert.equal(cursor.name, 'arrow', 'Actual arrow over editable document during resize');
+    }
+    if (finish === 'escape') native('Escape');
+    if (finish === 'blur') native('Focus', {}, 'main');
+    if (finish !== 'release') {
+      await waitFor(
+        async () => !(await overlay.locator('.is-gesturing').count()),
+        `${finish} completion`,
+      );
+      if (finish === 'escape') {
+        const restored = native('Probe');
+        for (const key of ['x', 'y', 'width', 'height'])
+          assert.equal(restored[key], before[key], 'Escape restores bounds');
+      }
+    }
+    if (!mode) return { handle, finish, before, during, cursor };
     const result = await capture(mode, phase, true);
+    const badge = await overlay.locator('.overlay-gesture-hint').boundingBox();
+    const scale = await overlay.evaluate(() => devicePixelRatio);
+    const badgePixels = ffmpeg([
+      '-i',
+      result.imagePath,
+      '-vf',
+      `crop=${Math.floor(badge.width * scale)}:${Math.floor(badge.height * scale)}:${Math.ceil(badge.x * scale)}:${Math.ceil(badge.y * scale)}`,
+      '-pix_fmt',
+      'rgb24',
+      '-f',
+      'rawvideo',
+      'pipe:1',
+    ]);
+    let badgeBlue = 0;
+    for (let i = 0; i < badgePixels.length; i += 3) {
+      const [r, g, b] = badgePixels.subarray(i, i + 3);
+      if (Math.abs(r - 25) < 30 && Math.abs(g - 65) < 30 && Math.abs(b - 95) < 30) badgeBlue++;
+    }
+    result.hintBlueRatio = badgeBlue / (badgePixels.length / 3);
+    assert.ok(result.hintBlueRatio > 0.97, `${mode}: local header badge excluded`);
     await writeFile(resolve(directory, `${mode}-${phase}.json`), JSON.stringify(result, null, 2));
     assert.equal(input.exitCode, null, 'Capture completed before mouse release');
     assert.equal(result.bounds.affinity, 0x11);
     assert.ok(result.yellow < 100, `${mode}: card excluded during ${phase}`);
+    assert.equal(result.cursor.name, 'arrow');
+    assert.ok(result.cursorPixels > 5, `${mode}: captured arrow remains visible`);
     assert.ok(
       result.borderBlue / result.borderPixels > 0.97,
       `${mode}: no captured outline on overlay perimeter during ${phase}`,
@@ -258,7 +422,179 @@ async function captureGesture(mode, resize) {
       'release native gesture and restore system setting',
     );
     assert.equal(input.exitCode, 0);
+    await waitFor(
+      async () => !(await overlay.locator('.is-gesturing').count()),
+      'gesture state cleared',
+    );
   }
+}
+
+async function cursorAcceptance(main, overlay, recoveryAvailable) {
+  const evidence = [];
+  native('Focus');
+  for (const excluded of [false, true]) {
+    await command(main, 'overlay_update', { patch: { captureExclusion: excluded } });
+    await waitFor(
+      async () => !!(await overlay.locator('.is-capture-excluded').count()) === excluded,
+      'cursor preference',
+    );
+    for (const [handle, [hint, ordinary]] of Object.entries(handles)) {
+      native('Focus');
+      const point = await pointAt(overlay, handle);
+      const cursor = native('CursorProbe');
+      if (cursor.name !== (excluded ? 'arrow' : ordinary))
+        console.log({
+          handle,
+          point,
+          cursor,
+          bounds: native('Probe'),
+          hit: await overlay.evaluate(
+            ({ point, bounds }) => {
+              const node = document.elementFromPoint(
+                (point.X - bounds.clientX) / devicePixelRatio,
+                (point.Y - bounds.clientY) / devicePixelRatio,
+              );
+              return { className: node?.className, cursor: node && getComputedStyle(node).cursor };
+            },
+            { point, bounds: native('Probe') },
+          ),
+        });
+      assert.equal(
+        cursor.name,
+        excluded ? 'arrow' : ordinary,
+        `${handle}: actual Windows hover cursor`,
+      );
+      assert.equal(cursor.visible, true);
+      assert.equal(cursor.overTestWindow, true, 'Pointer belongs to the tested overlay');
+      assert.equal(await overlay.locator('.overlay-gesture-hint').count(), excluded ? 1 : 0);
+      if (excluded)
+        assert.equal(await overlay.locator('.overlay-gesture-hint').textContent(), hint);
+      evidence.push({ handle, excluded, cursor });
+    }
+    console.log(`PASS: actual hover cursors and header hints, exclusion ${excluded}`);
+  }
+  native('MovePointer', { X: 5, Y: 5 });
+  await waitFor(
+    async () => !(await overlay.locator('.overlay-gesture-hint').count()),
+    'hover exit',
+  );
+  for (const handle of process.env.VEIL_CAPTURE_GESTURES?.split(',') ?? Object.keys(handles)) {
+    evidence.push(await captureGesture(null, handle !== 'move', overlay, handle));
+    console.log(`PASS: held ${handle}, active arrow and completion`);
+  }
+  evidence.push(await captureGesture(null, false, overlay, 'move', 'escape'));
+  evidence.push(await captureGesture(null, false, overlay, 'move', 'blur'));
+  native('Focus');
+  const focusPoint = await pointAt(overlay, 'move');
+  native('Click', focusPoint);
+  await waitFor(
+    async () => !(await overlay.locator('.is-gesturing').count()),
+    'focus click gesture finished',
+  );
+  assert.equal(native('Probe').foreground, true, 'Overlay actually focused before blur');
+  assert.equal(
+    await overlay.evaluate(() => document.hasFocus()),
+    true,
+    'WebView actually focused before blur',
+  );
+  native('Focus', {}, 'main');
+  assert.equal(
+    native('Probe', {}, 'main').foreground,
+    true,
+    'Control panel actually receives focus',
+  );
+  await waitFor(
+    async () => !(await overlay.locator('.overlay-gesture-hint').count()),
+    'blur clears hover',
+  );
+  native('Focus');
+  await pointAt(overlay, 'move');
+  await command(main, 'overlay_visibility', { visible: false });
+  await waitFor(
+    async () => !(await overlay.locator('.overlay-gesture-hint').count()),
+    'hide clears hover',
+  );
+  await command(main, 'overlay_visibility', { visible: true });
+  if (recoveryAvailable) {
+    await pointAt(overlay, 'move');
+    await command(main, 'overlay_update', { patch: { clickThrough: true } });
+    await waitFor(
+      async () => !(await overlay.locator('.overlay-gesture-hint').count()),
+      'click-through clears hover',
+    );
+    native('Recover');
+    await waitFor(
+      async () => !(await snapshot(main)).settings.clickThrough,
+      'click-through recovery',
+    );
+    native('Focus');
+    await pointAt(overlay, 'southEast');
+    assert.equal(native('CursorProbe').name, 'arrow');
+  }
+  // Hold in document content, then start a real native gesture outside the React handler.
+  // A second gesture from the header must reject with GESTURE_ACTIVE and clear UI state.
+  native('Focus');
+  native('Move', { X: 100, Y: 130, Width: 520, Height: 320 });
+  await delay(300);
+  const bounds = native('Probe');
+  const readyPath = resolve(directory, 'gesture-error.ready');
+  const input = holdPointer(
+    bounds.x + 100,
+    bounds.y + 100,
+    bounds.x + 100,
+    bounds.y + 100,
+    readyPath,
+  );
+  try {
+    await waitFor(
+      () =>
+        readFile(readyPath).then(
+          () => true,
+          () => false,
+        ),
+      'held error fixture',
+    );
+    await overlay.evaluate(() => {
+      window.__cursorFailureGesture = window.__TAURI_INTERNALS__.invoke('overlay_gesture', {
+        direction: null,
+      });
+    });
+    await delay(300);
+    await handleLocator(overlay, 'move').dispatchEvent('pointerdown', { button: 0 });
+    await waitFor(
+      async () =>
+        (await overlay.getByRole('alert').allTextContents()).join('').includes('already active'),
+      'native gesture rejection',
+    );
+    assert.equal(await overlay.locator('.is-gesturing').count(), 0);
+    evidence.push({ failure: 'GESTURE_ACTIVE', activeStateCleared: true });
+  } finally {
+    await writeFile(`${readyPath}.release`, 'release');
+    await waitFor(() => input.exitCode !== null, 'release error fixture');
+    assert.equal(input.exitCode, 0);
+    await overlay.evaluate(async () => {
+      await window.__cursorFailureGesture;
+      delete window.__cursorFailureGesture;
+    });
+  }
+  native('Move', { X: 100, Y: 130, Width: 280, Height: 180 });
+  await delay(300);
+  await pointAt(overlay, 'northWest');
+  const badge = await overlay.locator('.overlay-gesture-hint').boundingBox();
+  const header = await overlay.locator('.overlay-drag-handle').boundingBox();
+  const content = await overlay.locator('.overlay-document').boundingBox();
+  assert.ok(badge.x >= header.x && badge.x + badge.width <= header.x + header.width);
+  assert.ok(badge.y + badge.height <= content.y, 'Badge fits the header at minimum window size');
+  assert.equal(
+    await overlay
+      .locator('.overlay-gesture-hint')
+      .evaluate((node) => getComputedStyle(node).pointerEvents),
+    'none',
+  );
+  await overlay.screenshot({ path: resolve(directory, 'header-hint-minimum-size.png') });
+  native('Move', { X: 100, Y: 130, Width: 520, Height: 320 });
+  await delay(300);
+  await writeFile(resolve(directory, 'cursor-results.json'), JSON.stringify(evidence, null, 2));
 }
 
 try {
@@ -312,6 +648,7 @@ try {
     { windowsHide: true, stdio: 'ignore' },
   );
   await delay(1500);
+  await cursorAcceptance(main, overlay, recoveryAvailable);
   const results = [];
   const modes = ['gdi', 'dxgi'];
   if (process.env.VEIL_TEST_OBS_PORTABLE) modes.push('obs-dxgi', 'obs-wgc');
@@ -330,7 +667,10 @@ try {
     assert.ok(on.blue > 10000, `${mode}: underlying app captured, not a black overlay`);
     results.push(off, on);
     if (!mode.startsWith('obs-')) {
-      results.push(await captureGesture(mode, false), await captureGesture(mode, true));
+      results.push(
+        await captureGesture(mode, false, overlay),
+        await captureGesture(mode, true, overlay),
+      );
     }
     await writeFile(resolve(directory, 'capture-results.json'), JSON.stringify(results, null, 2));
   }
@@ -369,6 +709,31 @@ try {
   await main.getByRole('button', { name: 'Recheck native setting' }).click();
   assert.equal((await snapshot(main)).capture.status, 'applied');
   await main.screenshot({ path: resolve(directory, 'control-panel.png'), fullPage: true });
+  await command(main, 'overlay_capture_test', { enabled: false });
+  await main.getByRole('button', { name: 'Close Settings', exact: true }).click();
+  await main.getByRole('button', { name: 'Create document', exact: true }).click();
+  await overlay.locator('.tiptap').waitFor();
+  for (const excluded of [true, false]) {
+    await command(main, 'overlay_update', { patch: { captureExclusion: excluded, opacity: 1 } });
+    await overlay.locator('.tiptap').fill(`Editing works with exclusion ${excluded}.`);
+    if (excluded) await captureGesture(null, true, overlay, 'southEast', 'release', 'editor');
+    await waitFor(
+      async () => (await main.locator('.tiptap').textContent())?.includes(`exclusion ${excluded}`),
+      'overlay editing sync',
+    );
+    native('Focus');
+    assert.equal(
+      (await pointAtEditor(overlay)).name,
+      'text',
+      'Idle editing retains actual Windows text cursor',
+    );
+  }
+  await command(main, 'overlay_update', { patch: { captureExclusion: true } });
+  await main.getByRole('button', { name: 'Close document', exact: true }).click();
+  await main
+    .getByRole('dialog', { name: 'Close document?', exact: true })
+    .getByRole('button', { name: 'Close document', exact: true })
+    .click();
   await close();
   ({ main, overlay } = await launch());
   assert.equal((await snapshot(main)).settings.captureExclusion, true);
