@@ -21,6 +21,11 @@ git push -u origin feature/reconnect
 gh pr create --base develop --title "fix: reconnect after losing connection"
 ```
 
+Link issue-backed PRs in their body: `Closes #123` for a fully resolved issue or
+`Refs #123` for partial work. Give delegated agents the issue number and URL, then
+verify the published PR body and linked issues before handoff, following
+[AGENTS.md](../AGENTS.md). A PR being opened does not itself close the issue.
+
 Use Conventional Commit PR titles: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `build:`, `ci:`, `chore:` or `revert:`, optionally with a scope. Use `!` or a `BREAKING CHANGE:` footer for incompatible changes. Feature PRs squash so the reviewed title becomes the commit used for version proposals.
 
 After checks pass, run **Actions → Merge Gitflow PR → Run workflow** on `main`, entering the PR number. This action chooses squash for `feature/*` PRs and merge commits for releases, hotfixes and `main → develop`. It matches the reviewed head SHA and obeys required checks. It also explicitly dispatches subsequent workflows because a `GITHUB_TOKEN` merge does not automatically trigger ordinary push/closed-PR workflows.
