@@ -1,11 +1,11 @@
 {
-  "version": "0.4.0",
-  "notes": "# Veil 0.4.0\n\n## Fixes\n\n- fix(release): explicitly dispatch protected feed merges\n- fix: retain checked beta feed history during finalization\n- fix: omit historical distribution commits from release proposals\n- fix: enable capture exclusion by default and fill opacity slider\n- fix(network): stop recovery for departed guests\n\n## Other changes\n\n- chore: advance beta feed to 0.4.0-beta.1\n- build: prepare MIT repository consolidation and checked update feeds\n- test: include real installed HTTPS upgrade acceptance\n- test: wait for the hidden overlay before authorization checks\n- test: verify updater receipts against the running version\n- build: record audited import provenance and legacy baseline\n- build: prepare audited MIT source import\n- ci: select checks by changed paths and split network acceptance\n\n## Features\n\n- feat: show participant activity in the overlay\n- feat: configure close behavior and tray overlay controls\n- feat: validate hosting credentials before saving settings\n- feat: show version and developer information in About\n- feat: redesign document creation and reusable sharing\n- feat(overlay): add Windows capture compatibility controls\n",
-  "pub_date": "2026-10-11T06:13:59.951Z",
+  "version": "0.5.0",
+  "notes": "# Veil 0.5.0\n\n## Features\n\n- feat(settings): move desktop settings to bottom-right gear\n- feat(settings): add GitHub repository button to About\n\n## Other changes\n\n- docs: clarify task worktree locations and issue links\n- docs: refresh Veil README, security guidance, and project documentation\n- test: stabilize migration acceptance and record upgrade results\n- chore: advance beta feed to 0.4.0\n\n## Fixes\n\n- fix: remove redundant settings quit button\n- fix: persist the appearance display name\n- fix(overlay): prevent capture-visible drag outlines and resize cursors\n",
+  "pub_date": "2026-10-11T09:56:59.619Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDl1N2lDeDhOczVQRWp2SEZQNi93Nmx5cDJmcFk3NjBkbWVpaDVXU2gzQ3NUK3FYSCtKQVlDUlpaMmVrZllzQ3Y1bzVwOWVTQnp2Qk1nbWxkMk5kUVFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNjk5MjM5CWZpbGU6VmVpbF8wLjQuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC40LjAKSHJ6YmtrM3hYMllQS0pSODhYajYvN25Qc2RudE5yeUNFc29wa0JKWjVzRVgwR3MxTHhIL2JWOTNiajN6YUtwaU84MnM1dnNUU1RHc2pMQU56ZzlHQ1E9PQo=",
-      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.4.0/Veil_0.4.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TC9TemhIN0NJRDFaanAzUUZ3RGZHRXl6UDFYUlJoYzNtUlpSNHlDUmZRcW1ZS1d6c1p1SUJYajFnaEM5UG9kd0djQnppTFVpSjk2L1ZjczdKSHJNM0FJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNzEyNjE5CWZpbGU6VmVpbF8wLjUuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC41LjAKekJZZmM2Q2pya0VRSlhpTFVEcWVlb1B0M2d2cDhOb0RoTkJIbHlmdHNJTzQ0RzFoaXdxK1FwVytIeVJjc1NPb3FSNmxBMEdNaTRKT3l3TEpjK0FmRFE9PQo=",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.5.0/Veil_0.5.0_x64-setup.exe"
     }
   }
 }
