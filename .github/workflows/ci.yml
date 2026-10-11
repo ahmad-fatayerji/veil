@@ -332,3 +332,22 @@ jobs:
           FULL_VALIDATION: ${{ inputs.candidate || github.event_name != 'pull_request' || github.event.pull_request.base.ref == 'main' }}
           RESULTS: ${{ toJSON(needs) }}
         run: node scripts/ci-plan.mjs gate
+  dispatch-feed-merge:
+    needs: gate
+    if: >-
+      needs.gate.result == 'success' && !inputs.candidate &&
+      github.repository == 'ahmad-fatayerji/veil' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      startsWith(github.head_ref || github.ref_name, 'automation/update-feed-')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Explicitly dispatch the trusted feed merger
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          FEED_BRANCH: ${{ github.head_ref || github.ref_name }}
+          FEED_SHA: ${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+        run: gh workflow run merge-update-feed.yml --ref main -f "branch=$FEED_BRANCH" -f "sha=$FEED_SHA"
