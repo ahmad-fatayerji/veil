@@ -79,6 +79,15 @@ Guests install Veil, open the link (or paste it into **Join session**), enter a 
 - Overlay capture exclusion works only with compatible capture methods. Test your recording or screen-sharing setup first; the control panel remains capturable. See [capture compatibility](docs/capture-compatibility.md).
 - Update packages are signed for Veil's updater. Windows SmartScreen may still show a warning because the installer does not currently have an Authenticode signature.
 
+## Security and privacy
+
+- **Encrypted collaboration:** peer connections use WebRTC DTLS; authenticated signaling binds the host identity and derives separate encryption keys for each admitted guest link. The sharing server does not receive document contents or the invitation root secret.
+- **Control new joins:** share links grant editing access. Keep them private; **Reset link** replaces the invitation and **Stop sharing** blocks new joins. Already connected guests retain access until the session ends.
+- **Temporary documents:** Veil does not save documents to disk. Local preferences are saved separately, and host credentials are kept in Windows Credential Manager. Participants can still copy or record shared content.
+- **Verified updates:** the updater checks signed packages and blocks installation while a document session is active. Updater signatures are separate from Windows publisher certificates.
+
+Recording exclusion applies to compatible capture methods; it is not encryption or access control. Veil has not undergone an independent security audit. Read the [security model and reporting guidance](docs/security.md) for trust boundaries and limitations.
+
 ## Build and contribute
 
 Veil is open source: this repository contains the desktop app, shared editor packages, installers, and release automation. Contributions start from `develop`; `main` contains approved release source.

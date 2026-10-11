@@ -1,9 +1,9 @@
 # Veil repository rules
 
-- Follow PROJECT_SPEC.md and implement one milestone at a time. Current task: M4 (Windows capture compatibility), requested by the user. M6 installer/updater acceptance remains unfinished.
+- Follow PROJECT_SPEC.md and keep each task focused on the user's requested scope. The former numbered milestone roadmap is retired; do not use it to promise features or infer release authorization.
 - Keep Windows-first native code isolated from shared React packages.
 - Participant capacity defaults to no application-level cap.
-- Never expose a public unauthenticated service; M0 listens on loopback only.
+- Never expose a public unauthenticated service; the standalone development host listens on loopback only.
 - Do not claim universal capture exclusion.
 - Keep builds and tests passing. Document unverified native behavior honestly.
 
