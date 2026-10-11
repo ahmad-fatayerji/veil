@@ -19,6 +19,8 @@ The displayed status is separate from the saved preference:
 
 The native failure reason is displayed. A requested preference can remain on after failure so the user can retry; it is never presented as successfully applied. Failures do not disable unrelated overlay controls. Showing the window, recovery, opacity and toolkit style changes reapply/read back affinity. **Recheck native setting** only queries current capability/affinity and does not run a recorder. Only the control panel can change/check capture settings or display the test card; the overlay can read status. No caller supplies an HWND.
 
+Windows overlay header and edge gestures update the overlay HWND directly rather than entering the system move/size loop. This avoids a separate desktop outline or snap preview that would not inherit the overlay's capture affinity, including when **Show window contents while dragging** is disabled. The app does not change that Windows preference. Dragging no longer invokes Windows snap previews; resizing retains the scaled minimum size. Release outside the overlay, hiding it or changing focus ends the gesture; Escape restores its starting bounds. Other platforms retain toolkit gestures.
+
 ## Manual procedure
 
 1. Use a test document without secrets. In overlay Settings open **Capture compatibility test** and **Show test card**. The yellow/blue `VEIL CAPTURE TEST` card is local and temporary; it hides the overlay editor without editing the shared document. **Return to document** restores the view, and app restart clears the card.
@@ -31,6 +33,8 @@ The native failure reason is displayed. A requested preference can remain on aft
 ## Compatibility matrix
 
 Results are specific to the recorded machine/tool/mode. Untested rows are not supported-mode claims.
+
+11 October 2026 moving-window regression: FFmpeg 7.1 GDI and DXGI captures on Windows 10.0.26300 excluded the card during held header/corner gestures, with the underlying app visible and no outline across the captured overlay perimeter. Windows full-window dragging was disabled for each fixture gesture and its prior value restored afterwards. Evidence: `target/capture-acceptance/run-6oEpHh/`. These results do not extend the earlier OBS observations to moving-window capture or remote viewers.
 
 | Tool / mode                                            | Windows / tool version          | Off baseline | On output                        | Status / evidence                                              |
 | ------------------------------------------------------ | ------------------------------- | ------------ | -------------------------------- | -------------------------------------------------------------- |
@@ -59,6 +63,8 @@ pnpm test:overlay
 ```
 
 The capture script uses real WebView2 controls, a separate colored WinForms underlay and actual capture output. It confirms a visible baseline card and its removal with underlying pixels retained, HWND affinity, control-panel scope, forbidden overlay administration, style/recovery/show changes, persisted opt-in/out, ephemeral test card and absence of JavaScript errors. Preferences/WebView2 profiles and evidence are isolated under `target/capture-acceptance/`. No networking session or operator server is needed. It does not run in hosted CI because it requires an interactive desktop/GPU and external capture tooling.
+
+The GDI and DXGI regressions also hold real move/resize gestures open while capturing, check that bounds change before mouse release, and inspect the overlay perimeter for leaked outlines. The fixture temporarily disables Windows full-window dragging and restores its previous value in `finally`; avoid other pointer input during the run. OBS and remote sharing tools still need separate moving-window acceptance.
 
 To exercise installed OBS without touching normal profiles/scenes, copy its installation or unpack an official portable build into this worktree's `target/obs-portable`, then set `$env:VEIL_TEST_OBS_PORTABLE = "$PWD/target/obs-portable"` and run `pnpm test:capture` again. Remove the environment variable afterwards. The fixture only accepts a disposable copy under this worktree's `target`, enables portable mode, creates its own M4 profile/scenes, disables websocket control/auto-updates, records the cropped overlay test area and closes its own OBS process. It confirms the selected capture method in OBS logs and checks recorded frames. Local artifact paths are ignored by Git.
 

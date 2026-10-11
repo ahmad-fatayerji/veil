@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Focus','Probe','Click','Drag','Move','Recover','Toggle','Capture','Pixel','Close')][string]$Action,
+  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Focus','Probe','Click','Drag','HoldDrag','Move','Recover','Toggle','Capture','Pixel','Close')][string]$Action,
   [Parameter(Mandatory=$true)][int]$AppProcessId,
   [ValidateSet('main','overlay')][string]$Window = 'overlay',
   [int]$X = 0, [int]$Y = 0, [int]$ToX = 0, [int]$ToY = 0,
@@ -29,6 +29,7 @@ public class VeilNativeTest {
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window, int command);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] static extern bool SystemParametersInfo(uint action, uint parameter, ref int value, uint flags);
   [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
   [DllImport("user32.dll")] static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wparam, IntPtr lparam);
@@ -51,6 +52,21 @@ public class VeilNativeTest {
     SetCursorPos(x,y); Thread.Sleep(100); mouse_event(2,0,0,0,UIntPtr.Zero); Thread.Sleep(400);
     for (int step=1; step<=12; step++) { SetCursorPos(x+(toX-x)*step/12,y+(toY-y)*step/12); Thread.Sleep(35); }
     mouse_event(4,0,0,0,UIntPtr.Zero); Thread.Sleep(150);
+  }
+  public static void HoldDrag(int x, int y, int toX, int toY, string readyPath) {
+    int original = 0;
+    if (!SystemParametersInfo(0x26,0,ref original,0)) throw new Exception("Cannot read drag-full-windows setting.");
+    int unused = 0;
+    try {
+      if (!SystemParametersInfo(0x25,0,ref unused,0)) throw new Exception("Cannot set outline-only dragging for regression.");
+      SetCursorPos(x,y); Thread.Sleep(100); mouse_event(2,0,0,0,UIntPtr.Zero); Thread.Sleep(400);
+      for (int step=1; step<=12; step++) { SetCursorPos(x+(toX-x)*step/12,y+(toY-y)*step/12); Thread.Sleep(35); }
+      System.IO.File.WriteAllText(readyPath,"held");
+      for (int step=0; step<300 && !System.IO.File.Exists(readyPath+".release"); step++) Thread.Sleep(50);
+    } finally {
+      mouse_event(4,0,0,0,UIntPtr.Zero);
+      if (!SystemParametersInfo(0x25,(uint)original,ref unused,0)) throw new Exception("Cannot restore drag-full-windows setting.");
+    }
   }
   public static void Shortcut(bool shift) {
     keybd_event(0x11,0,0,UIntPtr.Zero); keybd_event(0x12,0,0,UIntPtr.Zero);
@@ -89,7 +105,13 @@ if ($handle -eq [IntPtr]::Zero) { throw "Test window for process $AppProcessId i
 $bounds = New-Object VeilNativeTest+Rect
 [VeilNativeTest]::GetWindowRect($handle, [ref]$bounds) | Out-Null
 switch ($Action) {
-  'Focus' { [VeilNativeTest]::ShowWindow($handle,9) | Out-Null; [VeilNativeTest]::SetForegroundWindow($handle) | Out-Null }
+  'Focus' {
+    [VeilNativeTest]::ShowWindow($handle,9) | Out-Null
+    # Raise within its current topmost/non-topmost band before pointer input.
+    # Another app-owned overlay can otherwise intercept the test's mouse down.
+    [VeilNativeTest]::SetWindowPos($handle,[IntPtr]::Zero,0,0,0,0,0x13) | Out-Null
+    [VeilNativeTest]::SetForegroundWindow($handle) | Out-Null
+  }
   'Raise' {
     [VeilNativeTest]::ShowWindow($handle,9) | Out-Null
     [VeilNativeTest]::SetWindowPos($handle,[IntPtr](-1),0,0,0,0,0x13) | Out-Null
@@ -108,6 +130,7 @@ switch ($Action) {
   }
   'Click' { [VeilNativeTest]::Click($X,$Y) }
   'Drag' { [VeilNativeTest]::Drag($X,$Y,$ToX,$ToY) }
+  'HoldDrag' { [VeilNativeTest]::HoldDrag($X,$Y,$ToX,$ToY,$OutputPath) }
   'Move' { [VeilNativeTest]::SetWindowPos($handle,[IntPtr]::Zero,$X,$Y,0,0,0x15) | Out-Null }
   'Recover' { [VeilNativeTest]::Shortcut($false) }
   'Toggle' { [VeilNativeTest]::Shortcut($true) }

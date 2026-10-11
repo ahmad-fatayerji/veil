@@ -1,5 +1,15 @@
 # Verification record
 
+## Capture-excluded overlay movement — 11 October 2026
+
+Windows overlay header and edge gestures now update the owned HWND without the system move/size loop or its separate capture-visible outline/snap preview. The native sizing border is disabled on Windows; the overlay's visible resize handles still work. Updates are posted to the UI thread so input polling can observe release and focus loss promptly. Escape restores starting bounds, and resizing preserves the scaled minimum size. The app does not change Windows' full-window dragging preference.
+
+`pnpm check`, `pnpm test` (24 TypeScript and 25 Rust tests; two packaged-installer tests intentionally ignored), production frontend builds and the debug Windows build passed. The debug executable was rebuilt after Cargo tests. Focused overlay Rust tests cover movement, all eight resize directions, opposite-edge anchoring, minimum size at non-default scale and negative monitor coordinates.
+
+`pnpm test:capture` passed on Windows/WebView2 with FFmpeg GDI and DXGI capture. With Windows full-window dragging temporarily disabled by the fixture, real header/corner gestures changed native bounds before mouse release, retained affinity `0x11`, excluded the test card and showed the underlying app across the captured perimeter without an outline. Screenshots were visually inspected. The fixture restored the previous Windows setting after each gesture. Affinity, authorization, appearance changes, click-through/recovery, hide/show, preference restart and the temporary test-card lifecycle also passed. Evidence: `target/capture-acceptance/run-6oEpHh/`.
+
+Earlier attempts stopped on foreground/z-order contention and pointer/position timing; the fixture now raises the test window before input and lets repositioning settle. The final run acquired the global shortcuts. This task did not rerun the full document/slider overlay suite. Moving-window OBS, Teams/Discord remote viewers, multiple monitors/DPI and non-Windows runtime behavior remain unverified. No release was published.
+
 ## Overlay participant activity — 10 October 2026
 
 The overlay now receives sanitized participant snapshots through the existing desktop-only bridge and shows names, colors, typing, selecting, in-document and away activity in a compact strip. Opening the overlay retains one desktop identity; leaving clears the strip and participant departure removes the corresponding entry.

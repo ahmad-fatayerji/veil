@@ -123,9 +123,9 @@ function ffmpeg(args) {
     maxBuffer: 16 * 1024 * 1024,
   });
 }
-async function capture(mode, phase) {
+async function capture(mode, phase, held = false) {
   // Keep the known background above unrelated normal windows, below the topmost overlay.
-  native('Raise', {}, 'main', underlay.pid);
+  if (!held) native('Raise', {}, 'main', underlay.pid);
   await delay(200);
   const bounds = native('Probe');
   const imagePath = resolve(directory, `${mode}-${phase}.png`);
@@ -167,13 +167,98 @@ async function capture(mode, phase) {
   const pixels = ffmpeg(['-i', imagePath, '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1']);
   let yellow = 0;
   let blue = 0;
+  let borderBlue = 0;
+  let borderPixels = 0;
   for (let index = 0; index < pixels.length; index += 3) {
     const [r, g, b] = pixels.subarray(index, index + 3);
     if (r > 220 && g > 200 && b < 140) yellow++;
     // WinForms can shade its button on hover; allow that small color variation.
-    if (Math.abs(r - 25) < 30 && Math.abs(g - 65) < 30 && Math.abs(b - 95) < 30) blue++;
+    const background = Math.abs(r - 25) < 30 && Math.abs(g - 65) < 30 && Math.abs(b - 95) < 30;
+    if (background) blue++;
+    const pixel = index / 3;
+    const x = pixel % bounds.width;
+    const y = Math.floor(pixel / bounds.width);
+    if (x < 4 || y < 4 || x >= bounds.width - 4 || y >= bounds.height - 4) {
+      borderPixels++;
+      if (background) borderBlue++;
+    }
   }
-  return { mode, phase, yellow, blue, imagePath, bounds };
+  return { mode, phase, yellow, blue, borderBlue, borderPixels, imagePath, bounds };
+}
+
+async function captureGesture(mode, resize) {
+  native('Raise', {}, 'main', underlay.pid);
+  native('Focus');
+  native('Move', { X: 100, Y: 130 });
+  await delay(500);
+  const before = native('Probe');
+  // Stay inside the rounded corner's visible resize handle.
+  const x = resize ? before.x + before.width - 4 : before.x + 80;
+  const y = resize ? before.y + before.height - 4 : before.y + 16;
+  const phase = resize ? 'held-resize' : 'held-move';
+  const readyPath = resolve(directory, `${mode}-${phase}.ready`);
+  const input = spawn(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      resolve(root, 'scripts/overlay-native.ps1'),
+      '-Action',
+      'HoldDrag',
+      '-AppProcessId',
+      String(app.pid),
+      '-X',
+      String(x),
+      '-Y',
+      String(y),
+      '-ToX',
+      String(x + 60),
+      '-ToY',
+      String(y + 45),
+      '-OutputPath',
+      readyPath,
+    ],
+    { windowsHide: true, stdio: 'ignore' },
+  );
+  try {
+    await waitFor(async () => {
+      if (input.exitCode !== null) throw new Error(`HoldDrag exited: ${input.exitCode}`);
+      return readFile(readyPath).then(
+        () => true,
+        () => false,
+      );
+    }, 'held native gesture');
+    const during = native('Probe');
+    await writeFile(
+      resolve(directory, `${mode}-${phase}-bounds.json`),
+      JSON.stringify({ before, during }, null, 2),
+    );
+    assert.ok(
+      resize
+        ? during.width > before.width + 40 && during.height > before.height + 25
+        : during.x > before.x + 40 && during.y > before.y + 25,
+      'Overlay updates before mouse release even with Windows outline-only dragging',
+    );
+    const result = await capture(mode, phase, true);
+    await writeFile(resolve(directory, `${mode}-${phase}.json`), JSON.stringify(result, null, 2));
+    assert.equal(input.exitCode, null, 'Capture completed before mouse release');
+    assert.equal(result.bounds.affinity, 0x11);
+    assert.ok(result.yellow < 100, `${mode}: card excluded during ${phase}`);
+    assert.ok(
+      result.borderBlue / result.borderPixels > 0.97,
+      `${mode}: no captured outline on overlay perimeter during ${phase}`,
+    );
+    return result;
+  } finally {
+    await writeFile(`${readyPath}.release`, 'release');
+    await waitFor(
+      () => input.exitCode !== null,
+      'release native gesture and restore system setting',
+    );
+    assert.equal(input.exitCode, 0);
+  }
 }
 
 try {
@@ -244,6 +329,9 @@ try {
     assert.ok(on.yellow < 100, `${mode}: card excluded in captured output`);
     assert.ok(on.blue > 10000, `${mode}: underlying app captured, not a black overlay`);
     results.push(off, on);
+    if (!mode.startsWith('obs-')) {
+      results.push(await captureGesture(mode, false), await captureGesture(mode, true));
+    }
     await writeFile(resolve(directory, 'capture-results.json'), JSON.stringify(results, null, 2));
   }
   // Appearance changes, click-through and recovery must preserve affinity.
