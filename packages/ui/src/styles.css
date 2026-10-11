@@ -638,6 +638,44 @@ input::placeholder {
   border: 1px solid;
   border-radius: 8px;
 }
+.desktop-content {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 68px;
+}
+.desktop-footer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px;
+}
+.desktop-settings-button {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.desktop-settings-button:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.desktop-settings-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .update-success {
   color: #195541;
   background: #eff9f5;
