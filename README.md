@@ -1,116 +1,104 @@
+﻿<div align="center">
+
+<img src="packages/ui/src/assets/veil-icon.png" alt="Veil logo" width="88" />
+
 # Veil
 
-A Windows-first collaborative document overlay. This repository implements **M0–M2 and P1** from [PROJECT_SPEC.md](PROJECT_SPEC.md): shared editing, Windows overlay, authenticated LAN/browser hosting, and desktop P2P.
+**Your words. A shared space. Always in view.**
 
-## Prerequisites
+Real-time collaborative notes with a customizable desktop overlay for Windows.
 
-**For testers:** download the setup EXE from [public Veil Releases](https://github.com/ahmad-fatayerji/veil/releases/latest). Windows 10/11 x64; no development tools needed. Follow the attached `TESTING.md` or [tester guide](docs/tester-guide.md). The installer is not Windows publisher-signed. Signed updater packages and GitHub updates are configured; documents remain temporary. The prerequisites below are for development.
+[**Download for Windows**](https://github.com/ahmad-fatayerji/veil/releases/latest) · [Getting started](#get-started) · [Self-hosting](https://github.com/ahmad-fatayerji/veil-server) · [Report an issue](https://github.com/ahmad-fatayerji/veil/issues)
 
-- Node.js 22.12+ and pnpm 10.30.1 (`corepack enable`, then `corepack pnpm --version`). If Corepack is unavailable, install the pinned pnpm version with `npm install -g pnpm@10.30.1`.
-- Rust 1.99.0 with rustfmt and Clippy (selected by `rust-toolchain.toml`).
-- Windows: Microsoft C++ Build Tools with **Desktop development with C++**, and Edge WebView2. See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
+[![Latest release](https://img.shields.io/github/v/release/ahmad-fatayerji/veil)](https://github.com/ahmad-fatayerji/veil/releases/latest)
+[![MIT license](https://img.shields.io/github/license/ahmad-fatayerji/veil)](LICENSE)
+[![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)](https://github.com/ahmad-fatayerji/veil/releases/latest)
 
-## Host and join a session
+<img src="docs/media/workspace.png" alt="Veil's dark workspace with a shared document and two participants in the People panel" width="1000" />
+
+</div>
+
+Veil gives you a temporary space to write together and a floating overlay to keep those notes beside whatever you're doing. Use it for meeting notes, a shared checklist, or a quick brainstorming session. Start writing locally, then invite people when you're ready.
+
+## See it in action
+
+### Write together
+
+Create a document, share a session link, and edit together in real time. The People panel shows who's there and their activity; named cursors and selections keep everyone's work easy to follow.
+
+![Real Veil session: Alex writes a shared checklist and Sam adds a line from another app instance](docs/media/write-together.gif)
+
+### Keep your notes close
+
+The overlay shows the same live document in a separate window. Move it, resize it, choose your font size and opacity, and keep it on top of other apps. Turn on click-through when you want to interact with the window underneath.
+
+<img src="docs/media/live-overlay.gif" alt="The real Veil overlay displaying the shared notes while its font size changes" width="640" />
+
+[View the overlay screenshot](docs/media/overlay.png).
+
+<details>
+<summary>See the overlay controls</summary>
+
+![Veil Overlay settings: opacity, font size, always on top, click-through, and recovery controls](docs/media/overlay-settings.png)
+
+</details>
+
+| Make it yours           | What you can do                                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| A document in seconds   | Write locally without setting up a server.                                                                |
+| A shared space          | Invite multiple participants with a reusable session link. There is no application-level participant cap. |
+| Notes that stay visible | Edit from the control panel or the movable, resizable overlay.                                            |
+| Your preferred look     | Choose light, dark, or system theme and save your overlay preferences on this device.                     |
+| Connections you control | Self-host the sharing server; peer connections use a direct path when available and TURN when needed.     |
+| Updates in the app      | Check for signed updates in Settings and choose the stable or beta channel.                               |
+
+## Get started
+
+1. [Download the latest Windows installer](https://github.com/ahmad-fatayerji/veil/releases/latest) and run the setup `.exe`. Veil supports Windows 10 and 11 on x64; the installer installs WebView2 if needed.
+2. Open Veil, enter an optional name, and choose **Create document**. You can start writing immediately.
+3. Choose **Show overlay** to keep your document in view. Customize it under **Settings → Overlay**.
+
+![Veil's welcome screen with Create document and Join session tabs](docs/media/welcome.png)
+
+### Invite your people
+
+The host needs a [self-hosted Veil server](https://github.com/ahmad-fatayerji/veil-server) with HTTPS and an operator-issued host credential. Configure it under **Settings → Hosting server**, then choose **Share → Copy link** and send the link to your guests.
+
+Guests install Veil, open the link (or paste it into **Join session**), enter a name, and join. They don't need to configure a server. Keep the host app open for the session to continue.
+
+### A few things to know
+
+- **Documents are temporary.** Copy anything you want to keep before closing a document, leaving a session, or quitting Veil.
+- Closing the main window moves Veil to the tray by default. Use **Quit Veil** in the tray menu to exit, or change the close behavior in Settings.
+- **Ctrl+Alt+V** restores interaction and brings back the control panel. **Ctrl+Alt+Shift+V** hides or shows the overlay.
+- Overlay capture exclusion works only with compatible capture methods. Test your recording or screen-sharing setup first; the control panel remains capturable. See [capture compatibility](docs/capture-compatibility.md).
+- Update packages are signed for Veil's updater. Windows SmartScreen may still show a warning because the installer does not currently have an Authenticode signature.
+
+## Build and contribute
+
+Veil is open source: this repository contains the desktop app, shared editor packages, installers, and release automation. Contributions start from `develop`; `main` contains approved release source.
+
+For local Windows development, install Node.js 22.12+, pnpm 10.30.1, Rust, the Visual Studio C++ build tools, and WebView2. Then:
 
 ```powershell
-pnpm install
+git clone https://github.com/ahmad-fatayerji/veil.git
+cd veil
+pnpm install --frozen-lockfile
 pnpm dev:desktop
 ```
 
-The desktop uses automatic P2P with self-hosted signaling and selective relay:
+[Project specification](PROJECT_SPEC.md) · [Architecture](docs/architecture.md) · [Testing](docs/testing.md) · [Networking](docs/automatic-networking.md) · [Releases](docs/releasing.md) · [Contributing workflow](AGENTS.md)
 
-1. An operator deploys [veil-server](https://github.com/ahmad-fatayerji/veil-server). The host enters the HTTPS server address and operator-issued credential once.
-2. Choose **Create document** to start writing immediately, including offline. Configure the hosting server and credential in **Settings > Hosting server** whenever you need sharing.
-3. Choose **Share > Copy link**. Missing setup opens Settings and resumes sharing after saving. The same reusable link admits multiple friends.
-4. Your friend installs Veil, opens or pastes the link, enters their name, and chooses **Join session**. Direct and relay connections are automatic; no guest server setup is needed.
-5. **Reset link** invalidates the old link; **Stop sharing** prevents new joins. Both retain existing collaborators. The host must stay open. Appearance, overlay, updates, and About are in Settings.
+Found a bug or have an idea? [Open an issue](https://github.com/ahmad-fatayerji/veil/issues) with the steps to reproduce it and your Veil version.
 
-Every connection tries direct/STUN first for six seconds, then requests TURN only if needed. A six-user session may have three direct friends and two relayed friends; healthy links remain independent. The displayed Direct/Relayed path comes from WebRTC statistics. No default third-party service or application participant cap is configured.
+## Star history
 
-Links last until sharing stops or the host session ends. **Closing/leaving discards the temporary document**, with confirmation for content. Reusable links require a server advertising `groupSharing: 1`; older single-use invitations can still be pasted into Join. Signaling outages keep healthy peer links running; local content remains visible if server registration ends. See [automatic networking](docs/automatic-networking.md) for security, deployment, recovery and validation boundaries. Existing manual/LAN infrastructure is debug regression tooling only; never expose its HTTP listener publicly.
+If Veil is useful to you, give the repository a star and help others discover it.
 
-## Run the local development spike
-
-From the repository root:
-
-```powershell
-pnpm install
-pnpm dev:host
-```
-
-In a second terminal:
-
-```powershell
-pnpm dev:web
-```
-
-Open **http://127.0.0.1:5173** in two browser windows. Enter different names and click **Join local session** in both. Write in either editor; both receive changes. Each collaborator has a named cursor and colored text selection. The People panel shows who is typing, selecting text, in the document, or away. **Disconnect** pauses one replica; edit both independently, then **Reconnect** to merge missing updates. Browser BroadcastChannel synchronization is disabled, so all remote changes travel through the Rust host.
-
-Open **Settings > About** for app information and a link to developer [Ahmad Fatayerji](https://ahmadfatayerji.com). See the [development roadmap](docs/roadmap.md) for milestone progress.
-
-In a third terminal, optionally run the native shell:
-
-```powershell
-pnpm dev:desktop
-```
-
-The legacy native M2/manual UI is available only in debug acceptance runs with `VEIL_TEST_LEGACY=1`. Normal desktop sessions use automatic networking.
-
-## Use the Windows overlay
-
-Start `pnpm dev:desktop` or open `target/debug/veil-desktop.exe` after building it. Start a session, enter your name, and join it in the control panel.
-
-- Click **Show overlay**, then **Settings** to adjust opacity (20–100%), font size, always on top, and click-through.
-- Write directly in the overlay or control-panel editor. Both show the same live document and share one participant identity. Browser collaborators receive edits, cursors, and selections from either window.
-- Drag the overlay header to move it. Drag an edge or corner to resize. **Reset position & size** returns it to a reachable default position.
-- **Ctrl+Alt+V** disables click-through, shows the overlay, and restores the control panel. **Ctrl+Alt+Shift+V** hides or shows the overlay globally.
-- If the recovery shortcut is already in use, click-through is disabled. The control panel can always show/hide the overlay.
-- Bounds, appearance, visibility, and click-through are saved locally in `%APPDATA%/dev.veil.desktop/overlay.json`; they never enter the shared document. Removed monitors are handled by fitting saved bounds into an available work area.
-- Closing the control panel exits both windows and saves preferences.
-- **Settings → Exclude overlay from compatible captures** opts into best-effort Windows capture exclusion (Windows 10 version 2004 or later). The native status confirms the setting, not every recording/sharing tool. The control panel remains capturable. Use **Capture compatibility test** to compare a local test card in your actual output with exclusion off/on; see the [compatibility matrix and procedure](docs/capture-compatibility.md).
-
-The overlay has no formatting toolbar or remote cursor decorations. Turn off **Click-through** to edit; enable it to let clicks reach the app underneath. Before joining, it explains how to open the control panel. See [overlay architecture and verification](docs/overlay.md).
-
-The standalone M0 demo binds only **127.0.0.1:4444** and keeps its fixed development room and trusted-origin credential bootstrap. The embedded M2 host uses port **4445** by default, fresh sessions, and invitation authentication. Its router never exposes the M0 bootstrap.
-
-## Check and test
-
-```powershell
-pnpm build
-cargo build -p veil-host
-pnpm check
-pnpm test
-pnpm exec playwright install chromium
-pnpm test:e2e
-pnpm --filter @veil/desktop tauri build --debug --no-bundle
-pnpm test:overlay
-pnpm test:host
-pnpm test:peer
-pnpm test:installer
-```
-
-`test:e2e` starts missing host and browser dev servers; locally it reuses servers already running on ports 4444 and 5173. Use an expendable demo session: tests replace its document. CI always starts fresh servers. Independent Chromium contexts verify simultaneous inserts, concurrent offline edits, reconnect convergence, late joins, awareness removal, authentication, named cursors, selections, activity, and the About developer credit. `pnpm format` formats the repository.
-
-`test:overlay` requires an interactive Windows desktop and a freshly built desktop debug executable. Close other Veil instances; leave ports 4445/9223/9224 free, and avoid moving the mouse during the test. It starts an embedded session through the real control panel and joins through the bundled browser editor. It uses actual WebView2 windows, OS input, a Chromium collaborator, and a separate test application. Preferences and screenshots are isolated under `target/overlay-acceptance`; normal settings are untouched.
-
-`test:host` uses real Tauri/WebView2 controls and Chromium to check bind failure recovery, hosting, authentication, bundled assets, live updates, presence, stop/restart and invitation rotation. Close other Veil instances and leave ports 4445/9225 free. Artifacts are isolated under `target/host-acceptance`. Optionally set `$env:VEIL_TEST_LAN_ADDRESS = '192.168.1.20'` to this PC's real private IPv4 address before running it. That exercises the private interface on this PC; a second physical device remains manual. Both native scripts run separately from hosted CI.
-
-## Layout and status
-
-Run the Tauri debug build **after Cargo tests and before native acceptance scripts**. Cargo integration tests can replace `target/debug/veil-desktop.exe` with a development-server build. Rebuilding with the Tauri CLI restores the embedded-assets test executable.
-
-Use `pnpm package:windows` to build the production NSIS installer and updater signature. Gitflow branches, required CI, reviewed version proposals, beta/stable publication, private key backup and update safety are documented in [releasing](docs/releasing.md). Source remote points to private `Veil-source`; public `veil` contains downloads only. Request betas explicitly; merging a finalized release PR approves stable publication. App updates offers separate stable and beta channels.
-
-`test:peer` launches three real desktop/WebView2 peers with isolated profiles. It requires a freshly built debug executable and free ports 9231–9233. It checks credential rejection, direct transport, fragmented updates, offline merge after fresh signaling, presence, P2P overlay editing and shutdown. Redacted screenshots are under `target/peer-acceptance`. This native script runs separately from hosted CI; internet and TURN checks remain manual.
-
-- `apps/desktop`: Tauri 2 control-window shell and Vite frontend.
-- `apps/web`: browser demo frontend.
-- `packages/editor`, `collaboration`, `protocol`, `ui`: shared client code.
-- `packages/host`: reusable Axum/Tokio/Yrs host library and loopback-only M0 demo. Browser assets are compiled into the library after `pnpm build`. A bare Cargo build can compile without assets, but embedded hosting then reports an error until browser assets are built and Rust is rebuilt.
-- `docs`: architecture, security boundaries, networking, and test notes.
-
-See [architecture](docs/architecture.md) for the protocol decision and [testing](docs/testing.md) for verification. Durable documents and permissions remain later work; different-network/relay and broader capture-mode acceptance are still needed. M6 installers and signed updates are available for testing; clean-VM acceptance remains manual.
+[**View Veil on Star History →**](https://www.star-history.com/?repos=ahmad-fatayerji%2Fveil&type=date&legend=top-left)
 
 ## License
 
-Veil is licensed under the [MIT license](LICENSE). Third-party dependencies retain their own licenses and notices. Source, installers, and updates are being consolidated into [ahmad-fatayerji/veil](https://github.com/ahmad-fatayerji/veil); see [the migration procedure](docs/repository-consolidation.md).
+[MIT](LICENSE) © Ahmad Fatayerji. Free to use, modify, and distribute, including commercially, with the copyright and license notice retained.
+
+Made by [Ahmad Fatayerji](https://ahmadfatayerji.com).
