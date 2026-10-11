@@ -55,7 +55,7 @@ Linux jobs pin `ubuntu-24.04` rather than following `ubuntu-latest` image migrat
 
 Each Windows job uploads Cargo HTML timing reports and `build-diagnostics/environment.json`, including cache-hit status, source SHA, toolchain and runner details. An exact cache miss can still restore a compatible fallback cache. Use the GitHub step durations to compare cache restore/save overhead as well as compilation; timing artifacts are retained for seven days.
 
-Baseline: [the last legacy release run](https://github.com/ahmad-fatayerji/veil/actions/runs/37902133850) took 29m 27s, including 11m 31s of optimized Rust compilation and 3m 24s saving a 1.11 GB compressed Rust cache. Its Rust cache restore reported no cache found. The new workflow's cold/warm hosted durations and end-to-end GitHub publication remain pending until actual runs; no new version is published solely for benchmarking.
+Baseline: [the last legacy release run](https://github.com/ahmad-fatayerji/Veil-source/actions/runs/37902133850) took 29m 27s, including 11m 31s of optimized Rust compilation and 3m 24s saving a 1.11 GB compressed Rust cache. Its Rust cache restore reported no cache found. The new workflow's cold/warm hosted durations and end-to-end GitHub publication remain pending until actual runs; no new version is published solely for benchmarking.
 
 ## Prepare and test a release
 
