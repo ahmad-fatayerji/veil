@@ -1,5 +1,13 @@
 # Verification record
 
+## Custom overlay hide/show shortcut - 11 October 2026
+
+Settings now records a device-local global hide/show shortcut, supports Escape cancellation and reset to Ctrl+Alt+Shift+V, and reports unavailable bindings. Legacy preferences retain the default. Native validation reserves Ctrl+Alt+V for recovery, restricts changes to the control panel, and acquires replacements before releasing the current shortcut so registration collisions preserve it.
+
+`pnpm check`, production frontend builds and the Windows debug build passed. `pnpm test` passed 27 TypeScript and 26 Rust tests; two signed-installer artifact tests were intentionally ignored. The debug executable was rebuilt after Cargo tests. Focused Windows 10.0.26300 / WebView2 acceptance passed UI recording/cancellation/reset, real global hide/show with an independent WinForms app's keyboard focus verified after an actual click, removal of the old binding, restart persistence and global activation, fixed recovery from click-through, overlay-command rejection, reserved recovery rejection, startup collision status, replacement of an unavailable startup binding, and collision rejection preserving the working binding. No JavaScript errors occurred. The settings screenshot was visually inspected. Evidence: `target/overlay-acceptance/run-uP0EQu/`; the focused fixture is retained locally at `target/keybind-acceptance.mjs`.
+
+Two full `pnpm test:overlay` attempts stopped before the new shortcut checks at the existing continuous native slider-drag assertions (font size, then opacity). The focused run does not verify the full document, compositor, drag/resize or slider matrix. Its foreground fixture uses a real click because Windows can refuse the helper's SetForegroundWindow request. The test-only foreground refinement passed ESLint and formatting validation. The known WebView2 window-class cleanup diagnostic appeared on clean exit. Non-Windows behavior and additional keyboard layouts remain unverified. No release was published.
+
 ## General settings quit cleanup ? 11 October 2026
 
 General no longer shows the standalone **Quit Veil** button or its explanatory line. The existing native **Quit app** close path exits immediately without a confirmation, including with a temporary document and visible overlay. Default tray behavior and tray quit confirmation remain unchanged.

@@ -559,7 +559,16 @@ try {
     async () => (await snapshot(main)).settings.hideShortcut === 'Ctrl+Shift+H',
     'custom binding saved',
   );
-  native('Focus', {}, 'main', underlay.pid);
+  native('Raise', {}, 'main', underlay.pid);
+  const shortcutSurface = native('Probe', {}, 'main', underlay.pid);
+  native('Click', {
+    X: shortcutSurface.clientX + shortcutSurface.width - 50,
+    Y: shortcutSurface.clientY + shortcutSurface.height - 80,
+  });
+  await waitFor(
+    () => native('Probe', {}, 'main', underlay.pid).foreground,
+    'independent app focused for custom shortcut',
+  );
   native('CustomToggle');
   await waitFor(
     async () => !(await snapshot(main)).settings.visible,
