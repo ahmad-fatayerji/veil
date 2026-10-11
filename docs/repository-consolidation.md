@@ -43,3 +43,17 @@ The final history scan included merge resolutions (`--all --full-history -m`); e
 The existing signing identity was copied securely to the unified publisher. Private publication workflows were disabled before public publication was enabled. Signing credentials remain limited to publication jobs, and unsigned PR/build validation receives none. Private Git bundles, asset copies, inventories, preferences and native evidence remain outside all checkouts.
 
 At the user's request, installed upgrade acceptance uses this Windows machine; no Windows VM is used. Clean-install and direct stable-to-stable acceptance remain unverified. Hosted CI and an unsigned production build do not establish those results.
+
+### Installed beta acceptance
+
+[Beta publication](https://github.com/ahmad-fatayerji/veil/actions/runs/38114918915) produced `0.4.0-beta.1` from `e032f09a882bf6a61fde58c9fc0ab885f725f9cf`. An initial draft-discovery delay stopped upload safely; retrying the failed job reused the successful unsigned build. A further publication retry preserved all six published asset IDs, sizes, SHA-256 digests and download URLs. Feed PR [#4](https://github.com/ahmad-fatayerji/veil/pull/4) passed its gate and merged through Gitflow; it did not trigger app publication.
+
+On this Windows machine, the registered per-user `0.3.0` installation upgraded through the unchanged public beta endpoint to signed `0.4.0-beta.1`, relaunched and confirmed successful completion. Opacity, font size, always-on-top, click-through and capture-exclusion preferences were retained. Installation was rejected while a document was active. Preferences and screenshot evidence were backed up privately. The publisher's packaged-installer verifier also passed valid-package verification and tamper rejection.
+
+### Stable acceptance
+
+Finalized release PR [#2](https://github.com/ahmad-fatayerji/veil/pull/2) passed its protected CI gate and merged at `86b842f3b72d8a389cbd71a70347ba75838fb580`. [Stable publication](https://github.com/ahmad-fatayerji/veil/actions/runs/38116982042) validated that exact source, compiled the final production executable, and published signed `0.4.0`. Its initial new-draft discovery also required a failed-job retry; the original build and reserved source/version were retained. Published package verification and tamper rejection passed.
+
+The existing `0.4.0-beta.1` installation upgraded through the unchanged stable `releases/latest/download/latest.json` endpoint to `0.4.0`, relaunched and confirmed completion, retained the checked overlay preferences, and again refused installation during an active document. The test first refused to launch while the user had Veil running; it resumed only after the user confirmed quitting. No user document was interrupted. Original releases, tag objects and asset identities/checksums still matched the migration snapshot after stable publication.
+
+A feed PR browser run timed out on the reconnect test's expected text prefix. The trace showed `offline-B` had been inserted before the seed despite the test's `Control+End` shortcut; both replicas converged to the same content. The same code passed the independent exact-head run and final release validation. The acceptance test now uses its existing focused DOM append helper for both offline edits, preserving the deletion, convergence, offline-content and late-join assertions while removing reliance on cross-window keyboard focus.

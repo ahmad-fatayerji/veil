@@ -69,12 +69,10 @@ test('two independent browser clients converge after simultaneous edits, deletes
     // Both replicas now edit the same original text independently.
     await deleteCharacter(first, a, 0);
     await expect(a).toHaveText(/^hared seed/);
-    await first.keyboard.press('Control+End');
-    await first.keyboard.insertText(' offline-A');
+    await append(a, ' offline-A');
     await deleteCharacter(second, b, 1);
     await expect(b).toHaveText(/^sared seed/);
-    await second.keyboard.press('Control+End');
-    await second.keyboard.insertText(' offline-B');
+    await append(b, ' offline-B');
     await Promise.all([
       first.getByRole('button', { name: 'Reconnect' }).click(),
       second.getByRole('button', { name: 'Reconnect' }).click(),
