@@ -34,7 +34,7 @@ Windows overlay header and edge gestures update the overlay HWND directly rather
 
 Results are specific to the recorded machine/tool/mode. Untested rows are not supported-mode claims.
 
-11 October 2026 moving-window regression: FFmpeg 7.1 GDI and DXGI captures on Windows 10.0.26300 excluded the card during held header/corner gestures, with the underlying app visible and no outline across the captured overlay perimeter. Windows full-window dragging was disabled for each fixture gesture and its prior value restored afterwards. Evidence: `target/capture-acceptance/run-6oEpHh/`. These results do not extend the earlier OBS observations to moving-window capture or remote viewers.
+11 October 2026 moving-window regression: FFmpeg 7.1 GDI and DXGI captures on Windows 10.0.26300 excluded the card during held header/corner gestures, with the underlying app visible and no outline across the captured overlay perimeter. Windows full-window dragging was disabled for each fixture gesture and its prior value restored afterwards. Evidence: `target/capture-acceptance/run-pfT6CH/`. These results do not extend the earlier OBS observations to moving-window capture or remote viewers.
 
 | Tool / mode                                            | Windows / tool version          | Off baseline | On output                        | Status / evidence                                              |
 | ------------------------------------------------------ | ------------------------------- | ------------ | -------------------------------- | -------------------------------------------------------------- |

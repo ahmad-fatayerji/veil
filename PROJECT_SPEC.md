@@ -91,7 +91,7 @@ honestly. See [overlay behavior](docs/overlay.md) and
 Public `ahmad-fatayerji/veil` contains MIT source, installers, and update metadata.
 Retain copyright and third-party notices, audited history, existing release tags,
 published assets, download URLs, updater endpoints, and signing identity. The
-migration is complete and the private source repository is archived as a fallback.
+migration is complete; all development and release work uses this repository.
 Never publish unaudited private material or signing credentials.
 
 `develop` is the default branch for ordinary work; `main` holds approved release
