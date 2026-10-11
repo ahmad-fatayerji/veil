@@ -539,18 +539,18 @@ export function AutomaticApp() {
         )}
         <footer className="desktop-footer">
           <button
-            className="quiet-button settings-button"
+            className="desktop-settings-button"
             aria-label="Settings"
             title="Settings"
             onClick={() => openSettings()}
           >
             <svg
-              width="22"
-              height="22"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.5"
+              strokeWidth="1.75"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"

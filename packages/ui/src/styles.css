@@ -652,14 +652,28 @@ input::placeholder {
   justify-content: flex-end;
   padding: 12px 20px;
 }
-.settings-button {
+.desktop-settings-button {
+  appearance: none;
   display: grid;
   place-items: center;
   width: 44px;
   height: 44px;
   padding: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.desktop-settings-button:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.desktop-settings-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .update-success {
