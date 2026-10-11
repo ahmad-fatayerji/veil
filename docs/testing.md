@@ -1,5 +1,13 @@
 # Verification record
 
+## Overlay participant activity — 10 October 2026
+
+The overlay now receives sanitized participant snapshots through the existing desktop-only bridge and shows names, colors, typing, selecting, in-document and away activity in a compact strip. Opening the overlay retains one desktop identity; leaving clears the strip and participant departure removes the corresponding entry.
+
+`pnpm check`, `pnpm test` (18 TypeScript and 24 Rust tests, with two packaged-artifact tests intentionally ignored) and both frontend builds passed. The debug executable was rebuilt after Cargo tests. Focused real Windows/WebView2 acceptance passed remote typing, idle transitions, selection and away activity, participant roster/departure cleanup, bidirectional editing, concurrent convergence, reconnect and leave/rejoin. The overlay screenshot was visually inspected. Evidence: `target/overlay-acceptance/run-l1g2bF/`.
+
+Two full `pnpm test:overlay` attempts stopped before the presence checks at the existing native slider-drag assertions (opacity, then font size). The focused run used keyboard setup for those sliders and stopped after document/presence acceptance; it does not verify the full native drag, compositor, click-through, shortcut or preference-restart matrix. The guest's away test explicitly focuses a browser control because native window activation cannot blur a headless Chromium editor. No release was published.
+
 ## Immediate window-close quit — 11 October 2026
 
 When **Quit app** is selected, the main window's close button now exits immediately without the quit confirmation, including with a temporary document and visible overlay. Settings/tray **Quit Veil** still confirms. Both paths save preferences and refuse to exit during update installation.

@@ -1,5 +1,5 @@
 import { invoke, useOverlay, errorMessage } from './api';
-import { useAppearance } from '@veil/ui';
+import { activityLabels, useAppearance } from '@veil/ui';
 import { SharedEditor } from '@veil/editor';
 import { useOverlayDocument } from './session';
 
@@ -66,6 +66,22 @@ export function OverlayWindow() {
           )}
         </div>
       </article>
+      {document.connection && !state?.captureTest && (
+        <ul className="overlay-participants" aria-label="Participants">
+          {document.participants.map((person) => (
+            <li key={person.id} data-participant-name={person.name}>
+              <span className="overlay-person-dot" style={{ backgroundColor: person.color }} />
+              <span className="overlay-person-name" title={person.name}>
+                {person.name}
+                {person.local && ' (you)'}
+              </span>
+              <span className={`participant-activity activity-${person.activity}`}>
+                {activityLabels[person.activity]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       {(error || document.error) && (
         <p role="alert" className="overlay-error">
           {error || document.error}

@@ -69,7 +69,7 @@ export function Dialog({
     </dialog>
   );
 }
-const activityLabels = {
+export const activityLabels = {
   typing: 'Typing' + '\u2026',
   selecting: 'Selecting text',
   document: 'In document',
