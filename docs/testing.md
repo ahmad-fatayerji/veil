@@ -96,6 +96,14 @@ PR check selection and gate enforcement are implemented in `scripts/ci-plan.mjs`
 
 `VEIL_NETWORK_MODE=smoke pnpm test:network` checks one direct and one forced-relay guest, staged fallback, selected ICE paths, concurrent document convergence, presence, session cleanup and TURN allocation cleanup. Run again with `VEIL_TURN_TRANSPORT=tcp` for TURN TCP. Ordinary networking PRs run both transports. The default `pnpm test:network` retains the full six-peer handover/recovery/load/capacity/outage suite; nightly and release validation explicitly use `VEIL_NETWORK_MODE=full`. These are loopback/container tests, not real-internet acceptance.
 
+## Overlay defaults and slider verification - 10 October 2026
+
+Capture exclusion now defaults on for new preferences and legacy files without `captureExclusion`; explicitly saved on/off choices remain unchanged. Overlay range inputs no longer inherit text-field padding, borders or backgrounds, so the 100% opacity track fills to its endpoint. The native capture regression checks the default and slider layout; compositor acceptance explicitly disables capture exclusion before measuring overlay pixels.
+
+`pnpm check`, `pnpm build`, and `pnpm test` passed (18 TypeScript and 24 Rust tests, with two packaged-artifact tests intentionally ignored). The final full test run used `RUST_TEST_THREADS=1`; earlier runs encountered existing updater slow-download/cancellation timing failures while other builds were running. Focused overlay and host Rust tests also passed. Browser and native WebView2 screenshots at 100% were visually inspected.
+
+After rebuilding the debug executable, `pnpm test:capture` passed the enabled default, native affinity, real GDI/DXGI exclusion output, administration isolation, style changes and saved on/off preferences across restart. Evidence: `target/capture-acceptance/run-lZTet8/`, including `opacity-100.png`. The existing installed Veil retained its recovery shortcut, so global shortcut/click-through activation and the full native overlay script were not rerun; control-panel recovery passed. Other capture modes and platform limitations remain as documented in [capture compatibility](capture-compatibility.md). No release was published.
+
 ## Create, Share, Join verification — 10 October 2026
 
 The desktop creates an offline temporary document before hosting, keeps configuration in Settings, and shares one reusable version-4 `veil://join/...` link. Browser and overlay share light/dark/System tokens and accessible dialogs. The compatible public server is coordinated in [server PR #3](https://github.com/ahmad-fatayerji/veil-server/pull/3).

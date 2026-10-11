@@ -1,10 +1,10 @@
 # M4 Windows capture compatibility
 
-Veil can request best-effort exclusion of its overlay from compatible Windows capture paths. This is an optional, local setting, off by default. It does not protect the control panel, prevent photographing the screen or certify every recorder/sharing tool. The overlay stays visible and editable on the local desktop. Test the output you intend to use before sharing sensitive content.
+Veil can request best-effort exclusion of its overlay from compatible Windows capture paths. This is an optional, local setting, on by default. It does not protect the control panel, prevent photographing the screen or certify every recorder/sharing tool. The overlay stays visible and editable on the local desktop. Test the output you intend to use before sharing sensitive content.
 
 ## Native behavior and status
 
-**Desktop overlay → Settings → Exclude overlay from compatible captures** saves `captureExclusion` with local overlay preferences. Old settings files load with this preference off. It never enters the shared document. The Rust Windows adapter uses the app-owned top-level overlay HWND with `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` and checks `GetWindowDisplayAffinity` against the requested value. Disabling requests and confirms `WDA_NONE`.
+**Desktop overlay → Settings → Exclude overlay from compatible captures** saves `captureExclusion` with local overlay preferences. New settings and old files without this preference default to on. An explicitly saved on/off choice is preserved. It never enters the shared document. The Rust Windows adapter uses the app-owned top-level overlay HWND with `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` and checks `GetWindowDisplayAffinity` against the requested value. Disabling requests and confirms `WDA_NONE`.
 
 The adapter checks the actual Windows version using `RtlGetVersion` and requires Windows 10 build 19041 (version 2004) or newer and active DWM composition. Older Windows is unsupported; it does not silently fall back to `WDA_MONITOR`, which can produce a black window in captures. macOS/Linux report unsupported. A failed capability query reports unknown. These platform fallbacks have unit/design coverage rather than runtime acceptance on old/non-Windows machines.
 

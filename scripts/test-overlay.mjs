@@ -180,6 +180,12 @@ try {
     .getByRole('region', { name: 'Overlay controls' })
     .getByRole('button', { name: 'Settings', exact: true })
     .click();
+  // Compositor pixel checks need the overlay included in screenshots.
+  await main.getByLabel('Exclude overlay from compatible captures', { exact: true }).uncheck();
+  await waitFor(
+    async () => !(await snapshot(main)).settings.captureExclusion,
+    'capture exclusion disabled for compositor checks',
+  );
   await dragRange(main, 'Opacity');
   await waitFor(async () => (await snapshot(main)).settings.opacity === 1, 'drag opacity saved');
   assert.equal(native('Probe').alpha, 255);
