@@ -1,5 +1,25 @@
 # Verification record
 
+## Normal cursor with local gesture hints — 11 October 2026
+
+With the saved capture-exclusion preference on, overlay move/resize handles use the normal arrow and show a compact Move/Resize direction badge inside the header. Active gestures take precedence over hover and retain the arrow over document content. Gesture completion/errors clear active state; native window-focus events supplement browser blur, and hiding/click-through clear hover. Handles prevent browser selection/drag-and-drop so repeated resizing cannot start a separate forbidden drag cursor. Idle editing and exclusion-off cursors remain ordinary. No global cursor settings or production native command interfaces changed.
+
+`pnpm check`, `pnpm test` (24 TypeScript and 25 Rust tests passed; two signed-package tests intentionally ignored), production frontend builds and the debug Windows build passed. The executable was rebuilt after Cargo tests. Full `pnpm test:capture` passed on Windows 10.0.26300 / FFmpeg 7.1. Actual `GetCursorInfo` probes verified header movement, all eight resize handles, hover hints, active precedence, completion, Escape, native focus loss, a real concurrent-gesture rejection, click-through/recovery and ordinary off/idle cursors. Cursor assertions compare Windows resource handles and respect the current system cursor theme. Editing synchronized with the control panel, including after resizing. The minimum-size header image was inspected; the badge fits without covering document text.
+
+GDI and DXGI both recorded with cursor capture enabled. During held movement and resizing, the arrow remained visible, test-card pixels were absent, the badge region showed only the underlying app, and no outline appeared across the overlay perimeter. Captured images were inspected. Affinity, authorization, appearance, hide/show and saved preference restart also passed. Evidence: `target/capture-acceptance/run-gUwawu/`, including `cursor-results.json`, capture frames/metrics and `header-hint-minimum-size.png`.
+
+Earlier runs exposed the browser drag cursor, missing browser blur during owned-window focus changes, and probes targeting scrolled-out editor coordinates; the final implementation/fixture addresses each. Moving-window OBS/Teams/Discord, multiple monitors/DPI and non-Windows runtime behavior remain unverified. No merge or release was performed.
+
+## Capture-excluded overlay movement — 11 October 2026
+
+Windows overlay header and edge gestures now update the owned HWND without the system move/size loop or its separate capture-visible outline/snap preview. The native sizing border is disabled on Windows; the overlay's visible resize handles still work. Updates are posted to the UI thread so input polling can observe release and focus loss promptly. Escape restores starting bounds, and resizing preserves the scaled minimum size. The app does not change Windows' full-window dragging preference.
+
+`pnpm check`, `pnpm test` (24 TypeScript and 25 Rust tests; two packaged-installer tests intentionally ignored), production frontend builds and the debug Windows build passed. After merging current canonical develop, checks/tests/builds and native capture acceptance passed again; all 29 release-tool tests also passed. The debug executable was rebuilt after Cargo tests. Focused overlay Rust tests cover movement, all eight resize directions, opposite-edge anchoring, minimum size at non-default scale and negative monitor coordinates.
+
+`pnpm test:capture` passed on Windows/WebView2 with FFmpeg GDI and DXGI capture. With Windows full-window dragging temporarily disabled by the fixture, real header/corner gestures changed native bounds before mouse release, retained affinity `0x11`, excluded the test card and showed the underlying app across the captured perimeter without an outline. Screenshots were visually inspected. The fixture restored the previous Windows setting after each gesture. Affinity, authorization, appearance changes, click-through/recovery, hide/show, preference restart and the temporary test-card lifecycle also passed. Evidence: `target/capture-acceptance/run-pfT6CH/`.
+
+Earlier attempts stopped on foreground/z-order contention and pointer/position timing; the fixture now raises the test window before input and lets repositioning settle. The final run acquired the global shortcuts. This task did not rerun the full document/slider overlay suite. Moving-window OBS, Teams/Discord remote viewers, multiple monitors/DPI and non-Windows runtime behavior remain unverified. No release was published.
+
 ## Overlay participant activity — 10 October 2026
 
 The overlay now receives sanitized participant snapshots through the existing desktop-only bridge and shows names, colors, typing, selecting, in-document and away activity in a compact strip. Opening the overlay retains one desktop identity; leaving clears the strip and participant departure removes the corresponding entry.
@@ -154,7 +174,7 @@ Unverified acceptance: unrelated physical Windows PCs, public HTTPS certificate 
 
 ## M6 stable 0.2.0 publication verification — 9 October 2026
 
-[Release workflow 37919381077](https://github.com/ahmad-fatayerji/Veil-source/actions/runs/37919381077) validated and compiled exact merged source `7b5e2513216915b295eb29a4e219d1be9035886a`. The signing job restored the same-run executable artifact, checked its provenance, bundled without recompiling the desktop, and passed real installer signature/version/tamper verification. The first publication attempt stopped on a draft release-by-tag 404 after uploading its assets. Before manual publication, all six downloaded draft assets were verified byte-for-byte against the signed workflow artifact, the private source tag, reviewed notes and checksums. The downloaded installer also passed signature and tamper verification locally. The same-run failed-job retry then completed successfully, retained the originally published assets and advanced the beta feed.
+[Release workflow 37919381077](https://github.com/ahmad-fatayerji/Veil-source/actions/runs/37919381077) validated and compiled exact merged source `7b5e2513216915b295eb29a4e219d1be9035886a`. The signing job restored the same-run executable artifact, checked its provenance, bundled without recompiling the desktop, and passed real installer signature/version/tamper verification. The first publication attempt stopped on a draft release-by-tag 404 after uploading its assets. Before manual publication, all six downloaded draft assets were verified byte-for-byte against the signed workflow artifact, the legacy source tag, reviewed notes and checksums. The downloaded installer also passed signature and tamper verification locally. The same-run failed-job retry then completed successfully, retained the originally published assets and advanced the beta feed.
 
 Public `v0.2.0` is the latest stable release. Both fixed HTTPS updater endpoints returned `0.2.0`; the unauthenticated public installer download matched SHA-256 `7c9678ca42adab8a4e41b676a8af950688f0ac4d888ab84fd524e2918b841e63`. Evidence: `target/release-acceptance/0.2.0/`. A real installed-client upgrade to 0.2.0, beta-to-stable installation, clean Windows VM, WebView2 bootstrap, SmartScreen and different-network P2P remain separate native acceptance. This publication verified an actual draft failure and recovery, but did not establish that every future automation path is covered.
 
@@ -168,7 +188,7 @@ Hosted cold/warm performance, same-run GitHub artifact transfer/retry and end-to
 
 ## M6 distribution verification — 9 October 2026
 
-Production Windows x64 NSIS installers and mandatory updater signatures built successfully. The public distribution repository is `ahmad-fatayerji/veil`; source remains private at `ahmad-fatayerji/Veil-source`. Version 0.1.0 and 0.1.1 have public release assets and HTTPS update metadata.
+Production Windows x64 NSIS installers and mandatory updater signatures built successfully. These releases used separate source and distribution repositories; source, installers and updates now live in public `ahmad-fatayerji/veil`. Version 0.1.0 and 0.1.1 have public release assets and HTTPS update metadata.
 
 `pnpm test:installer` verified actual per-user installation to a temporary path, installed production editor/overlay, native rejection of updater administration from the overlay, refusal to install during a peer document session, clean close, maintenance reinstall and retained opacity/font preferences. Original device preferences were restored and the temporary app uninstalled. Evidence: `target/installer-acceptance/run-2mAgB1`.
 
@@ -176,7 +196,7 @@ Production Windows x64 NSIS installers and mandatory updater signatures built su
 
 The ignored artifact test was explicitly run against both actual setup packages using `VEIL_TEST_INSTALLER`: the embedded public key verifies the real signature/version, and changing one installer byte causes signature verification failure. It requires packaged artifacts and is intentionally separate from ordinary unit tests. Native P2P acceptance passed again after updater/session tracking changes (`target/peer-acceptance/run-KALkRl`). Nine TypeScript and ten Rust unit tests passed; all four browser regressions passed. A clean Windows VM, absent-WebView2 bootstrap, Authenticode/SmartScreen trust, real different-network P2P and TURN remain unverified. No document persistence or recovery across updates is claimed.
 
-The source release workflow builds and creates drafts in the public repository, refuses overwriting published versions, and requires a token scoped to the public release repository. Signing secrets are stored in the private source repository. GitHub Actions execution is recorded separately from local validation.
+The source release workflow builds and creates drafts in the public repository, refuses overwriting published versions, and requires a token scoped to the public release repository. Signing secrets were scoped to the legacy publisher; they now remain limited to publication jobs in the unified repository. GitHub Actions execution is recorded separately from local validation.
 
 ## P1 peer transport verification — 9 October 2026
 

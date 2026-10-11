@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke, useOverlay, errorMessage } from './api';
 import { activityLabels, useAppearance } from '@veil/ui';
 import { SharedEditor } from '@veil/editor';
@@ -13,25 +15,80 @@ const directions = [
   'southEast',
   'southWest',
 ] as const;
+type Handle = (typeof directions)[number] | 'move';
+const hints: Record<Handle, string> = {
+  move: 'Move',
+  north: 'Resize ↕',
+  south: 'Resize ↕',
+  east: 'Resize ↔',
+  west: 'Resize ↔',
+  northEast: 'Resize ↗',
+  southWest: 'Resize ↗',
+  northWest: 'Resize ↘',
+  southEast: 'Resize ↘',
+};
 
 export function OverlayWindow() {
   useAppearance();
   const { state, error, setError } = useOverlay();
   const document = useOverlayDocument();
-  const gesture = (direction: string | null) => {
-    void invoke('overlay_gesture', { direction }).catch((failure: unknown) =>
-      setError(errorMessage(failure)),
-    );
+  const [hovered, setHovered] = useState<Handle | null>(null);
+  const [active, setActive] = useState<Handle | null>(null);
+  const gesturePending = useRef(false);
+  const interactive = !!state?.settings.visible && !state.settings.clickThrough;
+  const excluded = !!state?.settings.captureExclusion;
+  const [wasInteractive, setWasInteractive] = useState(interactive);
+  if (wasInteractive !== interactive) {
+    setWasInteractive(interactive);
+    setHovered(null);
+  }
+  useEffect(() => {
+    let listening = true;
+    const clearHover = () => {
+      if (listening) setHovered(null);
+    };
+    const nativeFocus = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (!focused) clearHover();
+    });
+    void nativeFocus.catch((failure: unknown) => {
+      if (listening) setError(errorMessage(failure));
+    });
+    window.addEventListener('blur', clearHover);
+    return () => {
+      listening = false;
+      window.removeEventListener('blur', clearHover);
+      void nativeFocus.then((unlisten) => unlisten()).catch(() => {});
+    };
+  }, [setError]);
+  const hint = excluded && interactive ? (active ?? hovered) : null;
+  const gesture = (handle: Handle) => {
+    if (!interactive || gesturePending.current) return;
+    gesturePending.current = true;
+    setActive(handle);
+    void invoke('overlay_gesture', { direction: handle === 'move' ? null : handle })
+      .catch((failure: unknown) => setError(errorMessage(failure)))
+      .finally(() => {
+        gesturePending.current = false;
+        setActive(null);
+      });
   };
   return (
     <main
-      className={`overlay-surface ${state?.settings.clickThrough ? 'is-click-through' : ''}`}
+      className={`overlay-surface ${state?.settings.clickThrough ? 'is-click-through' : ''} ${excluded ? 'is-capture-excluded' : ''} ${active && interactive ? 'is-gesturing' : ''}`}
       style={{ fontSize: `${state?.settings.fontSize ?? 20}px` }}
+      onDragStart={(event) => {
+        if (gesturePending.current) event.preventDefault();
+      }}
     >
       <header
         className="overlay-drag-handle"
+        onPointerEnter={() => setHovered('move')}
+        onPointerLeave={() => setHovered(null)}
         onPointerDown={(event) => {
-          if (event.button === 0) gesture(null);
+          if (event.button === 0) {
+            event.preventDefault();
+            gesture('move');
+          }
         }}
       >
         <span>
@@ -40,7 +97,11 @@ export function OverlayWindow() {
             {state?.settings.clickThrough ? 'click-through' : 'document'}
           </span>
         </span>
-        <span className="overlay-recovery-hint">Ctrl+Alt+V to restore controls</span>
+        {hint ? (
+          <span className="overlay-gesture-hint">{hints[hint]}</span>
+        ) : (
+          <span className="overlay-recovery-hint">Ctrl+Alt+V to restore controls</span>
+        )}
       </header>
       <article className="overlay-document" aria-label="Overlay document">
         {state?.captureTest && (
@@ -93,8 +154,13 @@ export function OverlayWindow() {
             key={direction}
             className={`overlay-resize overlay-resize-${direction}`}
             aria-hidden="true"
+            onPointerEnter={() => setHovered(direction)}
+            onPointerLeave={() => setHovered(null)}
             onPointerDown={(event) => {
-              if (event.button === 0) gesture(direction);
+              if (event.button === 0) {
+                event.preventDefault();
+                gesture(direction);
+              }
             }}
           />
         ))}

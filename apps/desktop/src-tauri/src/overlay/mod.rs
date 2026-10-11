@@ -13,7 +13,6 @@ use tauri::{
     WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-use tauri_runtime::ResizeDirection;
 
 const OVERLAY: &str = "overlay";
 
@@ -260,7 +259,9 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             .decorations(false)
             .transparent(capabilities.transparency)
             .shadow(false)
-            .resizable(true)
+            // Windows gestures use our handles and direct HWND updates. A native
+            // sizing border could still enter the capture-leaking modal loop.
+            .resizable(!cfg!(windows))
             .always_on_top(preferences.always_on_top && capabilities.always_on_top)
             .min_inner_size(280.0, 180.0)
             .visible(false)
@@ -562,7 +563,7 @@ pub fn overlay_reset_position(
 }
 
 #[tauri::command]
-pub fn overlay_gesture(
+pub async fn overlay_gesture(
     caller: WebviewWindow,
     direction: Option<String>,
 ) -> Result<(), OverlayError> {
@@ -573,15 +574,15 @@ pub fn overlay_gesture(
         ));
     }
     let direction = match direction.as_deref() {
-        None => return caller.start_dragging().map_err(OverlayError::native),
-        Some("north") => ResizeDirection::North,
-        Some("south") => ResizeDirection::South,
-        Some("east") => ResizeDirection::East,
-        Some("west") => ResizeDirection::West,
-        Some("northEast") => ResizeDirection::NorthEast,
-        Some("northWest") => ResizeDirection::NorthWest,
-        Some("southEast") => ResizeDirection::SouthEast,
-        Some("southWest") => ResizeDirection::SouthWest,
+        None => None,
+        Some("north") => Some(tauri_runtime::ResizeDirection::North),
+        Some("south") => Some(tauri_runtime::ResizeDirection::South),
+        Some("east") => Some(tauri_runtime::ResizeDirection::East),
+        Some("west") => Some(tauri_runtime::ResizeDirection::West),
+        Some("northEast") => Some(tauri_runtime::ResizeDirection::NorthEast),
+        Some("northWest") => Some(tauri_runtime::ResizeDirection::NorthWest),
+        Some("southEast") => Some(tauri_runtime::ResizeDirection::SouthEast),
+        Some("southWest") => Some(tauri_runtime::ResizeDirection::SouthWest),
         _ => {
             return Err(OverlayError::new(
                 "INVALID_DIRECTION",
@@ -589,11 +590,7 @@ pub fn overlay_gesture(
             ))
         }
     };
-    caller
-        .as_ref()
-        .window()
-        .start_resize_dragging(direction)
-        .map_err(OverlayError::native)
+    platform::gesture(caller, direction).await
 }
 
 #[cfg(test)]
