@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { version as appVersion } from '../../package.json';
 
 async function join(page: Page, name: string) {
   await page.goto('/');
@@ -60,30 +61,25 @@ test('remote cursors, selections, and activity follow their author and clear on 
   }
 });
 
-test('roadmap states the built editor and overlay, built hosting, and remaining milestones', async ({
-  page,
-}) => {
+test('About credits the developer and Settings closes with Escape', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('button', { name: 'Roadmap' }).click();
-  const dialog = page.getByRole('dialog', { name: "What's left to build" });
+  const dialog = page.getByRole('dialog', { name: 'Settings', exact: true });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('listitem')).toHaveCount(9);
-  await expect(
-    dialog.getByRole('listitem').filter({ hasText: 'Local collaboration' }),
-  ).toContainText('Built');
-  await expect(dialog.getByRole('listitem').filter({ hasText: 'Desktop overlay' })).toContainText(
-    'Built',
-  );
-  await expect(
-    dialog.getByRole('listitem').filter({ hasText: 'Host and invite friends' }),
-  ).toContainText('Built');
-  await expect(dialog).toContainText('Closing the host loses the document');
-  await page.screenshot({ path: test.info().outputPath('roadmap.png'), fullPage: true });
+  await expect(dialog).toContainText('Version ' + appVersion);
+  await expect(dialog).toContainText('Developed by Ahmad Fatayerji.');
+  await expect(dialog.getByRole('heading', { name: 'Developer', exact: true })).toHaveCount(0);
+  await expect(dialog).not.toContainText('Documents are temporary.');
+  await expect(dialog).not.toContainText('Documents live in memory.');
+  const website = dialog.getByRole('link', { name: 'ahmadfatayerji.com' });
+  await expect(website).toHaveAttribute('href', 'https://ahmadfatayerji.com');
+  await expect(website).toHaveAttribute('target', '_blank');
+  await expect(website).toHaveAttribute('rel', 'noopener noreferrer');
+  await expect(dialog.getByText('Roadmap', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('about.png'), fullPage: true });
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Roadmap', exact: true })).toBeFocused();
-  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: test.info().outputPath('mobile-join.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(

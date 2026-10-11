@@ -26,6 +26,7 @@ fn main() {
     }
     builder
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(hosting::Hosting::default())
         .manage(networking::Networking::default())
         .manage(updates::Updates::default())

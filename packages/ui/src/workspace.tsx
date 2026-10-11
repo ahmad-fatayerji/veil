@@ -1,7 +1,16 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type MouseEventHandler,
+} from 'react';
 import { readParticipants, type DemoConnection, type PeerSummary } from '@veil/collaboration';
 import { DOCUMENT_FRAGMENT } from '@veil/protocol';
 import veilIcon from './assets/veil-icon-small.png';
+import { version as appVersion } from '../../../package.json';
 export function Brand() {
   return (
     <span className="brand">
@@ -148,4 +157,24 @@ export function hasDocumentContent(connection: Pick<DemoConnection, 'doc'>) {
       .replace(/<[^>]*>/g, '')
       .trim().length > 0;
   return fragment.length > 0 && meaningful(fragment);
+}
+
+export function DeveloperCredit({ onVisit }: { onVisit?: MouseEventHandler<HTMLAnchorElement> }) {
+  return (
+    <div className="developer-credit">
+      <p>Developed by Ahmad Fatayerji.</p>
+      <a
+        href="https://ahmadfatayerji.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onVisit}
+      >
+        ahmadfatayerji.com
+      </a>
+    </div>
+  );
+}
+
+export function AppVersion() {
+  return <p>Version {appVersion}</p>;
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import {
   createPeerSession,
@@ -15,7 +16,8 @@ import {
   PeoplePanel,
   hasDocumentContent,
   useAppearance,
-  roadmap,
+  DeveloperCredit,
+  AppVersion,
   type Appearance,
 } from '@veil/ui';
 import { nativeSignaling } from './networking';
@@ -614,21 +616,15 @@ export function AutomaticApp() {
             </section>
             <section hidden={section !== 'About'}>
               <h3>About Veil</h3>
-              <p>A shared document, close at hand.</p>
-              <p>
-                Documents live in memory. Closing the host loses the document. Copy anything you
-                want to keep.
-              </p>
-              <h4>Roadmap</h4>
-              <ol className="about-roadmap">
-                {roadmap.map((m) => (
-                  <li key={m.id}>
-                    <strong>{m.title}</strong>
-                    <span className="muted">{m.status}</span>
-                    <p>{m.detail}</p>
-                  </li>
-                ))}
-              </ol>
+              <AppVersion />
+              <DeveloperCredit
+                onVisit={(event) => {
+                  event.preventDefault();
+                  void openUrl('https://ahmadfatayerji.com').catch((cause) => {
+                    setError(errorMessage(cause));
+                  });
+                }}
+              />
             </section>
             {notice && <p role="status">{notice}</p>}
             {error && (

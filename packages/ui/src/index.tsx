@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   connectDemo,
   readParticipants,
@@ -7,8 +7,7 @@ import {
 } from '@veil/collaboration';
 import { parseInvitation, type SessionTarget } from '@veil/protocol';
 import { SharedEditor } from '@veil/editor';
-import { roadmap } from './roadmap';
-import { Dialog, hasDocumentContent } from './workspace';
+import { AppVersion, DeveloperCredit, Dialog, hasDocumentContent } from './workspace';
 import { useAppearance, type Appearance } from './appearance';
 import veilIcon from './assets/veil-icon-small.png';
 
@@ -79,7 +78,6 @@ export function DemoApp({
   );
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [showPeople, setShowPeople] = useState(true);
-  const roadmapDialog = useRef<HTMLDialogElement>(null);
   const joining = joinRequest !== null;
 
   useEffect(() => {
@@ -391,15 +389,8 @@ export function DemoApp({
           <option value="dark">Dark</option>
         </select>
         <h3>About Veil</h3>
-        <p>Documents are temporary. Copy anything you want to keep before leaving.</p>
-        <button
-          className="secondary-button"
-          onClick={() => {
-            roadmapDialog.current?.showModal();
-          }}
-        >
-          Roadmap
-        </button>
+        <AppVersion />
+        <DeveloperCredit />
       </Dialog>
       <Dialog open={confirmLeave} title="Leave session?" onClose={() => setConfirmLeave(false)}>
         <p>This document is temporary. Copy any text you want to keep before leaving.</p>
@@ -418,45 +409,6 @@ export function DemoApp({
           </button>
         </div>
       </Dialog>
-      <dialog ref={roadmapDialog} className="roadmap-dialog" aria-labelledby="roadmap-title">
-        <div className="roadmap-heading">
-          <div>
-            <span className="overline">PROJECT STATUS</span>
-            <h2 id="roadmap-title">What's left to build</h2>
-          </div>
-          <button
-            className="icon-button"
-            aria-label="Close roadmap"
-            onClick={() => roadmapDialog.current?.close()}
-          >
-            ×
-          </button>
-        </div>
-        <p className="roadmap-intro">
-          Local collaboration, the Windows overlay, and hosting with LAN invitations are built.
-        </p>
-        <ol className="roadmap-list">
-          {roadmap.map((milestone) => (
-            <li key={milestone.id}>
-              <span className={`milestone-marker marker-${milestone.status.toLowerCase()}`}>
-                {milestone.id}
-              </span>
-              <div>
-                <div className="milestone-heading">
-                  <h3>{milestone.title}</h3>
-                  <span className={`milestone-status ${milestone.status.toLowerCase()}`}>
-                    {milestone.status}
-                  </span>
-                </div>
-                <p>{milestone.detail}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <p className="roadmap-note">
-          Start a session from the desktop control panel. Closing the host loses the document.
-        </p>
-      </dialog>
     </div>
   );
 }
