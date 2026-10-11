@@ -1,0 +1,11 @@
+{
+  "identifier": "repository-link",
+  "description": "The control panel can open Veil's canonical GitHub repository in the default browser.",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/ahmad-fatayerji/veil" }]
+    }
+  ]
+}
