@@ -1042,9 +1042,13 @@ p {
   background: color-mix(in srgb, var(--danger) 10%, var(--surface));
 }
 .repository-button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 20px;
+  text-align: left;
 }
 .repository-button svg {
   flex-shrink: 0;
