@@ -1,5 +1,7 @@
 # Veil repository rules
 
+- `ahmad-fatayerji/veil` is the canonical repository for source, issues, PRs, installers and update metadata. `ahmad-fatayerji/Veil-source` is obsolete, archived and read-only; do not target it for new work. Verify that `origin` points to `https://github.com/ahmad-fatayerji/veil.git` (or its SSH equivalent) before fetching, creating task worktrees or pushing.
+
 - Follow PROJECT_SPEC.md and keep each task focused on the user's requested scope. The former numbered milestone roadmap is retired; do not use it to promise features or infer release authorization.
 - Keep Windows-first native code isolated from shared React packages.
 - Participant capacity defaults to no application-level cap.
@@ -52,6 +54,6 @@ Write the PR body to a temporary file outside the checkout; `pr-body.md` above s
 - Feature merges do not publish installers. Do not manually bump application versions, create release tags, edit updater feeds, or publish assets during ordinary tasks. The release coordinator owns synchronized versions and release metadata.
 - Only perform release actions when requested. Follow [docs/releasing.md](docs/releasing.md): **Prepare release** proposes a draft; **Publish beta** explicitly requests a candidate; **Finalize release** removes the beta suffix and opens final review; merging the finalized release PR into `main` triggers stable publication. Draft candidates intentionally fail the stable merge policy until finalized.
 - Use **Back-merge main** and merge its PR with a merge commit after a stable release. Resolve conflicts while preserving both the released fixes and unreleased development work.
-- The authorized consolidation imports audited source into public `ahmad-fatayerji/veil` under MIT. `Veil-source` remains private until migration and upgrade acceptance finish. Never publish unaudited history or signing credentials, reuse a published version, or replace published assets. Do not request or print token/key values; use the existing Actions secrets.
+- Repository consolidation is complete. Public `ahmad-fatayerji/veil` contains audited MIT source and distribution assets; private `Veil-source` is only an archived historical fallback. Never publish unaudited private material or signing credentials, reuse a published version, or replace published assets. Do not request or print token/key values; use the existing Actions secrets.
 - `automation/update-feed-*` PRs into `main` change only `updates/beta.json`, require verified published assets and the CI gate, and merge with a merge commit. They never publish installers. The one-time `migration/source-import` route joins approved source and distribution history without publication.
 - Read `docs/releasing.md` before changing CI, release tooling, updater behavior or branch policy. In the handoff, include the branch/PR, validation results, and any remaining work; explicitly state if an authorized action published a release.
