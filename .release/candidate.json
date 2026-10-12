@@ -1,6 +1,6 @@
 {
-  "targetVersion": "0.5.0",
-  "baseRef": "refs/tags/v0.4.0",
-  "baseVersion": "0.4.0",
-  "branch": "release/0.5.0"
+  "targetVersion": "0.6.0",
+  "baseRef": "refs/tags/v0.5.0",
+  "baseVersion": "0.5.0",
+  "branch": "release/0.6.0"
 }
