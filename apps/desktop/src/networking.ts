@@ -14,11 +14,22 @@ export function nativeSignaling(
       ? {
           compatibility: {
             ...callbacks,
-            client: async () => ({
-              appVersion: await getVersion(),
-              serverProtocols: [...SERVER_PROTOCOLS],
-              peerProtocols: [...PEER_PROTOCOLS],
-            }),
+            client: async () => {
+              let appVersion: string;
+              try {
+                appVersion = await getVersion();
+              } catch (cause) {
+                throw new Error(
+                  "Veil couldn't read its installed version. Sharing or joining cannot continue because of an app configuration error.",
+                  { cause },
+                );
+              }
+              return {
+                appVersion,
+                serverProtocols: [...SERVER_PROTOCOLS],
+                peerProtocols: [...PEER_PROTOCOLS],
+              };
+            },
           },
         }
       : {}),
