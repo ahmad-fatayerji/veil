@@ -37,8 +37,8 @@ export function OverlayWindow() {
   const [active, setActive] = useState<Handle | null>(null);
   const gesturePending = useRef(false);
   const interactive = !!state?.settings.visible && !state.settings.clickThrough;
-  const visibilityMenu = useVisibilityMenu(false, setError, interactive);
   const excluded = !!state?.settings.captureExclusion;
+  const visibilityMenu = useVisibilityMenu(false, setError, interactive, excluded);
   const [wasInteractive, setWasInteractive] = useState(interactive);
   if (wasInteractive !== interactive) {
     setWasInteractive(interactive);

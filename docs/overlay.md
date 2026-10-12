@@ -22,6 +22,8 @@ and choose **Hide overlay**, the only context-menu option. Right-click the main
 document and choose **Show overlay** to bring it back. Editing keyboard shortcuts
 remain available. Both menus use the same app styling and follow the light/dark
 theme, with square corners, matching icons and an accent hover/focus state.
+With capture exclusion enabled, hovering the overlay close button or its menu
+action keeps the default arrow cursor; their visual hover highlights remain.
 The menu stays within its window; Escape, an outside click, scrolling, resizing,
 or the window losing focus dismisses it. Enter or Space activates the focused action.
 You can also show it from the control panel, the tray,

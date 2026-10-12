@@ -1,5 +1,15 @@
 # Verification record
 
+## Overlay control cursor with capture exclusion - 12 October 2026
+
+The overlay close button and its **Hide overlay** menu action now use the default
+arrow cursor when capture exclusion is enabled, retaining hover/focus styling.
+The portaled menu receives the overlay's exclusion setting explicitly. Normal
+cursor behavior remains when exclusion is disabled and in the main document menu.
+Formatting was applied; no builds or tests were run for this revision. Actual
+Windows pointer behavior and capture output remain unverified. No release was
+published.
+
 ## Matching app-styled visibility menus - 12 October 2026
 
 Both visibility menus now use one desktop React component and the app's theme

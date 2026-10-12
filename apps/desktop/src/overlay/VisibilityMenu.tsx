@@ -8,6 +8,7 @@ export function useVisibilityMenu(
   visible: boolean,
   onError: (message: string) => void,
   enabled = true,
+  captureExcluded = false,
 ) {
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -68,7 +69,7 @@ export function useVisibilityMenu(
         ? createPortal(
             <div
               ref={menu}
-              className="overlay-visibility-menu"
+              className={`overlay-visibility-menu${captureExcluded ? ' is-capture-excluded' : ''}`}
               role="menu"
               aria-label="Overlay visibility"
               style={{ left: position.x, top: position.y }}

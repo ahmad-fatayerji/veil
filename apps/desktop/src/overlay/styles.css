@@ -409,7 +409,9 @@ html.overlay-mode,
 }
 
 .overlay-surface.is-capture-excluded .overlay-drag-handle,
-.overlay-surface.is-capture-excluded .overlay-resize {
+.overlay-surface.is-capture-excluded .overlay-resize,
+.overlay-surface.is-capture-excluded .overlay-close,
+.overlay-visibility-menu.is-capture-excluded button {
   cursor: default;
 }
 
