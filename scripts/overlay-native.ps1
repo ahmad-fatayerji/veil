@@ -104,7 +104,11 @@ if ($Action -eq 'Underlay') {
   $button.ForeColor = [System.Drawing.Color]::White
   $button.Add_Click({ [System.IO.File]::WriteAllText($OutputPath,'clicked') })
   $form.Controls.Add($button)
-  $form.Add_Shown({ [VeilNativeTest]::ShowWindow($form.Handle,9) | Out-Null; [VeilNativeTest]::SetForegroundWindow($form.Handle) | Out-Null })
+  $form.Add_Shown({
+    [VeilNativeTest]::ShowWindow($form.Handle,9) | Out-Null
+    [VeilNativeTest]::SetForegroundWindow($form.Handle) | Out-Null
+    [System.IO.File]::WriteAllText($OutputPath + '.ready','ready')
+  })
   $form.ShowDialog() | Out-Null
   $form.Dispose()
   exit

@@ -1,3 +1,9 @@
+.desktop-shell .workspace,
+.desktop-shell .workspace.with-sidebar {
+  width: 100%;
+  max-width: none;
+}
+
 .overlay-controls {
   max-width: 1210px;
   margin: 22px auto -16px;
@@ -267,6 +273,8 @@ html.overlay-mode,
 }
 .overlay-participants .participant-activity {
   flex-shrink: 0;
+  margin-top: 0;
+  font-size: inherit;
 }
 .overlay-resize {
   position: absolute;

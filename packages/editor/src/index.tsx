@@ -34,7 +34,6 @@ export function SharedEditor({
           render: (user) => {
             const caret = document.createElement('span');
             caret.className = 'collaboration-carets__caret';
-            if (compact) caret.style.display = 'none';
             caret.style.borderColor = participantColor(user.color);
             caret.setAttribute('aria-hidden', 'true');
             const label = document.createElement('span');
@@ -47,7 +46,7 @@ export function SharedEditor({
           },
           selectionRender: (user) => ({
             class: 'collaboration-selection',
-            style: compact ? '' : `background-color: ${participantColor(user.color)}25`,
+            style: `background-color: ${participantColor(user.color)}25`,
             'data-selection-user': participantName(user.name),
           }),
         }),
