@@ -1,6 +1,6 @@
 {
-  "targetVersion": "0.7.1",
-  "baseRef": "refs/tags/v0.7.0",
-  "baseVersion": "0.7.0",
-  "branch": "hotfix/version-permission"
+  "targetVersion": "0.7.2",
+  "baseRef": "refs/tags/v0.7.1",
+  "baseVersion": "0.7.1",
+  "branch": "hotfix/overlay-capture"
 }
