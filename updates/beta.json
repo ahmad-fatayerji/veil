@@ -1,11 +1,11 @@
 {
-  "version": "0.7.1",
-  "notes": "# Veil 0.7.1\n\n## Fixes\n\n- fix: restore desktop version lookup for sharing and joining\n\n## Other changes\n\n- chore: advance beta feed to 0.7.0\n",
-  "pub_date": "2026-10-12T10:29:35.480Z",
+  "version": "0.7.2",
+  "notes": "# Veil 0.7.2\n\n## Other changes\n\n- docs: record user acceptance of overlay capture recovery\n- chore: advance beta feed to 0.7.1\n\n## Fixes\n\n- fix(overlay): rebuild layered surface during capture recovery\n- fix(overlay): refresh capture surface when reapplying exclusion\n",
+  "pub_date": "2026-10-12T11:42:21.149Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDBmWGpYRjRMclhRVlhRbW5URjhsbS9vNU9aL291QTFpK3JiZ3kzZDAxbWdPdGRzczRhbS9idGFLSUlNMXBIZGNORHM4UGpGQ25oQlo2eVI2MkNac0F3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxODAwOTc0CWZpbGU6VmVpbF8wLjcuMV94NjQtc2V0dXAuZXhlCXZlcnNpb246MC43LjEKaEVlckFZM1NNOWR1WlNkRUV0dmp1L0RDZVQvQURsUGxOa01rRTdtbnRYYjQzQkNQSzhlNlR1bGZBQWV3OGNLRHRQOU1nbWVkMkRYWk1FRFFrejF2REE9PQo=",
-      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.7.1/Veil_0.7.1_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDFRclE2b2UzR21LcllxejdFbk1UQzM1eVk1dERRL3I4QXBrTVI0QUU5djdnbXl0Um52QXllVHc3STFvYmdSSWV4TENnYVMwVmtyRExsRFJZWUtQUHdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxODA1MzQwCWZpbGU6VmVpbF8wLjcuMl94NjQtc2V0dXAuZXhlCXZlcnNpb246MC43LjIKMDNUY2FGZFVpT1NKNDJiS2JFWGpteDB3ajFsbzdCM0FpS0ZIQWtZWTBBRFc1eWZOaWNuM3B4dlVMeVYwdXlIb1F3VGlNR3k3ZHkwVVdjTFpnSlB5Qnc9PQo=",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.7.2/Veil_0.7.2_x64-setup.exe"
     }
   }
 }
