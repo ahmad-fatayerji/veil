@@ -11,7 +11,7 @@ use windows::Win32::{
         GetWindowDisplayAffinity, GetWindowLongPtrW, SetLayeredWindowAttributes,
         SetWindowDisplayAffinity, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, HWND_NOTOPMOST,
         HWND_TOPMOST, LWA_ALPHA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WDA_EXCLUDEFROMCAPTURE,
-        WDA_MONITOR, WDA_NONE, WINDOW_DISPLAY_AFFINITY, WS_EX_LAYERED,
+        WDA_NONE, WINDOW_DISPLAY_AFFINITY, WS_EX_LAYERED,
     },
 };
 
@@ -186,13 +186,9 @@ fn apply_capture_affinity(
     mut set: impl FnMut(WINDOW_DISPLAY_AFFINITY) -> Result<(), OverlayError>,
 ) -> Result<(), OverlayError> {
     if enabled {
-        // Repeating EXCLUDEFROMCAPTURE can leave the compositor's stale black
-        // surface unchanged after hidden-window/style initialization (#22).
-        // Force a protected affinity transition rather than briefly making the
-        // overlay capturable with NONE, as the manual off/on workaround does.
-        // MONITOR is only an intermediate reset on supported Windows, never a
-        // successful fallback: EXCLUDEFROMCAPTURE must succeed and read back.
-        set(WDA_MONITOR)?;
+        // Do not introduce MONITOR's black capture surface during a reapply.
+        // A stale layered surface requires rebuilding the layer, not changing
+        // the affinity to another protected mode and back.
         set(WDA_EXCLUDEFROMCAPTURE)
     } else {
         set(WDA_NONE)
@@ -230,7 +226,7 @@ pub fn capture_exclusion(
     Ok(())
 }
 
-pub fn refresh_capture_surface(window: &WebviewWindow) -> Result<(), OverlayError> {
+pub fn refresh_capture_surface(window: &WebviewWindow, alpha: f64) -> Result<(), OverlayError> {
     use windows::Win32::UI::WindowsAndMessaging::{
         GetForegroundWindow, IsWindowVisible, ShowWindow, SW_HIDE, SW_SHOW, SW_SHOWNOACTIVATE,
     };
@@ -240,12 +236,27 @@ pub fn refresh_capture_surface(window: &WebviewWindow) -> Result<(), OverlayErro
             return Ok(());
         }
         let was_foreground = GetForegroundWindow() == handle;
-        // Discord can retain a black surface despite confirmed exclusion and an
-        // affinity refresh. Wait for presentation between hide and show.
-        // The caller has already confirmed EXCLUDEFROMCAPTURE; never clear it.
+        // Unlike ShowWindow alone, Tauri's manual hide/show rebuilds extended
+        // styles, dropping our manually added WS_EX_LAYERED. Recreate that layer
+        // while hidden, then restore alpha and exclusion before showing it.
         let _ = ShowWindow(handle, SW_HIDE);
+        if IsWindowVisible(handle).as_bool() {
+            return Err(OverlayError::new(
+                "CAPTURE_REFRESH_FAILED",
+                "The overlay could not be hidden to refresh capture exclusion.",
+            ));
+        }
         let hidden = DwmFlush().map_err(OverlayError::native);
-        // Always restore visibility, including when the compositor flush fails.
+        if hidden.is_ok() {
+            let style = GetWindowLongPtrW(handle, GWL_EXSTYLE);
+            set_extended_style(handle, style & !(WS_EX_LAYERED.0 as isize))?;
+            opacity(window, alpha)?;
+            // Removing the layer can invalidate affinity. Never show the new
+            // surface until Windows confirms exclusion again. A failure leaves
+            // it hidden and is reflected in the app's visibility/capture status.
+            capture_exclusion(window, true, true)?;
+        }
+        // If the first flush fails, the original protected layer is unchanged.
         // Restore activation only when the overlay was already in the foreground.
         let _ = ShowWindow(
             handle,
@@ -267,16 +278,25 @@ pub fn refresh_capture_surface(window: &WebviewWindow) -> Result<(), OverlayErro
     Ok(())
 }
 
+fn set_extended_style(handle: HWND, style: isize) -> Result<(), OverlayError> {
+    unsafe {
+        SetLastError(WIN32_ERROR(0));
+        let previous = SetWindowLongPtrW(handle, GWL_EXSTYLE, style);
+        if previous == 0 && GetLastError().0 != 0 {
+            return Err(OverlayError::native(windows::core::Error::from_win32()));
+        }
+    }
+    Ok(())
+}
+
 pub fn opacity(window: &WebviewWindow, value: f64) -> Result<(), OverlayError> {
     let handle = window.hwnd().map_err(OverlayError::native)?;
     let handle = HWND(handle.0);
     // The HWND belongs to this app's overlay. Preserve all unrelated extended styles.
     unsafe {
         let style = GetWindowLongPtrW(handle, GWL_EXSTYLE);
-        SetLastError(WIN32_ERROR(0));
-        let previous = SetWindowLongPtrW(handle, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as isize);
-        if previous == 0 && GetLastError().0 != 0 {
-            return Err(OverlayError::native(windows::core::Error::from_win32()));
+        if style & WS_EX_LAYERED.0 as isize == 0 {
+            set_extended_style(handle, style | WS_EX_LAYERED.0 as isize)?;
         }
         SetLayeredWindowAttributes(
             handle,
@@ -386,7 +406,7 @@ mod tests {
             Ok(())
         })
         .unwrap();
-        assert_eq!(calls, [WDA_MONITOR, WDA_EXCLUDEFROMCAPTURE]);
+        assert_eq!(calls, [WDA_EXCLUDEFROMCAPTURE]);
         assert!(!calls.contains(&WDA_NONE));
         calls.clear();
         apply_capture_affinity(false, |affinity| {
@@ -399,19 +419,12 @@ mod tests {
 
     #[test]
     fn capture_refresh_propagates_failures_without_unprotected_fallback() {
-        for failure in [WDA_MONITOR, WDA_EXCLUDEFROMCAPTURE] {
-            let mut calls = Vec::new();
-            let result = apply_capture_affinity(true, |affinity| {
-                calls.push(affinity);
-                if affinity == failure {
-                    Err(OverlayError::native("affinity failure"))
-                } else {
-                    Ok(())
-                }
-            });
-            assert_eq!(result.unwrap_err().code, "NATIVE_ERROR");
-            assert_eq!(calls.last(), Some(&failure));
-            assert!(!calls.contains(&WDA_NONE));
-        }
+        let mut calls = Vec::new();
+        let result = apply_capture_affinity(true, |affinity| {
+            calls.push(affinity);
+            Err(OverlayError::native("affinity failure"))
+        });
+        assert_eq!(result.unwrap_err().code, "NATIVE_ERROR");
+        assert_eq!(calls, [WDA_EXCLUDEFROMCAPTURE]);
     }
 }

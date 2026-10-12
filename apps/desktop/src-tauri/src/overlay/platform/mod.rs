@@ -57,12 +57,12 @@ pub fn capture_exclusion(
     }
 }
 
-pub fn refresh_capture_surface(window: &WebviewWindow) -> Result<(), OverlayError> {
+pub fn refresh_capture_surface(window: &WebviewWindow, alpha: f64) -> Result<(), OverlayError> {
     #[cfg(windows)]
-    return windows::refresh_capture_surface(window);
+    return windows::refresh_capture_surface(window, alpha);
     #[cfg(not(windows))]
     {
-        let _ = window;
+        let _ = (window, alpha);
         Err(OverlayError::unsupported(
             "Capture exclusion is unavailable on this platform.",
         ))
