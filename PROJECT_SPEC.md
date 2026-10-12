@@ -68,9 +68,10 @@ See [security and privacy](docs/security.md) for limits and reporting guidance.
 
 Keep Windows native code isolated from shared React packages. The control panel
 and overlay are separate Tauri windows editing the same document. The overlay has
-minimal chrome, no formatting toolbar or remote cursor decorations, and a compact
-participant activity strip. Appearance and physical bounds are device-local,
-validated, and saved separately from the document.
+minimal chrome, no formatting toolbar, named remote cursors and selections matching
+the regular document view, and a compact participant activity strip. Appearance
+and physical bounds are device-local, validated, and saved separately from the
+document.
 
 Support opacity, font size, always on top, movement, resizing, hide/show, and
 click-through. Click-through requires a registered recovery shortcut. Ctrl+Alt+V
@@ -110,7 +111,11 @@ secrets to publication jobs; fork PRs receive none.
 
 ## Validation
 
-Run checks appropriate to the task: formatting for documentation, `pnpm check`
+For ordinary bug and feature tasks, the user performs testing: agents skip local
+test suites and `pnpm check` unless validation is explicitly requested, and do not
+wait for CI before handoff. Required CI gates still apply before merging. Report
+skipped checks honestly. When validation is requested, run checks appropriate to
+the task: formatting for documentation, `pnpm check`
 and relevant unit/integration tests for code, and `pnpm test:release` for release
 tooling. Rebuild the native debug executable after Cargo tests before native
 acceptance scripts. Test real Windows overlay/capture/installer behavior where
