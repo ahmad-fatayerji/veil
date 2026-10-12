@@ -65,7 +65,6 @@ export function AutomaticApp() {
   const [resumeShare, setResumeShare] = useState(false);
   const [pendingLink, setPendingLink] = useState('');
   const [confirmExit, setConfirmExit] = useState(false);
-  const [confirmQuit, setConfirmQuit] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [connected, setConnected] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
@@ -77,10 +76,8 @@ export function AutomaticApp() {
     setName(value);
   }
   useEffect(() => {
-    const unlisten = listen('app-quit-requested', () => setConfirmQuit(true));
     const unlistenFailure = listen<string>('app-quit-failed', (event) => setError(event.payload));
     return () => {
-      void unlisten.then((stop) => stop()).catch(() => {});
       void unlistenFailure.then((stop) => stop()).catch(() => {});
     };
   }, []);
@@ -841,36 +838,6 @@ export function AutomaticApp() {
           </>
         )}
         {notice && <p role="status">{notice}</p>}
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-      </Dialog>
-      <Dialog
-        open={confirmQuit}
-        title="Quit Veil?"
-        locked={updating || busy}
-        onClose={() => setConfirmQuit(false)}
-      >
-        <p>
-          Veil and the overlay will close.
-          {document &&
-            ' This document is temporary. Copy any text you want to keep before quitting.'}
-          {document && !guest && session && ' Everyone will be disconnected.'}
-        </p>
-        <div className="form-actions">
-          <button className="secondary-button" onClick={() => setConfirmQuit(false)}>
-            Cancel
-          </button>
-          <button
-            className="danger-button"
-            disabled={busy || updating}
-            onClick={() => void run(() => invoke('app_quit'))}
-          >
-            Quit Veil
-          </button>
-        </div>
         {error && (
           <p className="error" role="alert">
             {error}

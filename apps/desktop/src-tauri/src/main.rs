@@ -76,7 +76,7 @@ fn main() {
                     if overlay::close_behavior(window.app_handle())
                         == lifecycle::CloseBehavior::Quit
                     {
-                        lifecycle::quit_on_window_close(window.app_handle());
+                        lifecycle::quit_immediately(window.app_handle());
                         return;
                     }
                     // A pending WebView focus restoration (for example after a dialog)
