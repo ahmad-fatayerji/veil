@@ -1,6 +1,6 @@
 {
-  "targetVersion": "0.7.0",
-  "baseRef": "refs/tags/v0.6.0",
-  "baseVersion": "0.6.0",
-  "branch": "release/0.7.0"
+  "targetVersion": "0.7.1",
+  "baseRef": "refs/tags/v0.7.0",
+  "baseVersion": "0.7.0",
+  "branch": "hotfix/version-permission"
 }
