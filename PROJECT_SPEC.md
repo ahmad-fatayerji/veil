@@ -68,9 +68,10 @@ See [security and privacy](docs/security.md) for limits and reporting guidance.
 
 Keep Windows native code isolated from shared React packages. The control panel
 and overlay are separate Tauri windows editing the same document. The overlay has
-minimal chrome, no formatting toolbar or remote cursor decorations, and a compact
-participant activity strip. Appearance and physical bounds are device-local,
-validated, and saved separately from the document.
+minimal chrome, no formatting toolbar, named remote cursors and selections matching
+the regular document view, and a compact participant activity strip. Appearance
+and physical bounds are device-local, validated, and saved separately from the
+document.
 
 Support opacity, font size, always on top, movement, resizing, hide/show, and
 click-through. Click-through requires a registered recovery shortcut. Ctrl+Alt+V
