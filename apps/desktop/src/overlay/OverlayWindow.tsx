@@ -4,6 +4,7 @@ import { invoke, useOverlay, errorMessage } from './api';
 import { activityLabels, useAppearance } from '@veil/ui';
 import { SharedEditor } from '@veil/editor';
 import { useOverlayDocument } from './session';
+import { useVisibilityMenu } from './VisibilityMenu';
 
 const directions = [
   'north',
@@ -36,6 +37,7 @@ export function OverlayWindow() {
   const [active, setActive] = useState<Handle | null>(null);
   const gesturePending = useRef(false);
   const interactive = !!state?.settings.visible && !state.settings.clickThrough;
+  const visibilityMenu = useVisibilityMenu(false, setError, interactive);
   const excluded = !!state?.settings.captureExclusion;
   const [wasInteractive, setWasInteractive] = useState(interactive);
   if (wasInteractive !== interactive) {
@@ -76,10 +78,12 @@ export function OverlayWindow() {
     <main
       className={`overlay-surface ${state?.settings.clickThrough ? 'is-click-through' : ''} ${excluded ? 'is-capture-excluded' : ''} ${active && interactive ? 'is-gesturing' : ''}`}
       style={{ fontSize: `${state?.settings.fontSize ?? 20}px` }}
+      onContextMenu={visibilityMenu.onContextMenu}
       onDragStart={(event) => {
         if (gesturePending.current) event.preventDefault();
       }}
     >
+      {visibilityMenu.menu}
       <header
         className="overlay-drag-handle"
         onPointerEnter={() => setHovered('move')}

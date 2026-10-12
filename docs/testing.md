@@ -1,5 +1,20 @@
 # Verification record
 
+## Matching app-styled visibility menus - 12 October 2026
+
+Both visibility menus now use one desktop React component and the app's theme
+tokens, replacing the different WebView2 and Windows menu implementations. They
+contain one action each, use square corners and matching icons, clamp to the
+window bounds, and support keyboard focus, activation and Escape dismissal.
+Outside clicks, scrolling, window resize and blur dismiss the menu. The overlay
+menu is rendered inside the overlay webview, under its native capture policy.
+
+The acceptance fixture now checks the single focused menu item in each window,
+Escape dismissal and native keyboard activation, using webview screenshots for
+the app-styled menus. Formatting was applied; no builds or tests were run for this
+revision under the ordinary feature workflow. User testing remains pending.
+Earlier records below describe previous revisions. No release was published.
+
 ## Simplified overlay and main document menus - 12 October 2026
 
 The Windows overlay context menu now contains only **Hide overlay**. The main

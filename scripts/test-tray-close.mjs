@@ -109,16 +109,21 @@ try {
   await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
   native('Move', 'overlay', ['-X', '700', '-Y', '250', '-Width', '520', '-Height', '560']);
   await waitFor(async () => (await invoke(main, 'overlay_snapshot')).settings.x === 700);
-  await invoke(main, 'overlay_update', { patch: { captureExclusion: false } });
   await rightClick(overlay, '.tiptap');
-  native('Capture', 'overlay', ['-OutputPath', resolve(directory, 'overlay-context-menu.png')]);
+  await expect(overlay.getByRole('menuitem')).toHaveCount(1);
+  await expect(overlay.getByRole('menuitem', { name: 'Hide overlay' })).toBeFocused();
+  await overlay.screenshot({ path: resolve(directory, 'overlay-context-menu.png') });
   native('MenuLast', 'overlay');
   await waitFor(() => !native('Probe', 'overlay').visible);
   assert.equal(app.exitCode, null);
   await expect(main.locator('.tiptap')).toContainText('Tray keeps my temporary document');
-  await invoke(main, 'overlay_update', { patch: { captureExclusion: true } });
   await rightClick(main, '.tiptap', 'main');
-  native('Capture', 'main', ['-OutputPath', resolve(directory, 'document-context-menu.png')]);
+  await expect(main.getByRole('menuitem')).toHaveCount(1);
+  await expect(main.getByRole('menuitem', { name: 'Show overlay' })).toBeFocused();
+  native('Escape', 'main');
+  await expect(main.getByRole('menu')).toHaveCount(0);
+  await rightClick(main, '.tiptap', 'main');
+  await main.screenshot({ path: resolve(directory, 'document-context-menu.png') });
   native('MenuLast', 'main');
   await waitFor(() => native('Probe', 'overlay').visible);
   await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
@@ -127,7 +132,7 @@ try {
   await waitFor(() => !native('Probe', 'overlay').visible);
   await invoke(main, 'overlay_visibility', { visible: true });
   console.log(
-    'PASS: native Hide overlay in editor/header and Show overlay in main document retain document',
+    'PASS: app-styled Hide/Show overlay menus support native right-click and keyboard activation',
   );
   assert.equal(
     await overlay

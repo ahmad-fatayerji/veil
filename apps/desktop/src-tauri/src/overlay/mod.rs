@@ -15,7 +15,6 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 const OVERLAY: &str = "overlay";
-const DOCUMENT_SHOW_OVERLAY: &str = "document-show-overlay";
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -222,19 +221,6 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         save_requests: sender,
         path: path.clone(),
     });
-    if let Some(main) = app.get_webview_window("main") {
-        main.on_menu_event(|window, event| {
-            if event.id().as_ref() == DOCUMENT_SHOW_OVERLAY {
-                // Return control to the native menu before showing the other window.
-                let app = window.app_handle().clone();
-                std::thread::spawn(move || {
-                    if let Err(error) = set_visible(&app, true) {
-                        modify(&app, |model| model.warning = Some(error.message));
-                    }
-                });
-            }
-        });
-    }
     let recover = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
     let hide = Shortcut::new(
         Some(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT),
@@ -347,7 +333,6 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => {}
     });
-    platform::install_context_menu(&overlay).map_err(|error| error.message)?;
     if snapshot(app.handle()).settings.visible {
         overlay.show()?;
         let current = snapshot(app.handle());
@@ -531,21 +516,6 @@ pub fn overlay_capture_test(
     // Local ephemeral card, not shared document content or a persisted test result.
     modify(&app, |model| model.capture_test = enabled);
     Ok(snapshot(&app))
-}
-
-#[tauri::command]
-pub async fn overlay_document_menu(caller: WebviewWindow) -> Result<(), OverlayError> {
-    control_only(&caller)?;
-    let show = tauri::menu::MenuItem::with_id(
-        &caller,
-        DOCUMENT_SHOW_OVERLAY,
-        "Show overlay",
-        true,
-        None::<&str>,
-    )
-    .map_err(OverlayError::native)?;
-    let menu = tauri::menu::Menu::with_items(&caller, &[&show]).map_err(OverlayError::native)?;
-    caller.popup_menu(&menu).map_err(OverlayError::native)
 }
 
 #[tauri::command]
