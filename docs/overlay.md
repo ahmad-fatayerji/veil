@@ -18,8 +18,9 @@ Native window-setting commands require the `main` window. The overlay can read s
 
 The overlay has square corners and a **×** button in its header to hide it without
 ending the document or session. On Windows, right-click anywhere inside the overlay
-and choose **Hide overlay** from its existing context menu; normal editing actions
-remain available. Show it again from the control panel, the tray,
+and choose **Hide overlay**, the only context-menu option. Right-click the main
+document and choose **Show overlay** to bring it back. Editing keyboard shortcuts
+remain available. You can also show it from the control panel, the tray,
 or Ctrl+Alt+Shift+V. Ctrl+Alt+V also restores interaction. In click-through mode,
 use these recovery controls before clicking the button. The overlay can hide
 itself; showing it and changing settings remain control-panel operations.

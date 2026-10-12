@@ -19,6 +19,7 @@ const send = (message: Message) => invoke('document_relay', { message });
 
 export function DesktopEditor({ connection }: { connection: DemoConnection }) {
   const [view, setView] = useState<EditorConnection | null>(null);
+  const [menuError, setMenuError] = useState('');
   useEffect(() => {
     // Cursor plugins clear their own cursor on blur and document updates. Keep the
     // main editor's local cursor separate from the network cursor owned by the overlay.
@@ -55,7 +56,25 @@ export function DesktopEditor({ connection }: { connection: DemoConnection }) {
       awareness.destroy();
     };
   }, [connection]);
-  return view ? <SharedEditor connection={view} /> : null;
+  return view ? (
+    <div
+      style={{ display: 'contents' }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setMenuError('');
+        void invoke('overlay_document_menu').catch((failure: unknown) => {
+          setMenuError(errorMessage(failure));
+        });
+      }}
+    >
+      <SharedEditor connection={view} />
+      {menuError && (
+        <p className="overlay-error" role="alert">
+          Overlay menu: {menuError}
+        </p>
+      )}
+    </div>
+  ) : null;
 }
 
 // One network participant, two independent CRDT views. Incremental Yjs updates

@@ -45,6 +45,7 @@ fn main() {
             overlay::overlay_capture_check,
             overlay::overlay_capture_test,
             overlay::overlay_visibility,
+            overlay::overlay_document_menu,
             overlay::overlay_recover,
             overlay::overlay_reset_position,
             overlay::overlay_gesture,

@@ -70,10 +70,10 @@ const invoke = (page, command, args) =>
     command,
     args,
   });
-async function rightClick(page, selector) {
-  native('Escape', 'overlay');
-  native('Focus', 'overlay');
-  const bounds = native('Probe', 'overlay');
+async function rightClick(page, selector, window = 'overlay') {
+  native('Escape', window);
+  native('Focus', window);
+  const bounds = native('Probe', window);
   const box = await page.locator(selector).boundingBox();
   const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
   const position = [
@@ -86,13 +86,13 @@ async function rightClick(page, selector) {
       ),
     ),
   ];
-  native('MovePointer', 'overlay', position);
+  native('MovePointer', window, position);
   assert.equal(
-    native('CursorProbe', 'overlay').overTestWindow,
+    native('CursorProbe', window).overTestWindow,
     true,
-    'Right-click must target this overlay',
+    `Right-click must target the ${window} window`,
   );
-  native('RightClick', 'overlay', position);
+  native('RightClick', window, position);
   await new Promise((done) => setTimeout(done, 1000));
 }
 try {
@@ -117,13 +117,17 @@ try {
   assert.equal(app.exitCode, null);
   await expect(main.locator('.tiptap')).toContainText('Tray keeps my temporary document');
   await invoke(main, 'overlay_update', { patch: { captureExclusion: true } });
-  await invoke(main, 'overlay_visibility', { visible: true });
+  await rightClick(main, '.tiptap', 'main');
+  native('Capture', 'main', ['-OutputPath', resolve(directory, 'document-context-menu.png')]);
+  native('MenuLast', 'main');
+  await waitFor(() => native('Probe', 'overlay').visible);
+  await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
   await rightClick(overlay, '.overlay-drag-handle');
   native('MenuLast', 'overlay');
   await waitFor(() => !native('Probe', 'overlay').visible);
   await invoke(main, 'overlay_visibility', { visible: true });
   console.log(
-    'PASS: native right-click Hide overlay in editor/header retains editing menu and document',
+    'PASS: native Hide overlay in editor/header and Show overlay in main document retain document',
   );
   assert.equal(
     await overlay

@@ -3,13 +3,12 @@ use webview2_com::{
     ContextMenuRequestedEventHandler, CustomItemSelectedEventHandler,
     Microsoft::Web::WebView2::Win32::{
         ICoreWebView2Environment9, ICoreWebView2_11, COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_COMMAND,
-        COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_SEPARATOR,
     },
 };
 use windows_core::{w, Interface};
 
-// Extend only the overlay's default WebView2 menu. Let WebView2 keep handling
-// editing commands, selection, menu placement, keyboard navigation and dismissal.
+// Replace the overlay's browser commands with its single visibility action.
+// WebView2 still handles placement, keyboard navigation and dismissal.
 pub fn install(window: &WebviewWindow) -> tauri::Result<()> {
     let app = window.app_handle().clone();
     window.with_webview(move |webview| {
@@ -22,11 +21,6 @@ pub fn install(window: &WebviewWindow) -> tauri::Result<()> {
                     w!("Hide overlay"),
                     None,
                     COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_COMMAND,
-                )?;
-                let separator = environment.CreateContextMenuItem(
-                    w!(""),
-                    None,
-                    COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_SEPARATOR,
                 )?;
                 let selected_app = app.clone();
                 let mut token = 0;
@@ -49,11 +43,10 @@ pub fn install(window: &WebviewWindow) -> tauri::Result<()> {
                             let items = args.MenuItems()?;
                             let mut count = 0;
                             items.Count(&mut count)?;
-                            if count > 0 {
-                                items.InsertValueAtIndex(count, &separator)?;
-                                count += 1;
+                            for index in (0..count).rev() {
+                                items.RemoveValueAtIndex(index)?;
                             }
-                            items.InsertValueAtIndex(count, &hide)?;
+                            items.InsertValueAtIndex(0, &hide)?;
                         }
                         Ok(())
                     })),

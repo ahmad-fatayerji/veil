@@ -1,5 +1,19 @@
 # Verification record
 
+## Simplified overlay and main document menus - 12 October 2026
+
+The Windows overlay context menu now contains only **Hide overlay**. The main
+document context menu contains only **Show overlay**, which shows the overlay
+without toggling it off when already visible. The desktop editor owns the main
+document menu; shared browser editors are unchanged. Both actions preserve the
+document and session.
+
+The native tray acceptance fixture now includes hiding through the overlay menu
+and showing through the main document menu, with screenshots for manual menu
+inspection. This revision has not been built or tested locally; testing is left
+to the user under the ordinary feature workflow. The results below predate this
+menu simplification. No release was published.
+
 ## Overlay close button and context menu - 12 October 2026
 
 The square overlay has a header close button and a Windows native **Hide overlay**
