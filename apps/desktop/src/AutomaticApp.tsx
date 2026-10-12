@@ -563,6 +563,7 @@ export function AutomaticApp() {
         open={settings}
         title="Settings"
         locked={updating}
+        dismissOnBackdrop
         wide
         onClose={() => {
           if (!updating) {

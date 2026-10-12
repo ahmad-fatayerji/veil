@@ -376,7 +376,12 @@ export function DemoApp({
         )}
       </main>
 
-      <Dialog open={settingsOpen} title="Settings" onClose={() => setSettingsOpen(false)}>
+      <Dialog
+        open={settingsOpen}
+        title="Settings"
+        dismissOnBackdrop
+        onClose={() => setSettingsOpen(false)}
+      >
         <h3>Appearance</h3>
         <label htmlFor="browser-appearance">Theme</label>
         <select
