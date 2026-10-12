@@ -110,7 +110,11 @@ secrets to publication jobs; fork PRs receive none.
 
 ## Validation
 
-Run checks appropriate to the task: formatting for documentation, `pnpm check`
+For ordinary bug and feature tasks, the user performs testing: agents skip local
+test suites and `pnpm check` unless validation is explicitly requested, and do not
+wait for CI before handoff. Required CI gates still apply before merging. Report
+skipped checks honestly. When validation is requested, run checks appropriate to
+the task: formatting for documentation, `pnpm check`
 and relevant unit/integration tests for code, and `pnpm test:release` for release
 tooling. Rebuild the native debug executable after Cargo tests before native
 acceptance scripts. Test real Windows overlay/capture/installer behavior where
