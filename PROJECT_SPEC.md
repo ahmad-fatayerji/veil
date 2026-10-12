@@ -14,7 +14,8 @@ Capture exclusion is best effort and never universal.
 
 Users can create a local document immediately, without a server. Sharing attaches
 networking to that same document. A host configures an HTTPS Veil server and an
-operator-issued host credential in Settings, then sends a reusable session link.
+operator-issued host credential in Settings, then sends a short reusable session link. Hosts choose automatic admission or
+explicit guest approval; automatic admission remains the default.
 Guests install Veil, open or paste the link, enter a name, and explicitly join.
 Missing hosting configuration opens Settings and resumes sharing after a successful
 save; failure preserves the editable local document.
@@ -42,7 +43,8 @@ The host must remain open. Healthy peer transports can survive a signaling outag
 but new admission and recovery depend on the sharing server.
 
 Reusable `veil://join/...` links pin the host identity and admit separate guest
-tickets. Reset link and Stop sharing revoke new admission, while already admitted
+tickets. Reset link and Stop sharing revoke new admission and cancel pending approval
+requests, while already approved
 guests retain their authenticated links until the session ends. Compatible servers
 advertise reusable-sharing support; do not silently substitute a legacy invitation.
 Release-maintained server API and peer protocol generations determine admission.

@@ -10,7 +10,8 @@ origin; the server address is saved separately. There is no bundled default serv
 Create document opens a local editor before any server request. Share attaches to
 that same document and uses saved configuration. Missing setup opens Hosting
 settings and resumes after saving. Setup/activation failure leaves edits available
-for retry. Copy link shares one reusable `veil://join/...` version-4 invitation;
+for retry. Copy link shares one reusable `veil://join/<server>/<code>` invitation with a
+22-character random code;
 friends open or paste it, enter their name, and explicitly Join session. The Windows
 installer registers `veil`, and Tauri deep-link/single-instance integration delivers
 links to the running main window. Opening another invitation requires leaving the
@@ -18,7 +19,7 @@ current document; content receives confirmation and Cancel preserves it.
 
 Reset link replaces the admission credential; Stop sharing revokes admission.
 Existing guests retain their tickets, recovery, and relay renewal. Links last until
-sharing stops or the host session ends. A server must advertise `groupSharing: 1`;
+sharing stops or the host session ends. A server must advertise `groupSharing: 1` and `shortInvitations: 1`;
 otherwise Share explains the upgrade requirement without issuing single-use links.
 Pasted legacy `veil-invite:v2:` codes remain supported with their original ten-minute,
 single-use semantics. Older `veil-p2p:v1:` codes are incompatible. Forget saved host credential
@@ -195,3 +196,40 @@ provide a pinned host compatibility signature.
 Every networking change must assess server impact and update compatibility support,
 protocol documentation and coordinated app/server regression coverage as needed.
 Never declare unsupported generations or infer compatibility from equal versions.
+
+## Short links and guest approval
+
+The server address remains readable; the 22-character unpadded Base64url code
+contains 128 random bits. It is a secret: share privately and redact the entire
+link from reports. Opening or pasting only validates the link locally. Lookup and
+local decryption happen after the guest presses Join. HTTPS validation remains
+required; encoded HTTP loopback origins are available only in development.
+
+Hosts select **Auto join** (the default for each new session) or **Require approval**
+in Share document. Approval requests appear under People, showing the name supplied
+by the guest plus Approve and Reject. Names do not verify identity. The guest can
+cancel and requests expire after two minutes. Pending tickets cannot request relay
+credentials or exchange established signaling. The host withholds its signed key
+exchange and document transport until it approves.
+
+Changing mode keeps the same link and affects new requests. Existing waiting
+requests still require a decision, and connected collaborators remain connected.
+Reset link and Stop sharing cancel pending requests, without disconnecting existing
+collaborators. Reset retains the session's chosen join mode. A rejected registration
+preserves the prior link; a lost response after server commit can leave registration
+state uncertain, so retry Reset link if its outcome is unknown.
+
+The app derives separate lookup-reference, lookup-credential and encryption outputs
+from the code. Only the lookup credential, its hash, and an encrypted invitation
+record reach the server; neither the code nor invitation root secret does. AES-GCM
+binds the encrypted invitation to its canonical server origin and derived reference.
+The decrypted invitation retains its pinned host signing key. Waiting/rejection
+statuses are encrypted and separately host-signed, binding the guest's admission
+and exchange key. The existing signed handshake and per-link encryption remain.
+
+New sharing requires a supporting server and updated guests; there is no long-link
+fallback. Existing version-4 long links and legacy single-use invitations are still
+accepted. Upgrade the server before distributing this client. Source PRs do not
+authorize deployment or release publication.
+
+Coordinated short-link server support: [server PR #5](https://github.com/ahmad-fatayerji/veil-server/pull/5).

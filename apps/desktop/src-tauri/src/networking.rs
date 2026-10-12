@@ -59,6 +59,8 @@ fn path_allowed(path: &str, method: &str) -> bool {
             | ("POST", "/v2/sessions")
             | ("POST", "/v2/join")
             | ("POST", "/v3/join")
+            | ("POST", "/v3/invitations/resolve")
+            | ("POST", "/v3/admission/decision")
             | ("POST", "/v3/compatibility")
             | ("POST", "/v2/relay")
             | ("POST", "/v2/path")
@@ -277,8 +279,10 @@ async fn test_credentials(server: &str, credential: String) -> Result<(), String
         return Err("Invalid operator-issued host credential.".into());
     }
     let capabilities = request(server, "/v2/capabilities", "GET", Value::Null, None, None).await?;
-    if capabilities.get("groupSharing").and_then(Value::as_u64) != Some(1) {
-        return Err("This server needs an update to support reusable sharing links.".into());
+    if capabilities.get("groupSharing").and_then(Value::as_u64) != Some(1)
+        || capabilities.get("shortInvitations").and_then(Value::as_u64) != Some(1)
+    {
+        return Err("This server needs an update to support short sharing links.".into());
     }
     let registration = request(
         server,
@@ -455,6 +459,9 @@ mod tests {
     #[test]
     fn endpoints_are_scoped() {
         assert!(path_allowed("/v2/sessions", "POST"));
+        assert!(path_allowed("/v3/invitations/resolve", "POST"));
+        assert!(path_allowed("/v3/admission/decision", "POST"));
+        assert!(!path_allowed("/v3/invitations/resolve", "GET"));
         assert!(!path_allowed("/v2/metrics", "GET"));
         assert!(!path_allowed("/v2/socket/a", "GET"));
         assert!(!path_allowed("/v2/sessions/../metrics", "DELETE"));

@@ -1,4 +1,6 @@
-/** Release-maintained generations: advertise only implemented wire behavior. */
+/** Release-maintained generations: advertise only implemented wire behavior.
+ * Short invitation lookup is capability-gated; legacy API 2 and peer 1 remain implemented.
+ */
 export const SERVER_PROTOCOLS = [2] as const;
 export const PEER_PROTOCOLS = [1] as const;
 export interface ClientCompatibility {

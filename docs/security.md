@@ -116,3 +116,18 @@ Veil version, affected component, impact, and reproducible steps with fictional
 content. Do not publish live invitation links, credentials, private documents, or
 signing material in a public issue. Ordinary non-sensitive bugs can use
 [GitHub issues](https://github.com/ahmad-fatayerji/veil/issues).
+
+## Short invitation links
+
+A short link contains a 128-bit random secret. HKDF domain separation derives an
+opaque lookup reference, a lookup credential and an AES-GCM encryption key. The
+server receives the reference, lookup credential/hash and ciphertext, never the
+link code or invitation root. A server operator cannot replace the host key in the
+encrypted invitation without authentication failure. Keep full links private.
+
+Host approval gates signed key exchange and document transport locally, even if a
+server fabricates admission metadata. Waiting/rejection status is encrypted and
+host-signed. Guest names are unverified labels. Pending requests expire after two
+minutes and have bounded queue resources; this is not a connected-participant cap.
+Reset and Stop sharing cancel pending requests but do not revoke existing guests'
+access to document content. No independent security audit is claimed.
