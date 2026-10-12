@@ -1,11 +1,11 @@
 {
-  "version": "0.6.0",
-  "notes": "# Veil 0.6.0\n\n## Features\n\n- feat: discover updates and confirm session compatibility\n- feat: add app-styled overlay visibility menus and square corners\n\n## Fixes\n\n- fix: fill available desktop document width\n- fix: refresh overlay capture exclusion after initialization\n- fix: dismiss settings outside and center close icon\n- fix: show named cursors and align overlay presence\n- fix: quit immediately from the tray\n\n## Other changes\n\n- docs: delegate routine testing to the user\n- chore: advance beta feed to 0.5.0\n",
-  "pub_date": "2026-10-12T05:04:19.069Z",
+  "version": "0.7.0",
+  "notes": "# Veil 0.7.0\n\n## Features\n\n- feat: shorten invite links and add optional guest approval\n\n## Other changes\n\n- chore: advance beta feed to 0.6.0\n",
+  "pub_date": "2026-10-12T06:22:36.833Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TC9MN0tsbTFjL0Q0UWtGN25MN2MrTzZDMFp2ZXNjU3F2NGNyZkVnRVAyZGRneW5Mb01IZll4STlpUGVUc2NTZm90ZUdsVEdTaGREUE1FdzN6RCt3d0F3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNzgxNDU4CWZpbGU6VmVpbF8wLjYuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC42LjAKbFhqSW1vUEM3QUdpbjdrdWluTHg2ZmdDWHB3WFJuVE5UeGhLbjZYTDdyZFc3VzJQMmpuK3pvSHFVa1h0TzJ3ZWFKRStJdUdFQlgxbldvQi9IK2ZEQVE9PQo=",
-      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.6.0/Veil_0.6.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1THdVNDF1WWVKQlF0UVY0YWZjak11QUlHRjFJMFhaN29jUUNURWlYRi9FTnNOekpJT1BEMC8wVmN0ZmdyYVhsTGJyZkttMStBTFJ2UVRsOVdkVHJGZVFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNzg2MTU2CWZpbGU6VmVpbF8wLjcuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC43LjAKMUdOcjk3cUVQM3BXOTNEUFlSM1pXRWZSTzEyNnJ5ZEhpQk1Dc0tQY3N6MnJHenVBRzlUQnpaWHJ3YkF5S0F1TDFIK1B3U0FQekdIWVI5R08vam03RFE9PQo=",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.7.0/Veil_0.7.0_x64-setup.exe"
     }
   }
 }
