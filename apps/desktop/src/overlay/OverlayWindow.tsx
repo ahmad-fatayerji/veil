@@ -4,6 +4,7 @@ import { invoke, useOverlay, errorMessage } from './api';
 import { activityLabels, useAppearance } from '@veil/ui';
 import { SharedEditor } from '@veil/editor';
 import { useOverlayDocument } from './session';
+import { useVisibilityMenu } from './VisibilityMenu';
 
 const directions = [
   'north',
@@ -37,6 +38,7 @@ export function OverlayWindow() {
   const gesturePending = useRef(false);
   const interactive = !!state?.settings.visible && !state.settings.clickThrough;
   const excluded = !!state?.settings.captureExclusion;
+  const visibilityMenu = useVisibilityMenu(false, setError, interactive, excluded);
   const [wasInteractive, setWasInteractive] = useState(interactive);
   if (wasInteractive !== interactive) {
     setWasInteractive(interactive);
@@ -76,10 +78,12 @@ export function OverlayWindow() {
     <main
       className={`overlay-surface ${state?.settings.clickThrough ? 'is-click-through' : ''} ${excluded ? 'is-capture-excluded' : ''} ${active && interactive ? 'is-gesturing' : ''}`}
       style={{ fontSize: `${state?.settings.fontSize ?? 20}px` }}
+      onContextMenu={visibilityMenu.onContextMenu}
       onDragStart={(event) => {
         if (gesturePending.current) event.preventDefault();
       }}
     >
+      {visibilityMenu.menu}
       <header
         className="overlay-drag-handle"
         onPointerEnter={() => setHovered('move')}
@@ -97,11 +101,31 @@ export function OverlayWindow() {
             {state?.settings.clickThrough ? 'click-through' : 'document'}
           </span>
         </span>
-        {hint ? (
-          <span className="overlay-gesture-hint">{hints[hint]}</span>
-        ) : (
-          <span className="overlay-recovery-hint">Ctrl+Alt+V to restore controls</span>
-        )}
+        <div className="overlay-header-actions">
+          {hint ? (
+            <span className="overlay-gesture-hint">{hints[hint]}</span>
+          ) : (
+            <span className="overlay-recovery-hint">Ctrl+Alt+V to restore controls</span>
+          )}
+          <button
+            type="button"
+            className="overlay-close"
+            aria-label="Hide overlay"
+            title="Hide overlay (Ctrl+Alt+Shift+V to show again)"
+            disabled={!interactive}
+            onPointerEnter={() => setHovered(null)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => {
+              void invoke('overlay_visibility', { visible: false }).catch((failure: unknown) =>
+                setError(errorMessage(failure)),
+              );
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </button>
+        </div>
       </header>
       <article className="overlay-document" aria-label="Overlay document">
         {state?.captureTest && (
