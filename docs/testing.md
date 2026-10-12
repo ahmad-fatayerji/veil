@@ -1,5 +1,21 @@
 # Verification record
 
+## Overlay capture layer hotfix - 12 October 2026
+
+The user tested PR #43 with Discord full-desktop sharing started before Veil.
+The first native visibility-only candidate did not clear the black rectangle;
+manual hide/wait/show did. The revised debug build recreates the layered style
+while hidden, restores opacity and confirms exclusion before showing. The user
+reported that this revision appears to fix the problem and requested a hotfix.
+
+Production frontend builds and the final Windows debug build passed during the
+investigation. Changed-file formatting, JavaScript/PowerShell syntax checks and
+a one-second read-only diagnostic-script run without an active Veil passed.
+Local test suites and native capture acceptance were not run. Release CI must
+validate the exact hotfix source before merge and publication. Discord's internal
+capture state was not observed; the broader capture compatibility matrix and
+other hardware/modes remain unverified for this revision.
+
 ## Short invitation links and optional approval - 12 October 2026
 
 Added 22-character, 128-bit invitation codes, local encrypted invitation lookup,
