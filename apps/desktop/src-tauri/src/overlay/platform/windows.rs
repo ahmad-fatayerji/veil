@@ -11,7 +11,7 @@ use windows::Win32::{
         GetWindowDisplayAffinity, GetWindowLongPtrW, SetLayeredWindowAttributes,
         SetWindowDisplayAffinity, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, HWND_NOTOPMOST,
         HWND_TOPMOST, LWA_ALPHA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WDA_EXCLUDEFROMCAPTURE,
-        WDA_NONE, WS_EX_LAYERED,
+        WDA_MONITOR, WDA_NONE, WINDOW_DISPLAY_AFFINITY, WS_EX_LAYERED,
     },
 };
 
@@ -181,6 +181,24 @@ fn supports_capture_version(major: u32, build: u32) -> bool {
     (major, build) >= (10, 19041)
 }
 
+fn apply_capture_affinity(
+    enabled: bool,
+    mut set: impl FnMut(WINDOW_DISPLAY_AFFINITY) -> Result<(), OverlayError>,
+) -> Result<(), OverlayError> {
+    if enabled {
+        // Repeating EXCLUDEFROMCAPTURE can leave the compositor's stale black
+        // surface unchanged after hidden-window/style initialization (#22).
+        // Force a protected affinity transition rather than briefly making the
+        // overlay capturable with NONE, as the manual off/on workaround does.
+        // MONITOR is only an intermediate reset on supported Windows, never a
+        // successful fallback: EXCLUDEFROMCAPTURE must succeed and read back.
+        set(WDA_MONITOR)?;
+        set(WDA_EXCLUDEFROMCAPTURE)
+    } else {
+        set(WDA_NONE)
+    }
+}
+
 pub fn capture_exclusion(
     window: &WebviewWindow,
     enabled: bool,
@@ -199,7 +217,9 @@ pub fn capture_exclusion(
     // This top-level HWND is owned by the desktop, never provided by the frontend.
     unsafe {
         if apply {
-            SetWindowDisplayAffinity(handle, expected).map_err(OverlayError::native)?;
+            apply_capture_affinity(enabled, |affinity| {
+                SetWindowDisplayAffinity(handle, affinity).map_err(OverlayError::native)
+            })?;
         }
         let mut actual = 0;
         GetWindowDisplayAffinity(handle, &mut actual).map_err(OverlayError::native)?;
@@ -319,5 +339,42 @@ mod tests {
         assert!(supports_capture_version(10, 19041));
         assert!(supports_capture_version(10, 26100));
         assert!(supports_capture_version(11, 100));
+    }
+
+    #[test]
+    fn capture_refresh_never_temporarily_allows_capture() {
+        let mut calls = Vec::new();
+        apply_capture_affinity(true, |affinity| {
+            calls.push(affinity);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(calls, [WDA_MONITOR, WDA_EXCLUDEFROMCAPTURE]);
+        assert!(!calls.contains(&WDA_NONE));
+        calls.clear();
+        apply_capture_affinity(false, |affinity| {
+            calls.push(affinity);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(calls, [WDA_NONE]);
+    }
+
+    #[test]
+    fn capture_refresh_propagates_failures_without_unprotected_fallback() {
+        for failure in [WDA_MONITOR, WDA_EXCLUDEFROMCAPTURE] {
+            let mut calls = Vec::new();
+            let result = apply_capture_affinity(true, |affinity| {
+                calls.push(affinity);
+                if affinity == failure {
+                    Err(OverlayError::native("affinity failure"))
+                } else {
+                    Ok(())
+                }
+            });
+            assert_eq!(result.unwrap_err().code, "NATIVE_ERROR");
+            assert_eq!(calls.last(), Some(&failure));
+            assert!(!calls.contains(&WDA_NONE));
+        }
     }
 }

@@ -21,9 +21,11 @@ let app;
 let browser;
 let underlay;
 const errors = [];
+const startupOnly = process.argv.includes('--startup-only');
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
-async function waitFor(check, name) {
-  for (let attempt = 0; attempt < 100; attempt++) {
+async function waitFor(check, name, timeout = 15000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
     if (await check()) return;
     await delay(150);
   }
@@ -611,7 +613,6 @@ try {
   await main.getByRole('button', { name: 'Capture compatibility test', exact: true }).click();
   await main.getByRole('button', { name: 'Show test card', exact: true }).click();
   await overlay.getByLabel('Capture test card').waitFor();
-  await command(main, 'overlay_update', { patch: { opacity: 1, alwaysOnTop: true } });
   const opacitySlider = main.getByRole('slider', { name: /Opacity/ });
   assert.deepEqual(
     await opacitySlider.evaluate((node) => {
@@ -621,10 +622,8 @@ try {
     ['0px', '0px', '0px'],
     'Range track has no text-field padding or border at maximum opacity.',
   );
-  await main.locator('label[for="overlay-opacity"]').screenshot({
-    path: resolve(directory, 'opacity-100.png'),
-  });
-  native('Move', { X: 100, Y: 100 });
+  // Keep the full overlay crop inside the underlay's client area, below its title bar.
+  native('Move', { X: 100, Y: 130 });
   native('Move', { X: 900, Y: 100 }, 'main');
   underlay = spawn(
     'powershell.exe',
@@ -647,11 +646,44 @@ try {
     ],
     { windowsHide: true, stdio: 'ignore' },
   );
-  await delay(1500);
-  await cursorAcceptance(main, overlay, recoveryAvailable);
+  await waitFor(
+    async () => {
+      if (underlay.exitCode !== null) throw new Error(`Underlay exited: ${underlay.exitCode}`);
+      return readFile(resolve(directory, 'underlay-click.txt.ready')).then(
+        () => true,
+        () => false,
+      );
+    },
+    'underlay window ready',
+    60000,
+  );
   const results = [];
   const modes = ['gdi', 'dxgi'];
   if (process.env.VEIL_TEST_OBS_PORTABLE) modes.push('obs-dxgi', 'obs-wgc');
+  async function captureExcluded(phase) {
+    for (const mode of modes) {
+      const result = await capture(mode, phase);
+      results.push(result);
+      await writeFile(resolve(directory, 'capture-results.json'), JSON.stringify(results, null, 2));
+      assert.equal(result.bounds.affinity, 0x11);
+      assert.ok(result.yellow < 100, `${mode}: card excluded during ${phase}`);
+      assert.ok(
+        result.blue / (result.bounds.width * result.bounds.height) > 0.97,
+        `${mode}: underlying app visible without a black box during ${phase}`,
+      );
+    }
+  }
+  // Check the default-on path before any off/on transition can repair it (#22).
+  await captureExcluded('first-show-default-on');
+  await command(main, 'overlay_visibility', { visible: false });
+  await command(main, 'overlay_visibility', { visible: true });
+  await captureExcluded('reshow-default-on');
+  await command(main, 'overlay_update', { patch: { opacity: 1, alwaysOnTop: true } });
+  await main.locator('label[for="overlay-opacity"]').screenshot({
+    path: resolve(directory, 'opacity-100.png'),
+  });
+  await captureExcluded('appearance-default-on');
+  if (!startupOnly) await cursorAcceptance(main, overlay, recoveryAvailable);
   for (const mode of modes) {
     if (await checkbox.isChecked()) await checkbox.click();
     await waitFor(async () => (await snapshot(main)).capture.status === 'disabled', 'disabled');
@@ -666,7 +698,7 @@ try {
     assert.ok(on.yellow < 100, `${mode}: card excluded in captured output`);
     assert.ok(on.blue > 10000, `${mode}: underlying app captured, not a black overlay`);
     results.push(off, on);
-    if (!mode.startsWith('obs-')) {
+    if (!mode.startsWith('obs-') && !startupOnly) {
       results.push(
         await captureGesture(mode, false, overlay),
         await captureGesture(mode, true, overlay),
@@ -692,7 +724,7 @@ try {
   }
   await command(main, 'overlay_visibility', { visible: false });
   await command(main, 'overlay_visibility', { visible: true });
-  if (recoveryAvailable) native('Recover');
+  if (recoveryAvailable && !startupOnly) native('Recover');
   else await command(main, 'overlay_recover');
   await waitFor(async () => (await snapshot(main)).settings.visible, 'recovered');
   assert.equal(native('Probe').affinity, 0x11);
@@ -716,17 +748,20 @@ try {
   for (const excluded of [true, false]) {
     await command(main, 'overlay_update', { patch: { captureExclusion: excluded, opacity: 1 } });
     await overlay.locator('.tiptap').fill(`Editing works with exclusion ${excluded}.`);
-    if (excluded) await captureGesture(null, true, overlay, 'southEast', 'release', 'editor');
+    if (excluded && !startupOnly)
+      await captureGesture(null, true, overlay, 'southEast', 'release', 'editor');
     await waitFor(
       async () => (await main.locator('.tiptap').textContent())?.includes(`exclusion ${excluded}`),
       'overlay editing sync',
     );
-    native('Focus');
-    assert.equal(
-      (await pointAtEditor(overlay)).name,
-      'text',
-      'Idle editing retains actual Windows text cursor',
-    );
+    if (!startupOnly) {
+      native('Focus');
+      assert.equal(
+        (await pointAtEditor(overlay)).name,
+        'text',
+        'Idle editing retains actual Windows text cursor',
+      );
+    }
   }
   await command(main, 'overlay_update', { patch: { captureExclusion: true } });
   await main.getByRole('button', { name: 'Close document', exact: true }).click();
@@ -740,6 +775,9 @@ try {
   assert.equal((await snapshot(main)).capture.status, 'applied');
   assert.equal((await snapshot(main)).captureTest, false, 'Test card not persisted');
   assert.equal(native('Probe').affinity, 0x11);
+  await command(main, 'overlay_capture_test', { enabled: true });
+  await overlay.getByLabel('Capture test card').waitFor();
+  await captureExcluded('restart-saved-on');
   await main.getByLabel('Exclude overlay from compatible captures', { exact: true }).click();
   await waitFor(
     async () => (await snapshot(main)).capture.status === 'disabled',
@@ -765,7 +803,8 @@ try {
           '\n',
         )[0],
         results,
-        globalShortcutAndClickThroughVerified: recoveryAvailable,
+        globalShortcutAndClickThroughVerified: recoveryAvailable && !startupOnly,
+        startupOnly,
       },
       null,
       2,
