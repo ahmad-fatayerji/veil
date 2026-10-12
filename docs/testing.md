@@ -18,7 +18,9 @@ user/CI execution.
 Coordinated server validation passed: cargo fmt check, Clippy with warnings denied,
 11 Rust tests (including real loopback WebSocket rejection ordering), the public
 HKDF fixture, Python integration syntax and Compose configuration. Docker's Linux
-engine was unavailable locally, so container build/TURN integration requires CI.
+engine was unavailable locally. The coordinated
+[server CI run](https://github.com/ahmad-fatayerji/veil-server/actions/runs/38209810090)
+passed its Rust checks, container build, STUN/TURN integration and Server CI gate.
 Cross-device networking, Windows activation, native rendering and user acceptance
 remain unverified.
 
