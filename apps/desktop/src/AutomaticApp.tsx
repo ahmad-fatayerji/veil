@@ -9,8 +9,10 @@ import {
   type AutomaticSession,
   type PeerSession,
   type PeerSummary,
+  type PendingGuest,
+  type JoinMode,
 } from '@veil/collaboration';
-import { decodeShareLink, decodeServerInvitation } from '@veil/protocol';
+import { parseShareLink, decodeServerInvitation } from '@veil/protocol';
 import {
   Brand,
   Dialog,
@@ -52,6 +54,10 @@ export function AutomaticApp() {
   const [name, setName] = useState(readDisplayName);
   const [invitation, setInvitation] = useState('');
   const [link, setLink] = useState('');
+  const [joinMode, setJoinMode] = useState<JoinMode>('auto');
+  const [pendingGuests, setPendingGuests] = useState<PendingGuest[]>([]);
+  const joining = useRef<AbortController | null>(null);
+  const [joinInProgress, setJoinInProgress] = useState(false);
   const [peers, setPeers] = useState<PeerSummary[]>([]);
   const [notice, setNotice] = useState('');
   const [compatibilityNotice, setCompatibilityNotice] = useState('');
@@ -94,6 +100,7 @@ export function AutomaticApp() {
   useEffect(
     () => () => {
       compatibilityDecision.current?.(false);
+      joining.current?.abort();
     },
     [],
   );
@@ -127,7 +134,7 @@ export function AutomaticApp() {
       const code = urls.find((url) => url.startsWith('veil:'));
       if (!code) return;
       try {
-        decodeShareLink(code, development);
+        parseShareLink(code, development);
         if (documentRef.current || busyRef.current) setPendingLink(code);
         else {
           setInvitation(code);
@@ -160,10 +167,10 @@ export function AutomaticApp() {
     document.provider.on('status', changed);
     document.provider.on('sync', changed);
     changed();
-    const timer = setInterval(
-      () => setServiceOnline(network.current?.serviceOnline ?? false),
-      1000,
-    );
+    const timer = setInterval(() => {
+      setServiceOnline(network.current?.serviceOnline ?? false);
+      setPendingGuests(network.current?.pendingGuests ?? []);
+    }, 1000);
     return () => {
       clearInterval(timer);
       document.provider.off('peers', changed);
@@ -203,27 +210,36 @@ export function AutomaticApp() {
   }
   async function join() {
     if (!name.trim()) throw new Error('Enter your name.');
-    if (invitation.trim().startsWith('veil://')) decodeShareLink(invitation.trim(), development);
+    if (invitation.trim().startsWith('veil://')) parseShareLink(invitation.trim(), development);
     else decodeServerInvitation(invitation.trim(), development);
-    await invoke('document_open');
-    setCompatibilityNotice('');
-    setNotice('Connecting to host…');
+    const controller = new AbortController();
+    joining.current = controller;
+    setJoinInProgress(true);
+    let opened = false;
     try {
+      await invoke('document_open');
+      opened = true;
+      setCompatibilityNotice('');
+      setNotice('Connecting to host...');
       const joined = await joinShareLink(
         invitation,
         name.trim(),
         signaling(),
         setNotice,
         development,
+        controller.signal,
       );
       network.current = joined;
       setSession(joined);
       adopt(joined.session);
       setInvitation('');
     } catch (e) {
-      await invoke('document_closed');
+      if (opened) await invoke('document_closed');
       setNotice('');
       throw e;
+    } finally {
+      joining.current = null;
+      setJoinInProgress(false);
     }
   }
   function openSettings(next: Section = 'General') {
@@ -250,6 +266,7 @@ export function AutomaticApp() {
       );
       network.current = started;
       setSession(started);
+      setJoinMode(started.joinMode);
     }
     setLink(await network.current.enableSharing());
     setShareOpen(true);
@@ -306,6 +323,8 @@ export function AutomaticApp() {
       setSession(null);
       setPeers([]);
       setLink('');
+      setPendingGuests([]);
+      setJoinMode('auto');
       setNotice('');
       setCompatibilityNotice('');
       setError('');
@@ -366,7 +385,7 @@ export function AutomaticApp() {
                   aria-expanded={people}
                   onClick={() => setPeople(!people)}
                 >
-                  People
+                  People{pendingGuests.length > 0 ? ` (${pendingGuests.length} waiting)` : ''}
                 </button>
                 <button
                   className="secondary-button"
@@ -545,6 +564,45 @@ export function AutomaticApp() {
                     </>
                   )}
                 </details>
+                {!guest && pendingGuests.length > 0 && (
+                  <section aria-label="Join requests">
+                    <h3>Join requests</h3>
+                    <p className="muted">
+                      Names are supplied by guests and do not verify identity.
+                    </p>
+                    {pendingGuests.map((pending) => (
+                      <div key={pending.id}>
+                        <p>{pending.name}</p>
+                        <div className="form-actions">
+                          <button
+                            className="primary-button"
+                            disabled={busy}
+                            onClick={() =>
+                              void run(async () => {
+                                await session!.approveGuest(pending.id);
+                                setPendingGuests(session!.pendingGuests);
+                              })
+                            }
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="secondary-button"
+                            disabled={busy}
+                            onClick={() =>
+                              void run(async () => {
+                                await session!.rejectGuest(pending.id);
+                                setPendingGuests(session!.pendingGuests);
+                              })
+                            }
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                )}
               </PeoplePanel>
             )}
           </main>
@@ -834,8 +892,53 @@ export function AutomaticApp() {
           </div>
         </div>
       </Dialog>
+      {joinInProgress && (
+        <Dialog
+          open
+          title="Joining session"
+          onClose={() => {
+            joining.current?.abort();
+            decideCompatibility(false);
+          }}
+        >
+          <p role="status">{notice || 'Connecting to host...'}</p>
+          <p className="muted">Approval requests expire after two minutes.</p>
+          <button
+            className="secondary-button"
+            onClick={() => {
+              joining.current?.abort();
+              decideCompatibility(false);
+            }}
+          >
+            Cancel join
+          </button>
+        </Dialog>
+      )}
       <Dialog open={shareOpen} title="Share document" onClose={() => setShareOpen(false)}>
-        <p>Anyone with this link can join and edit. Send it to people you trust.</p>
+        <p>
+          {joinMode === 'auto'
+            ? 'Anyone with this link can join and edit.'
+            : 'Guests with this link need your approval before joining.'}{' '}
+          Send it to people you trust.
+        </p>
+        <label htmlFor="share-join-mode">Join mode</label>
+        <select
+          id="share-join-mode"
+          value={joinMode}
+          disabled={busy}
+          onChange={(event) => {
+            const mode = event.target.value as JoinMode;
+            network.current?.setJoinMode(mode);
+            setJoinMode(mode);
+          }}
+        >
+          <option value="auto">Auto join</option>
+          <option value="approval">Require approval</option>
+        </select>
+        <p className="muted">
+          Changing mode keeps this link. Existing guests stay connected; waiting requests still need
+          a decision.
+        </p>
         {link ? (
           <>
             <label htmlFor="share-link">Session link</label>

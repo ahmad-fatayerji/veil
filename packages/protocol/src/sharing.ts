@@ -171,6 +171,51 @@ export async function establishLink(
 }
 export const newShareId = () => randomSecret(16);
 
+export interface AdmissionStatus {
+  version: 1;
+  sessionId: string;
+  groupId: string;
+  inviteId: string;
+  hostClientId: number;
+  guestClientId: number;
+  guestPublic: string;
+  state: 'waiting' | 'rejected';
+  deadline: number;
+}
+export async function signAdmissionStatus(privateKey: CryptoKey, status: AdmissionStatus) {
+  return base64(
+    new Uint8Array(
+      await crypto.subtle.sign(
+        { name: 'ECDSA', hash: 'SHA-256' },
+        privateKey,
+        encode(['veil.admission-status.v1', status]),
+      ),
+    ),
+  );
+}
+export async function verifyAdmissionStatus(
+  group: ShareInvitation,
+  status: AdmissionStatus,
+  signature: string,
+) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    bytes(group.hostPublic),
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['verify'],
+  );
+  if (
+    !(await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      key,
+      bytes(signature),
+      encode(['veil.admission-status.v1', status]),
+    ))
+  )
+    throw new Error('Host approval authentication failed.');
+}
+
 // Separate domain/signature leaves the v1 exchange transcript and derived keys intact.
 function compatibilityTranscript(handshake: ShareHandshake, metadata: ClientCompatibility) {
   return encode(['veil.compatibility.v1', handshake, clientCompatibility(metadata)]);

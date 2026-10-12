@@ -96,3 +96,4 @@ export * from './signaling';
 export * from './sharing';
 
 export * from './compatibility';
+export * from './short-invitation';

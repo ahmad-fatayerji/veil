@@ -22,7 +22,11 @@ it('retains the same local document and awareness after unsupported servers and 
   const transport: SignalingTransport = {
     request: async (_server, path) => {
       paths.push(path);
-      if (path === '/v2/capabilities') return { groupSharing: supported ? 1 : undefined };
+      if (path === '/v2/capabilities')
+        return {
+          groupSharing: supported ? 1 : undefined,
+          shortInvitations: supported ? 1 : undefined,
+        };
       if (path === '/v2/sessions')
         return { ticket: 'a'.repeat(64), sessionId: 'b'.repeat(32), stunUrls: [] };
       if (path.endsWith('/sharing') && fail) throw new Error('Service unavailable');
