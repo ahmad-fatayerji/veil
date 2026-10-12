@@ -27,12 +27,7 @@ pub fn refresh_overlay_label(app: &AppHandle, visible: bool) {
     }
 }
 
-pub fn request_quit(app: &AppHandle) {
-    let _ = show_main(app);
-    let _ = app.emit_to("main", "app-quit-requested", ());
-}
-
-pub fn quit_on_window_close(app: &AppHandle) {
+pub fn quit_immediately(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         if let Err(error) = quit(&app).await {
@@ -67,8 +62,7 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
                 let _ = show_main(app);
             }
             "quit" => {
-                // The control panel owns the document and confirms loss before quitting.
-                request_quit(app);
+                quit_immediately(app);
             }
             "overlay" => crate::overlay::tray_toggle(app),
             _ => {}

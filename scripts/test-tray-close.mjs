@@ -69,23 +69,6 @@ const invoke = (page, command, args) =>
     command,
     args,
   });
-// Exercise the event emitted by the tray menu without requiring a physical
-// tray-menu pointer action. The Settings panel has no standalone quit button.
-const requestTrayQuit = (page) =>
-  page.evaluate(() => {
-    const event = 'app-quit-requested';
-    const listeners = Object.values(Object.getOwnPropertyDescriptors(window))
-      .map((property) => property.value)
-      .find((value) => value && Object.hasOwn(value, event))?.[event];
-    if (!listeners) throw new Error('Tray quit listener is not registered');
-    for (const id of Object.getOwnPropertyNames(listeners)) {
-      window.__TAURI_INTERNALS__.runCallback(listeners[id].handlerId, {
-        event,
-        id: Number(id),
-        payload: null,
-      });
-    }
-  });
 try {
   await waitFor(async () => (await fetch(`${endpoint}/json/version`).catch(() => null))?.ok);
   browser = await chromium.connectOverCDP(endpoint);
@@ -120,39 +103,21 @@ try {
   await waitFor(
     async () => (await invoke(main, 'overlay_snapshot')).settings.closeBehavior === 'quit',
   );
-  await requestTrayQuit(main);
-  const quit = main.getByRole('dialog', { name: 'Quit Veil?', exact: true });
-  await expect(quit).toContainText('temporary');
-  await main.screenshot({ path: resolve(directory, 'quit-confirmation.png') });
-  await quit.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(quit).not.toBeVisible();
-  console.log('PASS: explicit Quit Veil still confirms and can be cancelled');
-  assert.equal(app.exitCode, null);
-  await expect(main.locator('.tiptap')).toContainText('Edited while main is in tray');
+  await expect(main.getByRole('dialog', { name: 'Quit Veil?', exact: true })).toHaveCount(0);
   await settings.getByLabel('When closing the main window').selectOption('tray');
   await waitFor(
     async () => (await invoke(main, 'overlay_snapshot')).settings.closeBehavior === 'tray',
   );
-  await invoke(main, 'overlay_visibility', { visible: false });
   native('Close', 'main');
   await waitFor(() => !native('Probe', 'main').visible);
-  assert.equal(native('Probe', 'overlay').visible, false);
-  native('Focus', 'main');
-  await requestTrayQuit(main);
-  await expect(quit).toBeVisible();
-  await quit.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(quit).not.toBeVisible();
-  await settings.getByLabel('When closing the main window').selectOption('quit');
-  await waitFor(
-    async () => (await invoke(main, 'overlay_snapshot')).settings.closeBehavior === 'quit',
-  );
-  await requestTrayQuit(main);
-  await quit.getByRole('button', { name: 'Quit Veil', exact: true }).click();
+  // Exercise the native shutdown shared by tray Quit Veil and app_quit.
+  // This does not simulate a physical tray-menu click.
+  await invoke(main, 'app_quit').catch(() => {});
   await waitFor(() => app.exitCode !== null);
   assert.equal(app.exitCode, 0);
   assert.equal(
     JSON.parse(await readFile(resolve(directory, 'overlay.json'), 'utf8')).closeBehavior,
-    'quit',
+    'tray',
   );
   await browser.close();
   await waitFor(async () => !(await fetch(`${endpoint}/json/version`).catch(() => null))?.ok);
@@ -163,7 +128,11 @@ try {
   const restarted = pages().find((page) => !page.url().includes('?overlay'));
   restarted.on('pageerror', (error) => errors.push(error.message));
   await restarted.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(restarted.getByLabel('When closing the main window')).toHaveValue('quit');
+  await expect(restarted.getByLabel('When closing the main window')).toHaveValue('tray');
+  await restarted.getByLabel('When closing the main window').selectOption('quit');
+  await waitFor(
+    async () => (await invoke(restarted, 'overlay_snapshot')).settings.closeBehavior === 'quit',
+  );
   await restarted.getByRole('button', { name: 'Close Settings', exact: true }).click();
   await restarted.getByRole('button', { name: 'Create document', exact: true }).click();
   await restarted.locator('.tiptap').fill('Window close quits even with a temporary document');
@@ -174,7 +143,7 @@ try {
   assert.equal(app.exitCode, 0);
   assert.deepEqual(errors, []);
   console.log(
-    `PASS: default tray behavior, immediate native close in Quit mode, explicit quit cancellation/exit, overlay preservation and preference restart. Evidence: ${directory}`,
+    `PASS: default tray behavior, immediate native close in Quit mode, immediate native quit, overlay preservation and preference restart. Evidence: ${directory}`,
   );
 } finally {
   if (browser) await browser.close().catch(() => {});

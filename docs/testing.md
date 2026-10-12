@@ -8,6 +8,42 @@ WebView viewport emulation at 800, 960, 1,180 and 1,600 pixels verified full wor
 
 Both production frontend builds, the debug Windows executable and all 27 TypeScript tests passed. No release was published.
 
+## Named overlay cursors and participant alignment — 11 October 2026
+
+The overlay now uses the regular editor's named remote cursors and colored
+selections. The main window relays remote awareness snapshots, updates,
+heartbeats and removal tombstones; local overlay presence retains one desktop
+identity. Participant status inherits the strip's font size and has no sidebar
+top margin, keeping names and status text aligned.
+
+`pnpm check`, both production frontend builds, all 27 TypeScript tests and all
+25 Rust tests passed; two installer-artifact tests were intentionally skipped.
+The first Rust run hit the previously recorded updater cancellation/slow-download
+timing failures during compilation; the serial rerun passed. The debug Windows
+executable was rebuilt after that first Cargo run before native acceptance.
+
+A focused copy of `scripts/test-overlay.mjs` ran through its collaboration checks
+on real Windows/WebView2 with isolated settings. It omitted the recovery-shortcut
+assertion and the later global-shortcut/compositor/restart checks to preserve the
+already-open Veil instance. It verified visible author names, colored selections,
+no self cursor or extra participant, current cursor/selection after overlay reload,
+idle cursor retention beyond 30 seconds, blur/removal cleanup, typing activity,
+aligned away status within one pixel, bidirectional/concurrent edits, reconnect,
+and leave/rejoin. Cursor and participant-strip screenshots were visually inspected.
+Evidence: `target/overlay-acceptance/run-yxpYv1/`.
+
+This focused run does not verify capture compatibility, global shortcuts,
+unrelated-network transport, multiple monitors/DPI, or non-Windows behavior.
+No release was published.
+
+## Immediate tray quit ? 11 October 2026
+
+Tray **Quit Veil** now calls the same immediate native shutdown handler as the **Quit app** window-close preference. It no longer opens the control panel or shows a confirmation. Preferences still flush before exit, update installation still blocks quitting, and shutdown errors still reopen the control panel. The unused frontend quit dialog and request listener were removed.
+
+`pnpm check`, both production frontend builds, 27 TypeScript tests and 25 Rust tests passed; two signed-installer tests were intentionally ignored. The initial Rust run hit the previously recorded updater timing failures while compilation was active; the full serial rerun after checks passed. The Windows debug executable was rebuilt after Cargo tests. `node scripts/test-tray-close.mjs` passed default close-to-tray behavior, editing through the visible overlay while the main window is hidden, overlay command authorization, immediate native shutdown with an active document/overlay, saved preferences after restart, and immediate window-close exit in Quit mode. Evidence: `target/tray-acceptance/run-wlQaZ3/`.
+
+The fixture invokes `app_quit`, which shares native shutdown with the tray handler; it does not click the physical tray menu. Physical tray-menu interaction, non-Windows runtime behavior and multi-peer shutdown remain unverified. No release was published.
+
 ## General settings quit cleanup ? 11 October 2026
 
 General no longer shows the standalone **Quit Veil** button or its explanatory line. The existing native **Quit app** close path exits immediately without a confirmation, including with a temporary document and visible overlay. Default tray behavior and tray quit confirmation remain unchanged.
