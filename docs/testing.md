@@ -1,5 +1,112 @@
 # Verification record
 
+## Overlay control cursor with capture exclusion - 12 October 2026
+
+The overlay close button and its **Hide overlay** menu action now use the default
+arrow cursor when capture exclusion is enabled, retaining hover/focus styling.
+The portaled menu receives the overlay's exclusion setting explicitly. Normal
+cursor behavior remains when exclusion is disabled and in the main document menu.
+Formatting was applied; no builds or tests were run for this revision. Actual
+Windows pointer behavior and capture output remain unverified. No release was
+published.
+
+## Matching app-styled visibility menus - 12 October 2026
+
+Both visibility menus now use one desktop React component and the app's theme
+tokens, replacing the different WebView2 and Windows menu implementations. They
+contain one action each, use square corners and matching icons, clamp to the
+window bounds, and support keyboard focus, activation and Escape dismissal.
+Outside clicks, scrolling, window resize and blur dismiss the menu. The overlay
+menu is rendered inside the overlay webview, under its native capture policy.
+
+The acceptance fixture now checks the single focused menu item in each window,
+Escape dismissal and native keyboard activation, using webview screenshots for
+the app-styled menus. Formatting was applied; no builds or tests were run for this
+revision under the ordinary feature workflow. User testing remains pending.
+Earlier records below describe previous revisions. No release was published.
+
+## Simplified overlay and main document menus - 12 October 2026
+
+The Windows overlay context menu now contains only **Hide overlay**. The main
+document context menu contains only **Show overlay**, which shows the overlay
+without toggling it off when already visible. The desktop editor owns the main
+document menu; shared browser editors are unchanged. Both actions preserve the
+document and session.
+
+The native tray acceptance fixture now includes hiding through the overlay menu
+and showing through the main document menu, with screenshots for manual menu
+inspection. This revision has not been built or tested locally; testing is left
+to the user under the ordinary feature workflow. The results below predate this
+menu simplification. No release was published.
+
+## Overlay close button and context menu - 12 October 2026
+
+The square overlay has a header close button and a Windows native **Hide overlay**
+context-menu action. Both hide the overlay without ending the temporary document
+or session. The native menu retains its standard editing actions; showing the
+overlay and changing preferences remain control-panel operations.
+
+After integrating current develop, `pnpm check`, both production frontend builds,
+27 TypeScript tests and 27 Rust tests passed. Two signed-installer tests were
+intentionally ignored. The debug executable was rebuilt after Cargo tests.
+`node scripts/test-tray-close.mjs` passed real Windows/WebView2 right-clicks in the
+editor and header followed by native End/Enter menu selection, document retention,
+pointer/keyboard close-button activation, compact header layout, unchanged bounds,
+show authorization, hide with the main close preference set to Quit app, and the
+existing tray/native quit/restart regression. The menu screenshot was inspected.
+Evidence: `target/tray-acceptance/run-DrzDHe/`.
+
+The isolated fixture temporarily disables capture exclusion for the menu screenshot
+and restores it before the header-menu check. Earlier attempts stopped on desktop
+input/menu-accessibility contention; the final fixture checks pointer ownership
+and uses native menu keyboard selection. Physical mouse selection of the menu item,
+non-Windows runtime behavior, multiple monitors/DPI, and the full capture/networking
+acceptance matrices remain unverified by this focused run. No release was published.
+
+## Main document width (issue #23) — 11 October 2026
+
+The desktop workspace now fills the usable window width, with the existing People sidebar and responsive drawer retained. Real Windows/WebView2 local-document acceptance reproduced the previous 393-pixel editor and measured 829 pixels after the fix at a 1,180-pixel viewport (1,165 usable pixels after the scrollbar); closing People measured 1,101 pixels. The before/after screenshots were visually inspected.
+
+WebView viewport emulation at 800, 960, 1,180 and 1,600 pixels verified full workspace width, no horizontal overflow, the 240-pixel sidebar at larger sizes, People hide/show, and retained editable document contents. At 800 pixels, the existing 320-pixel People drawer remains usable. Evidence: `target/editor-width-acceptance/run-2vNfve/` (viewport emulation) and `target/editor-width-acceptance/run-w5WUIq/` (native initial viewport). The native resize helper did not change the observed viewport, so real native resizing and multiple DPI/monitor configurations remain unverified.
+
+Both production frontend builds, the debug Windows executable and all 27 TypeScript tests passed. No release was published.
+
+## Named overlay cursors and participant alignment — 11 October 2026
+
+The overlay now uses the regular editor's named remote cursors and colored
+selections. The main window relays remote awareness snapshots, updates,
+heartbeats and removal tombstones; local overlay presence retains one desktop
+identity. Participant status inherits the strip's font size and has no sidebar
+top margin, keeping names and status text aligned.
+
+`pnpm check`, both production frontend builds, all 27 TypeScript tests and all
+25 Rust tests passed; two installer-artifact tests were intentionally skipped.
+The first Rust run hit the previously recorded updater cancellation/slow-download
+timing failures during compilation; the serial rerun passed. The debug Windows
+executable was rebuilt after that first Cargo run before native acceptance.
+
+A focused copy of `scripts/test-overlay.mjs` ran through its collaboration checks
+on real Windows/WebView2 with isolated settings. It omitted the recovery-shortcut
+assertion and the later global-shortcut/compositor/restart checks to preserve the
+already-open Veil instance. It verified visible author names, colored selections,
+no self cursor or extra participant, current cursor/selection after overlay reload,
+idle cursor retention beyond 30 seconds, blur/removal cleanup, typing activity,
+aligned away status within one pixel, bidirectional/concurrent edits, reconnect,
+and leave/rejoin. Cursor and participant-strip screenshots were visually inspected.
+Evidence: `target/overlay-acceptance/run-yxpYv1/`.
+
+This focused run does not verify capture compatibility, global shortcuts,
+unrelated-network transport, multiple monitors/DPI, or non-Windows behavior.
+No release was published.
+
+## Immediate tray quit ? 11 October 2026
+
+Tray **Quit Veil** now calls the same immediate native shutdown handler as the **Quit app** window-close preference. It no longer opens the control panel or shows a confirmation. Preferences still flush before exit, update installation still blocks quitting, and shutdown errors still reopen the control panel. The unused frontend quit dialog and request listener were removed.
+
+`pnpm check`, both production frontend builds, 27 TypeScript tests and 25 Rust tests passed; two signed-installer tests were intentionally ignored. The initial Rust run hit the previously recorded updater timing failures while compilation was active; the full serial rerun after checks passed. The Windows debug executable was rebuilt after Cargo tests. `node scripts/test-tray-close.mjs` passed default close-to-tray behavior, editing through the visible overlay while the main window is hidden, overlay command authorization, immediate native shutdown with an active document/overlay, saved preferences after restart, and immediate window-close exit in Quit mode. Evidence: `target/tray-acceptance/run-wlQaZ3/`.
+
+The fixture invokes `app_quit`, which shares native shutdown with the tray handler; it does not click the physical tray menu. Physical tray-menu interaction, non-Windows runtime behavior and multi-peer shutdown remain unverified. No release was published.
+
 ## General settings quit cleanup ? 11 October 2026
 
 General no longer shows the standalone **Quit Veil** button or its explanatory line. The existing native **Quit app** close path exits immediately without a confirmation, including with a temporary document and visible overlay. Default tray behavior and tray quit confirmation remain unchanged.

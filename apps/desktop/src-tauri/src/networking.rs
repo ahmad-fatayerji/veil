@@ -59,6 +59,7 @@ fn path_allowed(path: &str, method: &str) -> bool {
             | ("POST", "/v2/sessions")
             | ("POST", "/v2/join")
             | ("POST", "/v3/join")
+            | ("POST", "/v3/compatibility")
             | ("POST", "/v2/relay")
             | ("POST", "/v2/path")
             | ("POST", "/v2/leave")
@@ -248,6 +249,18 @@ async fn request(
         bytes.extend_from_slice(&chunk);
     }
     if !status.is_success() {
+        if status.as_u16() == 409 {
+            let value: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+            let message = match value.get("error").and_then(Value::as_str) {
+                Some("CLIENT_PROTOCOL_UNSUPPORTED") => Some("This app is no longer supported by the server. Open Settings > Updates, or ask the operator to update the server."),
+                Some("HOST_PROTOCOL_UNSUPPORTED") => Some("The host app is no longer supported by the server. Ask the host to update Veil."),
+                Some("PEER_PROTOCOL_UNSUPPORTED") => Some("Your app and the host use incompatible collaboration protocols. Open Settings > Updates or ask the host to update Veil."),
+                _ => None,
+            };
+            if let Some(message) = message {
+                return Err(message.into());
+            }
+        }
         return Err(match status.as_u16() {
             401 | 403 => "Server authorization rejected or session ended.",
             429 => "Server or relay capacity unavailable.",

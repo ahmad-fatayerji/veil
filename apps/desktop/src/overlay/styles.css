@@ -1,3 +1,44 @@
+.overlay-visibility-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 170px;
+  max-width: calc(100vw - 8px);
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+.overlay-visibility-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.overlay-visibility-menu button:hover,
+.overlay-visibility-menu button:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.overlay-visibility-menu button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.desktop-shell .workspace,
+.desktop-shell .workspace.with-sidebar {
+  width: 100%;
+  max-width: none;
+}
+
 .overlay-controls {
   max-width: 1210px;
   margin: 22px auto -16px;
@@ -146,7 +187,7 @@ html.overlay-mode,
   position: relative;
   height: 100%;
   border: 1px solid #e3e3e3;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--surface);
   color: var(--text);
   overflow: hidden;
@@ -168,6 +209,40 @@ html.overlay-mode,
   font-weight: 400;
   color: var(--muted);
   margin-left: 6px;
+}
+.overlay-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.overlay-recovery-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overlay-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.overlay-close:hover:not(:disabled) {
+  background: var(--border);
+  color: var(--text);
+}
+.overlay-close:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 .overlay-recovery-hint {
   font-size: 10px;
@@ -233,6 +308,8 @@ html.overlay-mode,
 }
 .overlay-participants .participant-activity {
   flex-shrink: 0;
+  margin-top: 0;
+  font-size: inherit;
 }
 .overlay-resize {
   position: absolute;
@@ -332,7 +409,9 @@ html.overlay-mode,
 }
 
 .overlay-surface.is-capture-excluded .overlay-drag-handle,
-.overlay-surface.is-capture-excluded .overlay-resize {
+.overlay-surface.is-capture-excluded .overlay-resize,
+.overlay-surface.is-capture-excluded .overlay-close,
+.overlay-visibility-menu.is-capture-excluded button {
   cursor: default;
 }
 

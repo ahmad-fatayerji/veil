@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Focus','Probe','CursorProbe','MovePointer','Escape','Click','Drag','HoldDrag','Move','Recover','Toggle','Capture','Pixel','Close')][string]$Action,
+  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Focus','Probe','CursorProbe','MovePointer','Escape','Click','RightClick','MenuLast','Drag','HoldDrag','Move','Recover','Toggle','Capture','Pixel','Close')][string]$Action,
   [Parameter(Mandatory=$true)][int]$AppProcessId,
   [ValidateSet('main','overlay')][string]$Window = 'overlay',
   [int]$X = 0, [int]$Y = 0, [int]$ToX = 0, [int]$ToY = 0,
@@ -54,6 +54,8 @@ public class VeilNativeTest {
     return result;
   }
   public static void Click(int x, int y) { SetCursorPos(x, y); Thread.Sleep(70); mouse_event(2,0,0,0,UIntPtr.Zero); Thread.Sleep(70); mouse_event(4,0,0,0,UIntPtr.Zero); }
+  public static void RightClick(int x, int y) { SetCursorPos(x, y); Thread.Sleep(70); mouse_event(8,0,0,0,UIntPtr.Zero); Thread.Sleep(70); mouse_event(16,0,0,0,UIntPtr.Zero); Thread.Sleep(200); }
+  public static void MenuLast() { keybd_event(0x23,0,0,UIntPtr.Zero); Thread.Sleep(70); keybd_event(0x23,0,2,UIntPtr.Zero); Thread.Sleep(70); keybd_event(0x0D,0,0,UIntPtr.Zero); Thread.Sleep(70); keybd_event(0x0D,0,2,UIntPtr.Zero); }
   public static void Escape() { keybd_event(0x1B,0,0,UIntPtr.Zero); Thread.Sleep(70); keybd_event(0x1B,0,2,UIntPtr.Zero); }
   public static void Drag(int x, int y, int toX, int toY) {
     SetCursorPos(x,y); Thread.Sleep(100); mouse_event(2,0,0,0,UIntPtr.Zero); Thread.Sleep(400);
@@ -102,7 +104,11 @@ if ($Action -eq 'Underlay') {
   $button.ForeColor = [System.Drawing.Color]::White
   $button.Add_Click({ [System.IO.File]::WriteAllText($OutputPath,'clicked') })
   $form.Controls.Add($button)
-  $form.Add_Shown({ [VeilNativeTest]::ShowWindow($form.Handle,9) | Out-Null; [VeilNativeTest]::SetForegroundWindow($form.Handle) | Out-Null })
+  $form.Add_Shown({
+    [VeilNativeTest]::ShowWindow($form.Handle,9) | Out-Null
+    [VeilNativeTest]::SetForegroundWindow($form.Handle) | Out-Null
+    [System.IO.File]::WriteAllText($OutputPath + '.ready','ready')
+  })
   $form.ShowDialog() | Out-Null
   $form.Dispose()
   exit
@@ -149,6 +155,8 @@ switch ($Action) {
     @{ x=$bounds.Left; y=$bounds.Top; clientX=$client.X; clientY=$client.Y; width=$bounds.Right-$bounds.Left; height=$bounds.Bottom-$bounds.Top; visible=[VeilNativeTest]::IsWindowVisible($handle); foreground=([VeilNativeTest]::GetForegroundWindow() -eq $handle); topmost=($style -band 8) -ne 0; clickThrough=($style -band 32) -ne 0; alpha=$alpha; layered=$layered; affinityRead=$affinityRead; affinity=$affinity } | ConvertTo-Json -Compress
   }
   'Click' { [VeilNativeTest]::Click($X,$Y) }
+  'RightClick' { [VeilNativeTest]::RightClick($X,$Y) }
+  'MenuLast' { [VeilNativeTest]::MenuLast() }
   'Drag' { [VeilNativeTest]::Drag($X,$Y,$ToX,$ToY) }
   'HoldDrag' { [VeilNativeTest]::HoldDrag($X,$Y,$ToX,$ToY,$OutputPath) }
   'Move' {

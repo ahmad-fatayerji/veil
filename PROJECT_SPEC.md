@@ -45,6 +45,10 @@ Reusable `veil://join/...` links pin the host identity and admit separate guest
 tickets. Reset link and Stop sharing revoke new admission, while already admitted
 guests retain their authenticated links until the session ends. Compatible servers
 advertise reusable-sharing support; do not silently substitute a legacy invitation.
+Release-maintained server API and peer protocol generations determine admission.
+Before joining, compatible host/guest app-version differences or missing legacy
+compatibility information require confirmation. Unsupported protocols block joining.
+Reusable links authenticate host compatibility metadata before document exchange.
 Retained legacy formats and LAN/browser tools are regression infrastructure, not
 the primary user journey. See [automatic networking](docs/automatic-networking.md).
 
@@ -68,9 +72,10 @@ See [security and privacy](docs/security.md) for limits and reporting guidance.
 
 Keep Windows native code isolated from shared React packages. The control panel
 and overlay are separate Tauri windows editing the same document. The overlay has
-minimal chrome, no formatting toolbar or remote cursor decorations, and a compact
-participant activity strip. Appearance and physical bounds are device-local,
-validated, and saved separately from the document.
+minimal chrome, no formatting toolbar, named remote cursors and selections matching
+the regular document view, and a compact participant activity strip. Appearance
+and physical bounds are device-local, validated, and saved separately from the
+document.
 
 Support opacity, font size, always on top, movement, resizing, hide/show, and
 click-through. Click-through requires a registered recovery shortcut. Ctrl+Alt+V
@@ -102,7 +107,11 @@ release. Release actions use Prepare release, Publish beta, Finalize release, an
 requested. Do not manually bump versions, reuse published versions, overwrite
 published assets, or bypass branch protections. See [releasing](docs/releasing.md).
 
-Windows installation is per user. Updates use signed packages and reject invalid
+Windows installation is per user. Veil checks its selected update channel quietly
+at startup and every six hours while running, including in the tray. An available
+update or incomplete installation shows a persistent attention badge on Settings;
+viewing Updates does not clear it. Download and installation remain explicit.
+Updates use signed packages and reject invalid
 signatures; installation is blocked while a document session or embedded host is
 active. Preferences are distinct from temporary documents. Updater signatures do
 not imply Authenticode signing or remove SmartScreen warnings. Restrict signing
@@ -110,7 +119,11 @@ secrets to publication jobs; fork PRs receive none.
 
 ## Validation
 
-Run checks appropriate to the task: formatting for documentation, `pnpm check`
+For ordinary bug and feature tasks, the user performs testing: agents skip local
+test suites and `pnpm check` unless validation is explicitly requested, and do not
+wait for CI before handoff. Required CI gates still apply before merging. Report
+skipped checks honestly. When validation is requested, run checks appropriate to
+the task: formatting for documentation, `pnpm check`
 and relevant unit/integration tests for code, and `pnpm test:release` for release
 tooling. Rebuild the native debug executable after Cargo tests before native
 acceptance scripts. Test real Windows overlay/capture/installer behavior where

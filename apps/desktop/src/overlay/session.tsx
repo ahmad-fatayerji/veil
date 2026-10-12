@@ -5,6 +5,7 @@ import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protoc
 import { readParticipants, type DemoConnection, type Participant } from '@veil/collaboration';
 import { SharedEditor, type EditorConnection } from '@veil/editor';
 import { errorMessage, invoke } from './api';
+import { useVisibilityMenu } from './VisibilityMenu';
 
 type Message =
   | { kind: 'request' }
@@ -12,12 +13,15 @@ type Message =
   | { kind: 'session'; id: string; update: number[]; user: Record<string, unknown> }
   | { kind: 'update'; id: string; update: number[] }
   | { kind: 'participants'; id: string; participants: Participant[] }
+  | { kind: 'awareness'; id: string; update: number[] }
   | { kind: 'presence'; id: string; cursor: unknown; activity: unknown };
 const relayOrigin = Symbol('desktop document relay');
 const send = (message: Message) => invoke('document_relay', { message });
 
 export function DesktopEditor({ connection }: { connection: DemoConnection }) {
   const [view, setView] = useState<EditorConnection | null>(null);
+  const [menuError, setMenuError] = useState('');
+  const visibilityMenu = useVisibilityMenu(true, setMenuError);
   useEffect(() => {
     // Cursor plugins clear their own cursor on blur and document updates. Keep the
     // main editor's local cursor separate from the network cursor owned by the overlay.
@@ -54,7 +58,17 @@ export function DesktopEditor({ connection }: { connection: DemoConnection }) {
       awareness.destroy();
     };
   }, [connection]);
-  return view ? <SharedEditor connection={view} /> : null;
+  return view ? (
+    <div style={{ display: 'contents' }} onContextMenu={visibilityMenu.onContextMenu}>
+      <SharedEditor connection={view} />
+      {visibilityMenu.menu}
+      {menuError && (
+        <p className="overlay-error" role="alert">
+          Overlay menu: {menuError}
+        </p>
+      )}
+    </div>
+  ) : null;
 }
 
 // One network participant, two independent CRDT views. Incremental Yjs updates
@@ -82,6 +96,11 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
           user: connection.provider.awareness.getLocalState()?.user ?? {},
         });
         participants();
+        awareness({
+          added: [...connection.provider.awareness.getStates().keys()],
+          updated: [],
+          removed: [],
+        });
       } else dispatch({ kind: 'closed' });
     };
     const participants = () => {
@@ -90,6 +109,29 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
           kind: 'participants',
           id: String(connection.doc.clientID),
           participants: readParticipants(connection),
+        });
+    };
+    // Only remote identities belong in the overlay's awareness replica. Its own
+    // cursor remains independent and publishes through the main network identity.
+    // Forward update events (including heartbeats and removal tombstones), so
+    // idle remote cursors do not expire while the network still considers them live.
+    const awareness = ({
+      added,
+      updated,
+      removed,
+    }: {
+      added: number[];
+      updated: number[];
+      removed: number[];
+    }) => {
+      if (!connection) return;
+      const network = connection.provider.awareness;
+      const ids = [...added, ...updated, ...removed].filter((id) => id !== network.clientID);
+      if (ids.length)
+        dispatch({
+          kind: 'awareness',
+          id: String(connection.doc.clientID),
+          update: Array.from(encodeAwarenessUpdate(network, ids)),
         });
     };
     const update = (bytes: Uint8Array) => {
@@ -102,6 +144,7 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
     };
     connection?.doc.on('update', update);
     connection?.provider.awareness.on('change', participants);
+    connection?.provider.awareness.on('update', awareness);
     const subscription = listen<Message>('desktop-document', ({ payload }) => {
       if (!active || current.current !== connection) return;
       if (payload.kind === 'request') initial();
@@ -128,6 +171,7 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
       active = false;
       connection?.doc.off('update', update);
       connection?.provider.awareness.off('change', participants);
+      connection?.provider.awareness.off('update', awareness);
       if (connection) dispatch({ kind: 'closed' });
       void subscription.then((unlisten) => unlisten()).catch(() => {});
     };
@@ -180,7 +224,8 @@ export function useOverlayDocument() {
           if (origin !== relayOrigin)
             dispatch({ kind: 'update', id: payload.id, update: Array.from(bytes) });
         };
-        const presence = () => {
+        const presence = ({ added, updated }: { added: number[]; updated: number[] }) => {
+          if (![...added, ...updated].includes(awareness.clientID)) return;
           const local = awareness.getLocalState();
           if (local)
             dispatch({
@@ -208,6 +253,12 @@ export function useOverlayDocument() {
         Y.applyUpdate(session.connection.doc, new Uint8Array(payload.update), relayOrigin);
       } else if (payload.kind === 'participants' && session?.id === payload.id) {
         setParticipants(payload.participants);
+      } else if (payload.kind === 'awareness' && session?.id === payload.id) {
+        applyAwarenessUpdate(
+          session.connection.provider.awareness,
+          new Uint8Array(payload.update),
+          relayOrigin,
+        );
       }
     });
     void subscription

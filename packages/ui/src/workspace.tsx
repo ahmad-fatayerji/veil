@@ -28,6 +28,7 @@ export function Dialog({
   children,
   wide = false,
   locked = false,
+  dismissOnBackdrop = false,
 }: {
   open: boolean;
   title: string;
@@ -35,9 +36,11 @@ export function Dialog({
   children: ReactNode;
   wide?: boolean;
   locked?: boolean;
+  dismissOnBackdrop?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
+  const backdropPointer = useRef<number | null>(null);
   useEffect(() => {
     const dialog = ref.current;
     if (open && !dialog?.open) dialog?.showModal();
@@ -52,17 +55,62 @@ export function Dialog({
         if (locked) event.preventDefault();
         else onClose();
       }}
+      onPointerDown={(event) => {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const outside =
+          event.clientX < bounds.left ||
+          event.clientX > bounds.right ||
+          event.clientY < bounds.top ||
+          event.clientY > bounds.bottom;
+        backdropPointer.current =
+          event.button === 0 && event.target === event.currentTarget && outside
+            ? event.pointerId
+            : null;
+      }}
+      onPointerUp={(event) => {
+        const startedOutside = backdropPointer.current === event.pointerId;
+        backdropPointer.current = null;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        const outside =
+          event.clientX < bounds.left ||
+          event.clientX > bounds.right ||
+          event.clientY < bounds.top ||
+          event.clientY > bounds.bottom;
+        if (
+          dismissOnBackdrop &&
+          !locked &&
+          startedOutside &&
+          event.target === event.currentTarget &&
+          outside
+        ) {
+          onClose();
+        }
+      }}
+      onPointerCancel={() => {
+        backdropPointer.current = null;
+      }}
       onClose={onClose}
     >
       <div className="dialog-heading">
         <h2 id={id}>{title}</h2>
         <button
-          className="icon-button"
+          className="icon-button dialog-close"
           aria-label={`Close ${title}`}
           onClick={onClose}
           disabled={locked}
         >
-          {'\u00d7'}
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="m6 6 12 12M18 6 6 18" />
+          </svg>
         </button>
       </div>
       {children}

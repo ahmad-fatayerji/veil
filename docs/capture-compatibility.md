@@ -8,6 +8,8 @@ Veil can request best-effort exclusion of its overlay from compatible Windows ca
 
 The adapter checks the actual Windows version using `RtlGetVersion` and requires Windows 10 build 19041 (version 2004) or newer and active DWM composition. Older Windows is unsupported; it does not silently fall back to `WDA_MONITOR`, which can produce a black window in captures. macOS/Linux report unsupported. A failed capability query reports unknown. These platform fallbacks have unit/design coverage rather than runtime acceptance on old/non-Windows machines.
 
+When applying enabled exclusion, the adapter first requests `WDA_MONITOR`, then immediately requests `WDA_EXCLUDEFROMCAPTURE` and verifies the final affinity. This forces an actual native transition when initialization or style changes leave a stale black capture surface despite matching affinity readback (issue #22). The intermediate setting blocks window content instead of temporarily allowing capture with `WDA_NONE`; it is not a compatibility fallback or a successful final state. Either native write failing reports an error. Read-only checks do not perform this refresh.
+
 The displayed status is separate from the saved preference:
 
 | Status      | Meaning                                                                                                                         |
@@ -65,6 +67,10 @@ pnpm test:overlay
 ```
 
 The capture script uses real WebView2 controls, a separate colored WinForms underlay and actual capture output. It confirms a visible baseline card and its removal with underlying pixels retained, HWND affinity, control-panel scope, forbidden overlay administration, style/recovery/show changes, persisted opt-in/out, ephemeral test card and absence of JavaScript errors. Preferences/WebView2 profiles and evidence are isolated under `target/capture-acceptance/`. No networking session or operator server is needed. It does not run in hosted CI because it requires an interactive desktop/GPU and external capture tooling.
+
+Before any off/on toggle, the script also checks actual output with the default-on preference at first show, hide/show and appearance changes. It captures again after restarting with saved exclusion enabled. These checks require the underlying app across at least 97% of the overlay area, so a black rectangle cannot pass merely because the test card is absent. Discord remote-view verification on the originally affected machine remains separate.
+
+`pnpm test:capture --startup-only` runs the capture, appearance, authorization, document editing and preference-restart checks without the physical pointer/gesture/cursor checks or global recovery shortcut. Its results explicitly mark global shortcut/click-through verification false. Both modes still require a quiet desktop; unrelated windows obscuring the known underlay make pixel comparisons inconclusive.
 
 The GDI and DXGI regressions enable cursor recording and hold real move/resize gestures open while capturing. They check that bounds change before mouse release, inspect the overlay perimeter for leaked outlines, verify that the recorded arrow remains visible and check the header badge's region for the underlying app. Native `GetCursorInfo` probes verify hover/active cursor shapes, all eight resize handles, ordinary cursors with exclusion off and idle text cursors. The script also checks completion, Escape, focus loss, a real concurrent-gesture rejection, hover cleanup, hide/show, click-through/recovery, badge layout at minimum size and editing. The fixture temporarily disables Windows full-window dragging and restores its previous value in `finally`; avoid other pointer input during the run. OBS and remote sharing tools still need separate moving-window acceptance.
 

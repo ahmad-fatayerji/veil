@@ -94,3 +94,5 @@ export function validateBootstrap(value: unknown): Bootstrap {
 export * from './signaling';
 
 export * from './sharing';
+
+export * from './compatibility';

@@ -1016,6 +1016,15 @@ p {
   width: 36px;
   border-radius: 6px;
 }
+.dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex-shrink: 0;
+}
 .settings-layout {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
@@ -1222,4 +1231,26 @@ p {
 .update-warning {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+}
+
+.desktop-settings-button {
+  position: relative;
+}
+.settings-attention-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.settings-nav-attention {
+  color: var(--accent);
+}
+.compatibility-warning {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
