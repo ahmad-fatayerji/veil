@@ -221,7 +221,7 @@ try {
   const share = host.getByRole('dialog', { name: 'Share document', exact: true });
   await expect(share).toBeVisible();
   const link = await share.getByLabel('Session link').inputValue();
-  assert.ok(link.startsWith('veil://join/'));
+  assert.match(link, /^veil:\/\/join\/[^/]+\/[A-Za-z0-9_-]{22}$/);
   await share.getByRole('button', { name: 'Copy link', exact: true }).click();
   await expect(share.getByRole('status')).toHaveText('Link copied.');
   await share.getByRole('button', { name: 'Close Share document' }).click();
@@ -233,10 +233,31 @@ try {
     [guest, 'Sam'],
     [other, 'Jo'],
   ]) {
+    if (name === 'Jo') {
+      await host.getByRole('button', { name: 'Share', exact: true }).click();
+      await share.getByLabel('Join mode').selectOption('approval');
+      assert.equal(await share.getByLabel('Session link').inputValue(), link);
+      await share.getByRole('button', { name: 'Close Share document' }).click();
+    }
     await page.getByRole('tab', { name: 'Join session', exact: true }).click();
     await page.getByRole('textbox', { name: /Your name/ }).fill(name);
     await page.getByLabel('Session link').fill(link);
     await page.getByRole('button', { name: 'Join session', exact: true }).click();
+    if (name === 'Jo') {
+      await expect(
+        page.getByRole('dialog', { name: 'Joining session', exact: true }),
+      ).toContainText('Waiting for the host');
+      await expect(page.getByRole('textbox', { name: 'Shared document' })).toHaveCount(0);
+      const requests = host.getByRole('region', { name: 'Join requests' });
+      await expect(requests).toContainText('Jo');
+      await host.getByRole('button', { name: 'Share', exact: true }).click();
+      await share.getByLabel('Join mode').selectOption('auto');
+      assert.equal(await share.getByLabel('Session link').inputValue(), link);
+      await share.getByRole('button', { name: 'Close Share document' }).click();
+      await expect(page.getByRole('textbox', { name: 'Shared document' })).toHaveCount(0);
+      await requests.getByRole('button', { name: 'Approve', exact: true }).click();
+      await expect(requests).toHaveCount(0);
+    }
     await expect(page.getByRole('textbox', { name: 'Shared document' })).toHaveText(
       'Written before sharing.',
     );

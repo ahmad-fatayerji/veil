@@ -1,5 +1,27 @@
 # Verification record
 
+## Short invitation links and optional approval - 12 October 2026
+
+Added 22-character, 128-bit invitation codes, local encrypted invitation lookup,
+and host-selectable automatic/approval joining. Approval requests are bounded and
+expire after two minutes. Reset/Stop revoke pending access while preserving
+approved guests. The server queues signed rejection status before closing that
+guest. No release was published or deployed.
+
+App TypeScript typechecking, linting of changed TypeScript/JavaScript, scoped
+formatting and Rust formatting checks passed. App test suites, builds and Windows
+acceptance were intentionally not run under the ordinary task workflow. Added
+protocol/admission regression cases and extended the native sharing acceptance
+script for approval, mode changes and preserving the same link; these remain for
+user/CI execution.
+
+Coordinated server validation passed: cargo fmt check, Clippy with warnings denied,
+11 Rust tests (including real loopback WebSocket rejection ordering), the public
+HKDF fixture, Python integration syntax and Compose configuration. Docker's Linux
+engine was unavailable locally, so container build/TURN integration requires CI.
+Cross-device networking, Windows activation, native rendering and user acceptance
+remain unverified.
+
 ## Overlay control cursor with capture exclusion - 12 October 2026
 
 The overlay close button and its **Hide overlay** menu action now use the default

@@ -25,3 +25,19 @@ Documents are temporary: ending/leaving/closing loses the local document, with c
 ## Useful test report
 
 Send the app version shown under **Settings > About**, both Windows versions, whether PCs are on the same or different networks, whether a VPN is active, the displayed direct/relay path, the exact error, and steps to reproduce. Test offline creation, sharing existing edits, simultaneous joins/edits, reset/stop, reconnect, leaving, overlays, both themes, URL activation, and restart preferences. Redact invitations, response codes, credentials and private document text from screenshots.
+
+## Short links and approval
+
+Copy link now produces `veil://join/<server>/<22-character-code>`. New sharing
+requires a server advertising short-link support; guests need an updated Veil.
+Existing long links remain accepted. In Share document, choose Auto join or
+Require approval. Approve or Reject waiting guests under People. Names are supplied
+by guests, not verified identities. Guests can cancel; requests expire after two
+minutes. Changing mode keeps the link and existing pending decisions. Reset/Stop
+cancel pending requests while connected guests continue editing.
+
+Test both join modes, a rejected request followed by a fresh retry, cancellation,
+two-minute expiry, mode changes while someone waits, and Reset/Stop with both a
+waiting and connected guest. Confirm waiting guests have no shared editor and
+cannot receive document updates. Check Windows link activation and pasted links,
+old long links, unsupported servers, and retry after an outage. Redact all codes.
