@@ -93,18 +93,27 @@ fn refresh_capture(
     refresh_surface: bool,
 ) -> Result<(), OverlayError> {
     let overlay = window(app)?;
-    let enabled = snapshot(app).settings.capture_exclusion;
+    let preferences = snapshot(app).settings;
+    let enabled = preferences.capture_exclusion;
     let result = platform::capture_exclusion(&overlay, enabled, apply).and_then(|()| {
         if enabled && apply && refresh_surface {
-            platform::refresh_capture_surface(&overlay)?;
+            platform::refresh_capture_surface(&overlay, preferences.opacity)?;
             // Showing the HWND must not invalidate its confirmed affinity.
             platform::capture_exclusion(&overlay, enabled, false)?;
         }
         Ok(())
     });
     let capture = capture_result(result, enabled);
+    let visible = if enabled && apply && refresh_surface {
+        overlay.is_visible().ok()
+    } else {
+        None
+    };
     modify(app, |model| {
         model.capture = capture;
+        if let Some(visible) = visible {
+            model.settings.visible = visible;
+        }
         model.capabilities.capture_exclusion = platform::capabilities().capture_exclusion;
     });
     Ok(())

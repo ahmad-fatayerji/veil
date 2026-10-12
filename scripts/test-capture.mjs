@@ -742,11 +742,16 @@ try {
   assert.equal((await snapshot(main)).capture.status, 'applied');
   // Matching affinity does not prove successful output. Recovery must remain
   // available while native status is applied, and must retain visible exclusion.
+  const beforeReapply = native('Probe');
   await main.getByRole('button', { name: 'Reapply setting', exact: true }).click();
   await waitFor(async () => (await snapshot(main)).capture.status === 'applied', 'reapplied');
   assert.equal((await snapshot(main)).settings.visible, true);
   assert.equal((await snapshot(main)).settings.captureExclusion, true);
-  assert.equal(native('Probe').affinity, 0x11);
+  const afterReapply = native('Probe');
+  assert.equal(afterReapply.affinity, 0x11);
+  assert.equal(afterReapply.layered, true, 'Reapply restores the layered alpha surface');
+  for (const property of ['x', 'y', 'width', 'height', 'alpha', 'topmost', 'clickThrough'])
+    assert.equal(afterReapply[property], beforeReapply[property], `Reapply preserves ${property}`);
   await captureExcluded('explicit-reapply');
   await main.screenshot({ path: resolve(directory, 'control-panel.png'), fullPage: true });
   await command(main, 'overlay_capture_test', { enabled: false });
