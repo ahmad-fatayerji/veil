@@ -5089,7 +5089,7 @@ dependencies = [
 
 [[package]]
 name = "veil-desktop"
-version = "0.7.1-beta.1"
+version = "0.7.1"
 dependencies = [
  "base64 0.22.1",
  "futures-util",

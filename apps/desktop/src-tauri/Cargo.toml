@@ -1,6 +1,6 @@
 [package]
 name = "veil-desktop"
-version = "0.7.1-beta.1"
+version = "0.7.1"
 edition = "2021"
 
 [features]
