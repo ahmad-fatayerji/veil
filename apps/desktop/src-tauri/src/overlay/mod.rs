@@ -87,9 +87,22 @@ fn capture_result(result: Result<(), OverlayError>, enabled: bool) -> CaptureSta
     }
 }
 
-fn refresh_capture(app: &AppHandle, apply: bool) -> Result<(), OverlayError> {
+fn refresh_capture(
+    app: &AppHandle,
+    apply: bool,
+    refresh_surface: bool,
+) -> Result<(), OverlayError> {
     let overlay = window(app)?;
-    let capture = capture_status(&overlay, snapshot(app).settings.capture_exclusion, apply);
+    let enabled = snapshot(app).settings.capture_exclusion;
+    let result = platform::capture_exclusion(&overlay, enabled, apply).and_then(|()| {
+        if enabled && apply && refresh_surface {
+            platform::refresh_capture_surface(&overlay)?;
+            // Showing the HWND must not invalidate its confirmed affinity.
+            platform::capture_exclusion(&overlay, enabled, false)?;
+        }
+        Ok(())
+    });
+    let capture = capture_result(result, enabled);
     modify(app, |model| {
         model.capture = capture;
         model.capabilities.capture_exclusion = platform::capabilities().capture_exclusion;
@@ -337,7 +350,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         overlay.show()?;
         let current = snapshot(app.handle());
         apply(&overlay, &current.settings, &current.capabilities).map_err(|error| error.message)?;
-        refresh_capture(app.handle(), true).map_err(|error| error.message)?;
+        refresh_capture(app.handle(), true, true).map_err(|error| error.message)?;
     }
     Ok(())
 }
@@ -370,7 +383,7 @@ fn set_visible(app: &AppHandle, visible: bool) -> Result<(), OverlayError> {
             model.settings = preferences;
             model.settings.visible = true;
         });
-        refresh_capture(app, true)?;
+        refresh_capture(app, true, true)?;
     } else {
         overlay.hide().map_err(OverlayError::native)?;
         modify(app, |model| model.settings.visible = false);
@@ -488,7 +501,7 @@ pub fn overlay_update(
         || patch.click_through.is_some()
         || patch.opacity.is_some()
     {
-        refresh_capture(&app, true)?;
+        refresh_capture(&app, true, patch.capture_exclusion == Some(true))?;
     }
     Ok(snapshot(&app))
 }
@@ -499,7 +512,7 @@ pub fn overlay_capture_check(
     caller: WebviewWindow,
 ) -> Result<Snapshot, OverlayError> {
     control_only(&caller)?;
-    refresh_capture(&app, false)?;
+    refresh_capture(&app, false, false)?;
     Ok(snapshot(&app))
 }
 

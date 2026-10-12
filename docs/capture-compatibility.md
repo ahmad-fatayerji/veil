@@ -10,6 +10,10 @@ The adapter checks the actual Windows version using `RtlGetVersion` and requires
 
 When applying enabled exclusion, the adapter first requests `WDA_MONITOR`, then immediately requests `WDA_EXCLUDEFROMCAPTURE` and verifies the final affinity. This forces an actual native transition when initialization or style changes leave a stale black capture surface despite matching affinity readback (issue #22). The intermediate setting blocks window content instead of temporarily allowing capture with `WDA_NONE`; it is not a compatibility fallback or a successful final state. Either native write failing reports an error. Read-only checks do not perform this refresh.
 
+On first show, subsequent show, and explicit enable/reapply, a visible Windows overlay also briefly hides and shows its existing HWND, with `DwmFlush` presentation waits between visibility changes and after showing. Exclusion remains enabled throughout, and affinity is checked again afterwards. A hidden overlay stays hidden. The adapter restores visibility even if the hidden presentation wait fails, and reports refresh failures through capture status. Activation is restored only if the overlay was already in the foreground. Opacity and other appearance updates do not perform this visibility cycle. This is a candidate mitigation for the 12 October 2026 report on Veil 0.7.1 and Discord full-desktop sharing: off/on did not remove the black rectangle, but manual hide/show did. The new behavior has not been verified in Discord or native capture acceptance.
+
+**Reapply setting** is available with exclusion enabled even when native status is **Applied**. Use it if the captured output is black; it performs the visibility refresh without turning exclusion off. **Recheck native setting** remains a read-only check. A brief local disappearance during refresh is expected; successful readback still does not establish capture-tool compatibility.
+
 The displayed status is separate from the saved preference:
 
 | Status      | Meaning                                                                                                                         |
