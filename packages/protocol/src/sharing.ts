@@ -1,3 +1,4 @@
+import { clientCompatibility, type ClientCompatibility } from './compatibility';
 import {
   base64,
   normalizeServer,
@@ -169,3 +170,46 @@ export async function establishLink(
   return { invite, keys: await invitationKeys(invite) };
 }
 export const newShareId = () => randomSecret(16);
+
+// Separate domain/signature leaves the v1 exchange transcript and derived keys intact.
+function compatibilityTranscript(handshake: ShareHandshake, metadata: ClientCompatibility) {
+  return encode(['veil.compatibility.v1', handshake, clientCompatibility(metadata)]);
+}
+export async function signCompatibility(
+  privateKey: CryptoKey,
+  handshake: ShareHandshake,
+  metadata: ClientCompatibility,
+) {
+  return base64(
+    new Uint8Array(
+      await crypto.subtle.sign(
+        { name: 'ECDSA', hash: 'SHA-256' },
+        privateKey,
+        compatibilityTranscript(handshake, metadata),
+      ),
+    ),
+  );
+}
+export async function verifyCompatibility(
+  group: ShareInvitation,
+  handshake: ShareHandshake,
+  metadata: ClientCompatibility,
+  signature: string,
+) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    bytes(group.hostPublic),
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['verify'],
+  );
+  if (
+    !(await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      key,
+      bytes(signature),
+      compatibilityTranscript(handshake, metadata),
+    ))
+  )
+    throw new Error('Host compatibility authentication failed. Ask the host for a new link.');
+}

@@ -92,9 +92,9 @@ The shared invitation root protects bootstrap messages only, never established
 guest signaling. Reset/stop do not erase existing authenticated link state. Secrets
 stay in memory and are omitted from logs/preferences and masked in test screenshots.
 
-Deploy the compatible server before making the new desktop build available. The
-coordinated server implementation is [server PR #3](https://github.com/ahmad-fatayerji/veil-server/pull/3),
-commit `0441fb8ea2d8ef48376d232877fd774355110e2c`; desktop network CI pins that source.
+Deploy the compatible server before making the new desktop build available. Reusable sharing was introduced by [server PR #3](https://github.com/ahmad-fatayerji/veil-server/pull/3).
+The coordinated compatibility extension is [server PR #4](https://github.com/ahmad-fatayerji/veil-server/pull/4),
+commit `2aa361f15e3581356a5b6185f2072ba0541b1cd3`; desktop network CI pins that source.
 The new server retains v2 routes and legacy clients. The old server cannot admit
 version-4 group links. No deployment or release is performed by this overhaul.
 
@@ -154,3 +154,44 @@ valid HTTPS, direct ICE, TURN UDP/TCP and optional TURN TLS. Record selected pat
 allocation counts/bytes, CPU/memory and convergence under realistic editing/presence.
 Check restricted networks, exhaustion, slow consumers, disconnect/recovery, restart
 and cleanup. Same-PC browser/native tests do not prove these deployment conditions.
+
+## Compatibility before joining
+
+Release-maintained app metadata declares `appVersion`, `serverProtocols` and
+`peerProtocols`; current implementations support API generation 2 and peer
+generation 1. Server capabilities advertise `compatibility: 1`, `serverVersion`
+and `serverProtocols`. Package versions are descriptive; mutually implemented
+protocol generations determine whether admission is supported.
+
+After capability discovery, new clients send optional `compatibility` metadata
+on session creation and either join endpoint. Older servers receive the existing
+request shapes. An admission-credential-protected POST `/v3/compatibility` accepts
+`sessionId`, `admission`, `compatibility` and exactly one of `groupId`/`inviteId`.
+It previews `hostClientId`, nullable `hostCompatibility`, `serverVersion`,
+`serverProtocol` and `peerProtocol` without issuing a ticket or consuming an invite.
+Admission rechecks support and link validity under the same server lock.
+Unsupported client/server, host/server and peer combinations return HTTP 409 with
+`CLIENT_PROTOCOL_UNSUPPORTED`, `HOST_PROTOCOL_UNSUPPORTED` or
+`PEER_PROTOCOL_UNSUPPORTED`; these failures cannot be bypassed.
+
+Matching verified host/guest app versions proceed normally. Different supported
+versions require **Join anyway** or **Cancel**, warning that some features may not
+work properly. Missing server/host metadata requires confirmation that compatibility
+could not be verified. Compatibility warnings remain separate from connection
+notices. Cancelling before admission creates no ticket; cancelling after host
+authentication revokes the provisional guest admission before closing transports.
+
+Reusable-link bootstrap additionally carries `hostCompatibility` and
+`compatibilitySignature`. The signature is ECDSA P-256/SHA-256 over UTF-8 JSON
+`["veil.compatibility.v1", canonicalHandshake, canonicalHostCompatibility]`.
+The metadata property order is `appVersion`, `serverProtocols`, `peerProtocols`;
+array order is preserved. The original v1 handshake signature and ECDH transcript
+remain unchanged. Guests verify against the host identity pinned in the link before
+sending final signaling. Changed signed metadata requires renewed confirmation;
+invalid signatures or omitted previously advertised metadata stop admission.
+Legacy manual invitations retain their existing authentication limits and cannot
+provide a pinned host compatibility signature.
+
+Every networking change must assess server impact and update compatibility support,
+protocol documentation and coordinated app/server regression coverage as needed.
+Never declare unsupported generations or infer compatibility from equal versions.

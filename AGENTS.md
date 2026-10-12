@@ -9,6 +9,47 @@
 - Do not claim universal capture exclusion.
 - Keep builds and tests passing. Document unverified native behavior honestly.
 
+## Server impact and compatibility maintenance
+
+- Every task must assess whether it changes the server contract: requests/responses,
+  admission, authentication, signaling, invitation formats, peer negotiation, relay
+  behavior or advertised capabilities. Record the assessment in the PR body.
+- When required, inspect current `ahmad-fatayerji/veil-server` source and its
+  `AGENTS.md`, implement a coordinated server PR into `develop`, and cross-link both
+  PRs. Required server work is part of task completion, not an unspecified follow-up.
+  Keep server work isolated and verify its canonical origin before fetching/pushing.
+- Review `packages/protocol/src/compatibility.ts` and server
+  `src/compatibility.rs` for every relevant change. Advertise only implemented
+  generations; add a generation for incompatible wire changes, retain older ones
+  only while their implementations work, and explicitly remove unsupported ones.
+  App/server package versions are descriptive, not proof of wire compatibility.
+  Pure UI changes do not require protocol-generation or application-version bumps.
+- Update protocol documentation, compatibility regression cases, and the exact
+  server source pinned in app integration CI when required. Preserve legacy behavior
+  intentionally; do not advertise compatibility merely because version numbers match.
+- Release preparation must review supported generations and server-before-client
+  upgrade order. A coordinated PR never authorizes deployment or publication.
+
+## Safe worktree cleanup
+
+Inspect task worktrees at startup and after completion. Automatically remove a stale
+worktree only when its task PR is merged, all work is published, its HEAD has no
+subsequent unpublished commits, and no active task owns it. Verify PR state/head,
+branch tracking, locks, tracked/untracked changes and valuable ignored files first.
+Recognized disposable build artifacts may be removed only after that verification;
+never discard credentials, documents or unknown ignored files.
+
+Resolve the absolute target and verify it is a direct sibling of `Veil` inside
+`C:\Users\ahmad\Documents\CodeBase\veil project\Veil-app`. Run
+`git worktree remove <verified-path>` from outside the target, without `--force`,
+then `git worktree prune` for obsolete registrations. Do not delete protected or
+remote branches as part of cleanup. Never remove the original checkout, stash/reset
+work to clear it, or recursively delete an unchecked path.
+
+Preserve dirty, locked, active, open-PR, closed-unmerged and uncertain worktrees.
+An open task PR keeps its worktree for follow-up; merged status alone is insufficient
+if subsequent work or valuable local files exist. Report skipped uncertain candidates.
+
 ## Required task workflow
 
 These rules apply to every agent working in this repository. `develop` is the default branch for new checkouts and ordinary PRs; `main` holds approved release source. Use the existing Gitflow automation; a completed feature does not automatically authorize a release.

@@ -6,6 +6,8 @@ import {
   encodeShareLink,
   establishLink,
   signHandshake,
+  signCompatibility,
+  verifyCompatibility,
   verifyHandshake,
   type ShareInvitation,
   type ShareHandshake,
@@ -92,4 +94,25 @@ describe('reusable sharing authentication', () => {
     );
     expect(another.invite.secret).not.toBe(h.invite.secret);
   });
+});
+
+it('binds compatibility signatures to the host, metadata, and individual handshake', async () => {
+  const { signing, group, handshake } = await fixture();
+  const metadata = { appVersion: '0.5.0', serverProtocols: [2], peerProtocols: [1] };
+  const signature = await signCompatibility(signing.privateKey, handshake, metadata);
+  await expect(verifyCompatibility(group, handshake, metadata, signature)).resolves.toBeUndefined();
+  await expect(
+    verifyCompatibility(group, handshake, { ...metadata, appVersion: '0.4.0' }, signature),
+  ).rejects.toThrow('authentication');
+  await expect(
+    verifyCompatibility(group, { ...handshake, inviteId: randomSecret(16) }, metadata, signature),
+  ).rejects.toThrow('authentication');
+  const other = await createShareIdentity();
+  await expect(
+    verifyCompatibility({ ...group, hostPublic: other.publicKey }, handshake, metadata, signature),
+  ).rejects.toThrow('authentication');
+  // The old exchange signature remains independently valid.
+  await expect(
+    verifyHandshake(group, handshake, await signHandshake(signing.privateKey, handshake)),
+  ).resolves.toBeUndefined();
 });

@@ -1232,3 +1232,25 @@ p {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 10%, var(--surface));
 }
+
+.desktop-settings-button {
+  position: relative;
+}
+.settings-attention-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.settings-nav-attention {
+  color: var(--accent);
+}
+.compatibility-warning {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
