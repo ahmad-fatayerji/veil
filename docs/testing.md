@@ -1,5 +1,29 @@
 # Verification record
 
+## Overlay close button and context menu - 12 October 2026
+
+The square overlay has a header close button and a Windows native **Hide overlay**
+context-menu action. Both hide the overlay without ending the temporary document
+or session. The native menu retains its standard editing actions; showing the
+overlay and changing preferences remain control-panel operations.
+
+After integrating current develop, `pnpm check`, both production frontend builds,
+27 TypeScript tests and 27 Rust tests passed. Two signed-installer tests were
+intentionally ignored. The debug executable was rebuilt after Cargo tests.
+`node scripts/test-tray-close.mjs` passed real Windows/WebView2 right-clicks in the
+editor and header followed by native End/Enter menu selection, document retention,
+pointer/keyboard close-button activation, compact header layout, unchanged bounds,
+show authorization, hide with the main close preference set to Quit app, and the
+existing tray/native quit/restart regression. The menu screenshot was inspected.
+Evidence: `target/tray-acceptance/run-DrzDHe/`.
+
+The isolated fixture temporarily disables capture exclusion for the menu screenshot
+and restores it before the header-menu check. Earlier attempts stopped on desktop
+input/menu-accessibility contention; the final fixture checks pointer ownership
+and uses native menu keyboard selection. Physical mouse selection of the menu item,
+non-Windows runtime behavior, multiple monitors/DPI, and the full capture/networking
+acceptance matrices remain unverified by this focused run. No release was published.
+
 ## Main document width (issue #23) — 11 October 2026
 
 The desktop workspace now fills the usable window width, with the existing People sidebar and responsive drawer retained. Real Windows/WebView2 local-document acceptance reproduced the previous 393-pixel editor and measured 829 pixels after the fix at a 1,180-pixel viewport (1,165 usable pixels after the scrollbar); closing People measured 1,101 pixels. The before/after screenshots were visually inspected.
