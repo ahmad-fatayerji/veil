@@ -70,6 +70,31 @@ const invoke = (page, command, args) =>
     command,
     args,
   });
+async function rightClick(page, selector) {
+  native('Escape', 'overlay');
+  native('Focus', 'overlay');
+  const bounds = native('Probe', 'overlay');
+  const box = await page.locator(selector).boundingBox();
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  const position = [
+    '-X',
+    String(Math.round(bounds.clientX + ((box.x + box.width / 2) * bounds.width) / viewport.width)),
+    '-Y',
+    String(
+      Math.round(
+        bounds.clientY + ((box.y + Math.min(20, box.height / 2)) * bounds.height) / viewport.height,
+      ),
+    ),
+  ];
+  native('MovePointer', 'overlay', position);
+  assert.equal(
+    native('CursorProbe', 'overlay').overTestWindow,
+    true,
+    'Right-click must target this overlay',
+  );
+  native('RightClick', 'overlay', position);
+  await new Promise((done) => setTimeout(done, 1000));
+}
 try {
   await waitFor(async () => (await fetch(`${endpoint}/json/version`).catch(() => null))?.ok);
   browser = await chromium.connectOverCDP(endpoint);
@@ -82,6 +107,24 @@ try {
   await main.locator('.tiptap').fill('Tray keeps my temporary document');
   await invoke(main, 'overlay_visibility', { visible: true });
   await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
+  native('Move', 'overlay', ['-X', '700', '-Y', '250', '-Width', '520', '-Height', '560']);
+  await waitFor(async () => (await invoke(main, 'overlay_snapshot')).settings.x === 700);
+  await invoke(main, 'overlay_update', { patch: { captureExclusion: false } });
+  await rightClick(overlay, '.tiptap');
+  native('Capture', 'overlay', ['-OutputPath', resolve(directory, 'overlay-context-menu.png')]);
+  native('MenuLast', 'overlay');
+  await waitFor(() => !native('Probe', 'overlay').visible);
+  assert.equal(app.exitCode, null);
+  await expect(main.locator('.tiptap')).toContainText('Tray keeps my temporary document');
+  await invoke(main, 'overlay_update', { patch: { captureExclusion: true } });
+  await invoke(main, 'overlay_visibility', { visible: true });
+  await rightClick(overlay, '.overlay-drag-handle');
+  native('MenuLast', 'overlay');
+  await waitFor(() => !native('Probe', 'overlay').visible);
+  await invoke(main, 'overlay_visibility', { visible: true });
+  console.log(
+    'PASS: native right-click Hide overlay in editor/header retains editing menu and document',
+  );
   assert.equal(
     await overlay
       .locator('.overlay-surface')

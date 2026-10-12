@@ -4,6 +4,17 @@ use tauri::WebviewWindow;
 #[cfg(windows)]
 mod windows;
 
+#[cfg(windows)]
+mod context_menu;
+
+pub fn install_context_menu(window: &WebviewWindow) -> Result<(), OverlayError> {
+    #[cfg(windows)]
+    context_menu::install(window).map_err(OverlayError::native)?;
+    #[cfg(not(windows))]
+    let _ = window;
+    Ok(())
+}
+
 pub async fn gesture(
     window: WebviewWindow,
     direction: Option<tauri_runtime::ResizeDirection>,

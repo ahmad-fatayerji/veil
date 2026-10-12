@@ -333,6 +333,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => {}
     });
+    platform::install_context_menu(&overlay).map_err(|error| error.message)?;
     if snapshot(app.handle()).settings.visible {
         overlay.show()?;
         let current = snapshot(app.handle());
