@@ -1,11 +1,11 @@
 {
-  "version": "0.5.0",
-  "notes": "# Veil 0.5.0\n\n## Features\n\n- feat(settings): move desktop settings to bottom-right gear\n- feat(settings): add GitHub repository button to About\n\n## Other changes\n\n- docs: clarify task worktree locations and issue links\n- docs: refresh Veil README, security guidance, and project documentation\n- test: stabilize migration acceptance and record upgrade results\n- chore: advance beta feed to 0.4.0\n\n## Fixes\n\n- fix: remove redundant settings quit button\n- fix: persist the appearance display name\n- fix(overlay): prevent capture-visible drag outlines and resize cursors\n",
-  "pub_date": "2026-10-11T09:56:59.619Z",
+  "version": "0.6.0",
+  "notes": "# Veil 0.6.0\n\n## Features\n\n- feat: discover updates and confirm session compatibility\n- feat: add app-styled overlay visibility menus and square corners\n\n## Fixes\n\n- fix: fill available desktop document width\n- fix: refresh overlay capture exclusion after initialization\n- fix: dismiss settings outside and center close icon\n- fix: show named cursors and align overlay presence\n- fix: quit immediately from the tray\n\n## Other changes\n\n- docs: delegate routine testing to the user\n- chore: advance beta feed to 0.5.0\n",
+  "pub_date": "2026-10-12T05:04:19.069Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TC9TemhIN0NJRDFaanAzUUZ3RGZHRXl6UDFYUlJoYzNtUlpSNHlDUmZRcW1ZS1d6c1p1SUJYajFnaEM5UG9kd0djQnppTFVpSjk2L1ZjczdKSHJNM0FJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNzEyNjE5CWZpbGU6VmVpbF8wLjUuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC41LjAKekJZZmM2Q2pya0VRSlhpTFVEcWVlb1B0M2d2cDhOb0RoTkJIbHlmdHNJTzQ0RzFoaXdxK1FwVytIeVJjc1NPb3FSNmxBMEdNaTRKT3l3TEpjK0FmRFE9PQo=",
-      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.5.0/Veil_0.5.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TC9MN0tsbTFjL0Q0UWtGN25MN2MrTzZDMFp2ZXNjU3F2NGNyZkVnRVAyZGRneW5Mb01IZll4STlpUGVUc2NTZm90ZUdsVEdTaGREUE1FdzN6RCt3d0F3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNzgxNDU4CWZpbGU6VmVpbF8wLjYuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC42LjAKbFhqSW1vUEM3QUdpbjdrdWluTHg2ZmdDWHB3WFJuVE5UeGhLbjZYTDdyZFc3VzJQMmpuK3pvSHFVa1h0TzJ3ZWFKRStJdUdFQlgxbldvQi9IK2ZEQVE9PQo=",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.6.0/Veil_0.6.0_x64-setup.exe"
     }
   }
 }
