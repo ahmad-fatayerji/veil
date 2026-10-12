@@ -5,6 +5,7 @@ import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protoc
 import { readParticipants, type DemoConnection, type Participant } from '@veil/collaboration';
 import { SharedEditor, type EditorConnection } from '@veil/editor';
 import { errorMessage, invoke } from './api';
+import { useVisibilityMenu } from './VisibilityMenu';
 
 type Message =
   | { kind: 'request' }
@@ -19,6 +20,8 @@ const send = (message: Message) => invoke('document_relay', { message });
 
 export function DesktopEditor({ connection }: { connection: DemoConnection }) {
   const [view, setView] = useState<EditorConnection | null>(null);
+  const [menuError, setMenuError] = useState('');
+  const visibilityMenu = useVisibilityMenu(true, setMenuError);
   useEffect(() => {
     // Cursor plugins clear their own cursor on blur and document updates. Keep the
     // main editor's local cursor separate from the network cursor owned by the overlay.
@@ -55,7 +58,17 @@ export function DesktopEditor({ connection }: { connection: DemoConnection }) {
       awareness.destroy();
     };
   }, [connection]);
-  return view ? <SharedEditor connection={view} /> : null;
+  return view ? (
+    <div style={{ display: 'contents' }} onContextMenu={visibilityMenu.onContextMenu}>
+      <SharedEditor connection={view} />
+      {visibilityMenu.menu}
+      {menuError && (
+        <p className="overlay-error" role="alert">
+          Overlay menu: {menuError}
+        </p>
+      )}
+    </div>
+  ) : null;
 }
 
 // One network participant, two independent CRDT views. Incremental Yjs updates

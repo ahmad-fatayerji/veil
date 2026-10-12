@@ -524,7 +524,11 @@ pub fn overlay_visibility(
     caller: WebviewWindow,
     visible: bool,
 ) -> Result<Snapshot, OverlayError> {
-    control_only(&caller)?;
+    // The overlay may hide itself, but showing it and all other settings stay
+    // under control-panel administration.
+    if caller.label() != OVERLAY || visible {
+        control_only(&caller)?;
+    }
     set_visible(&app, visible)?;
     Ok(snapshot(&app))
 }

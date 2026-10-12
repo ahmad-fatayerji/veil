@@ -44,7 +44,7 @@ async function waitFor(check) {
   }
   throw new Error('Native acceptance timed out');
 }
-function native(action, window) {
+function native(action, window, extra = []) {
   const result = execFileSync(
     'powershell.exe',
     [
@@ -59,6 +59,7 @@ function native(action, window) {
       String(app.pid),
       '-Window',
       window,
+      ...extra,
     ],
     { windowsHide: true, encoding: 'utf8' },
   ).trim();
@@ -69,6 +70,31 @@ const invoke = (page, command, args) =>
     command,
     args,
   });
+async function rightClick(page, selector, window = 'overlay') {
+  native('Escape', window);
+  native('Focus', window);
+  const bounds = native('Probe', window);
+  const box = await page.locator(selector).boundingBox();
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  const position = [
+    '-X',
+    String(Math.round(bounds.clientX + ((box.x + box.width / 2) * bounds.width) / viewport.width)),
+    '-Y',
+    String(
+      Math.round(
+        bounds.clientY + ((box.y + Math.min(20, box.height / 2)) * bounds.height) / viewport.height,
+      ),
+    ),
+  ];
+  native('MovePointer', window, position);
+  assert.equal(
+    native('CursorProbe', window).overTestWindow,
+    true,
+    `Right-click must target the ${window} window`,
+  );
+  native('RightClick', window, position);
+  await new Promise((done) => setTimeout(done, 1000));
+}
 try {
   await waitFor(async () => (await fetch(`${endpoint}/json/version`).catch(() => null))?.ok);
   browser = await chromium.connectOverCDP(endpoint);
@@ -81,6 +107,99 @@ try {
   await main.locator('.tiptap').fill('Tray keeps my temporary document');
   await invoke(main, 'overlay_visibility', { visible: true });
   await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
+  native('Move', 'overlay', ['-X', '700', '-Y', '250', '-Width', '520', '-Height', '560']);
+  await waitFor(async () => (await invoke(main, 'overlay_snapshot')).settings.x === 700);
+  await rightClick(overlay, '.tiptap');
+  await expect(overlay.getByRole('menuitem')).toHaveCount(1);
+  await expect(overlay.getByRole('menuitem', { name: 'Hide overlay' })).toBeFocused();
+  await overlay.screenshot({ path: resolve(directory, 'overlay-context-menu.png') });
+  native('MenuLast', 'overlay');
+  await waitFor(() => !native('Probe', 'overlay').visible);
+  assert.equal(app.exitCode, null);
+  await expect(main.locator('.tiptap')).toContainText('Tray keeps my temporary document');
+  await rightClick(main, '.tiptap', 'main');
+  await expect(main.getByRole('menuitem')).toHaveCount(1);
+  await expect(main.getByRole('menuitem', { name: 'Show overlay' })).toBeFocused();
+  native('Escape', 'main');
+  await expect(main.getByRole('menu')).toHaveCount(0);
+  await rightClick(main, '.tiptap', 'main');
+  await main.screenshot({ path: resolve(directory, 'document-context-menu.png') });
+  native('MenuLast', 'main');
+  await waitFor(() => native('Probe', 'overlay').visible);
+  await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
+  await rightClick(overlay, '.overlay-drag-handle');
+  native('MenuLast', 'overlay');
+  await waitFor(() => !native('Probe', 'overlay').visible);
+  await invoke(main, 'overlay_visibility', { visible: true });
+  console.log(
+    'PASS: app-styled Hide/Show overlay menus support native right-click and keyboard activation',
+  );
+  assert.equal(
+    await overlay
+      .locator('.overlay-surface')
+      .evaluate((element) => getComputedStyle(element).borderRadius),
+    '0px',
+  );
+  const originalBounds = (await invoke(main, 'overlay_snapshot')).settings;
+  await overlay.screenshot({ path: resolve(directory, 'overlay-square-close.png') });
+  await overlay.getByRole('button', { name: 'Hide overlay', exact: true }).click();
+  await waitFor(() => !native('Probe', 'overlay').visible);
+  const hidden = (await invoke(main, 'overlay_snapshot')).settings;
+  assert.equal(hidden.visible, false);
+  for (const property of ['x', 'y', 'width', 'height']) {
+    assert.equal(hidden[property], originalBounds[property], `Close must not drag: ${property}`);
+  }
+  assert.equal(app.exitCode, null);
+  await expect(main.locator('.tiptap')).toContainText('Tray keeps my temporary document');
+  const forbiddenShow = await overlay.evaluate(async () => {
+    try {
+      await window.__TAURI_INTERNALS__.invoke('overlay_visibility', { visible: true });
+      return null;
+    } catch (error) {
+      return error;
+    }
+  });
+  assert.equal(forbiddenShow?.code, 'FORBIDDEN');
+  assert.match(forbiddenShow.message, /Use the control panel/);
+  await invoke(main, 'overlay_visibility', { visible: true });
+  await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
+  native('Move', 'overlay', [
+    '-X',
+    String(originalBounds.x),
+    '-Y',
+    String(originalBounds.y),
+    '-Width',
+    '280',
+    '-Height',
+    '180',
+  ]);
+  await waitFor(async () => (await invoke(main, 'overlay_snapshot')).settings.width === 280);
+  const closeFits = await overlay.locator('.overlay-close').evaluate((element) => {
+    const button = element.getBoundingClientRect();
+    const header = element.closest('header').getBoundingClientRect();
+    return (
+      button.left >= header.left && button.right <= header.right && button.bottom <= header.bottom
+    );
+  });
+  assert.equal(closeFits, true, 'Close button must fit the compact header');
+  await overlay.screenshot({ path: resolve(directory, 'overlay-compact-close.png') });
+  await overlay.getByRole('button', { name: 'Hide overlay', exact: true }).focus();
+  await overlay.keyboard.press('Enter');
+  await waitFor(() => !native('Probe', 'overlay').visible);
+  await invoke(main, 'overlay_visibility', { visible: true });
+  native('Move', 'overlay', [
+    '-X',
+    String(originalBounds.x),
+    '-Y',
+    String(originalBounds.y),
+    '-Width',
+    String(originalBounds.width),
+    '-Height',
+    String(originalBounds.height),
+  ]);
+  console.log(
+    'PASS: square overlay, pointer/keyboard close, preserved document/bounds and show authorization',
+  );
   native('Close', 'main');
   await waitFor(() => !native('Probe', 'main').visible);
   assert.equal(app.exitCode, null);
@@ -103,6 +222,10 @@ try {
   await waitFor(
     async () => (await invoke(main, 'overlay_snapshot')).settings.closeBehavior === 'quit',
   );
+  await overlay.getByRole('button', { name: 'Hide overlay', exact: true }).click();
+  await waitFor(() => !native('Probe', 'overlay').visible);
+  assert.equal(app.exitCode, null, 'Overlay close must hide even when main close quits');
+  await invoke(main, 'overlay_visibility', { visible: true });
   await expect(main.getByRole('dialog', { name: 'Quit Veil?', exact: true })).toHaveCount(0);
   await settings.getByLabel('When closing the main window').selectOption('tray');
   await waitFor(

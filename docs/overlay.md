@@ -16,6 +16,21 @@ Native window-setting commands require the `main` window. The overlay can read s
 
 ## Verification
 
+The overlay has square corners and a **×** button in its header to hide it without
+ending the document or session. Right-click anywhere inside the overlay
+and choose **Hide overlay**, the only context-menu option. Right-click the main
+document and choose **Show overlay** to bring it back. Editing keyboard shortcuts
+remain available. Both menus use the same app styling and follow the light/dark
+theme, with square corners, matching icons and an accent hover/focus state.
+With capture exclusion enabled, hovering the overlay close button or its menu
+action keeps the default arrow cursor; their visual hover highlights remain.
+The menu stays within its window; Escape, an outside click, scrolling, resizing,
+or the window losing focus dismisses it. Enter or Space activates the focused action.
+You can also show it from the control panel, the tray,
+or Ctrl+Alt+Shift+V. Ctrl+Alt+V also restores interaction. In click-through mode,
+use these recovery controls before clicking the button. The overlay can hide
+itself; showing it and changing settings remain control-panel operations.
+
 ```powershell
 pnpm --filter @veil/desktop tauri build --debug --no-bundle
 pnpm test:overlay
