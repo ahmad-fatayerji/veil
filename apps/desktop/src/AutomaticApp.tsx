@@ -24,7 +24,7 @@ import {
 import { nativeSignaling } from './networking';
 import { DesktopEditor, SessionBridge } from './overlay/session';
 import { OverlayControls } from './overlay/Controls';
-import { Updates } from './Updates';
+import { Updates, useUpdateAttention } from './Updates';
 import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
 
@@ -54,11 +54,15 @@ export function AutomaticApp() {
   const [link, setLink] = useState('');
   const [peers, setPeers] = useState<PeerSummary[]>([]);
   const [notice, setNotice] = useState('');
+  const [compatibilityNotice, setCompatibilityNotice] = useState('');
+  const [compatibilityPrompt, setCompatibilityPrompt] = useState('');
+  const compatibilityDecision = useRef<((accepted: boolean) => void) | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [development, setDevelopment] = useState(false);
   const [people, setPeople] = useState(() => window.innerWidth >= 900);
+  const updateAttention = useUpdateAttention();
   const [settings, setSettings] = useState(false);
   const [section, setSection] = useState<Section>('General');
   const [shareOpen, setShareOpen] = useState(false);
@@ -71,6 +75,28 @@ export function AutomaticApp() {
   const { appearance, setAppearance } = useAppearance();
   const overlay = useOverlay();
   const onUpdateBusy = useCallback((value: boolean) => setUpdating(value), []);
+  function signaling() {
+    return nativeSignaling({
+      confirm: (message) =>
+        new Promise<boolean>((resolve) => {
+          compatibilityDecision.current = resolve;
+          setCompatibilityPrompt(message);
+        }),
+      warning: setCompatibilityNotice,
+    });
+  }
+  function decideCompatibility(accepted: boolean) {
+    const resolve = compatibilityDecision.current;
+    compatibilityDecision.current = null;
+    setCompatibilityPrompt('');
+    resolve?.(accepted);
+  }
+  useEffect(
+    () => () => {
+      compatibilityDecision.current?.(false);
+    },
+    [],
+  );
   function updateName(value: string) {
     saveDisplayName(value);
     setName(value);
@@ -180,12 +206,13 @@ export function AutomaticApp() {
     if (invitation.trim().startsWith('veil://')) decodeShareLink(invitation.trim(), development);
     else decodeServerInvitation(invitation.trim(), development);
     await invoke('document_open');
+    setCompatibilityNotice('');
     setNotice('Connecting to host…');
     try {
       const joined = await joinShareLink(
         invitation,
         name.trim(),
-        nativeSignaling(),
+        signaling(),
         setNotice,
         development,
       );
@@ -217,7 +244,7 @@ export function AutomaticApp() {
         documentRef.current,
         configuredServer,
         name.trim() || 'You',
-        nativeSignaling(),
+        signaling(),
         setNotice,
         development,
       );
@@ -280,6 +307,7 @@ export function AutomaticApp() {
       setPeers([]);
       setLink('');
       setNotice('');
+      setCompatibilityNotice('');
       setError('');
       setShareOpen(false);
       setConfirmExit(false);
@@ -521,6 +549,11 @@ export function AutomaticApp() {
             )}
           </main>
         )}
+        {document && compatibilityNotice && (
+          <div className="app-notice compatibility-warning" role="status">
+            {compatibilityNotice}
+          </div>
+        )}
         {notice && (
           <div className="app-notice" role="status">
             {notice}
@@ -529,6 +562,11 @@ export function AutomaticApp() {
         {error && (
           <div className="app-notice error" role="alert">
             {error}
+            {/protocol|update/i.test(error) && (
+              <button className="quiet-button" onClick={() => openSettings('Updates')}>
+                Open Updates
+              </button>
+            )}
             <button className="quiet-button" onClick={() => setError('')}>
               Dismiss
             </button>
@@ -538,8 +576,9 @@ export function AutomaticApp() {
           <button
             className="desktop-settings-button"
             aria-label="Settings"
-            title="Settings"
-            onClick={() => openSettings()}
+            aria-description={updateAttention ? 'Update requires attention' : undefined}
+            title={updateAttention ? 'Update requires attention' : 'Settings'}
+            onClick={() => openSettings(updateAttention ? 'Updates' : 'General')}
           >
             <svg
               width="20"
@@ -555,10 +594,26 @@ export function AutomaticApp() {
               <path d="m9.5 3-.5 2-2 .9-1.9-.6-2.5 4.3 1.5 1.4v2l-1.5 1.4 2.5 4.3 1.9-.6 2 .9.5 2h5l.5-2 2-.9 1.9.6 2.5-4.3-1.5-1.4v-2l1.5-1.4-2.5-4.3-1.9.6-2-.9-.5-2z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
+            {updateAttention && <span className="settings-attention-dot" aria-hidden="true" />}
           </button>
         </footer>
       </div>
       <SessionBridge connection={document} />
+      <Dialog
+        open={!!compatibilityPrompt}
+        title="Session compatibility"
+        onClose={() => decideCompatibility(false)}
+      >
+        <p>{compatibilityPrompt}</p>
+        <div className="form-actions">
+          <button className="secondary-button" onClick={() => decideCompatibility(false)}>
+            Cancel
+          </button>
+          <button className="primary-button" onClick={() => decideCompatibility(true)}>
+            Join anyway
+          </button>
+        </div>
+      </Dialog>
       <Dialog
         open={settings}
         title="Settings"
@@ -577,11 +632,20 @@ export function AutomaticApp() {
             {sections.map((item) => (
               <button
                 key={item}
+                aria-label={item}
+                aria-description={
+                  item === 'Updates' && updateAttention ? 'Update requires attention' : undefined
+                }
                 aria-current={section === item ? 'page' : undefined}
                 disabled={updating && item !== 'Updates'}
                 onClick={() => setSection(item)}
               >
                 {item}
+                {item === 'Updates' && updateAttention && (
+                  <span className="settings-nav-attention" aria-hidden="true">
+                    &#8226;
+                  </span>
+                )}
               </button>
             ))}
           </nav>

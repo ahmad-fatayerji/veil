@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { errorMessage, invoke } from './overlay/api';
 import { progressLabel, type UpdateProgress } from './update-progress';
 
-interface UpdateInfo {
+export interface UpdateInfo {
   currentVersion: string;
   availableVersion: string | null;
   notes: string | null;
@@ -12,7 +12,30 @@ interface UpdateInfo {
   busy: boolean;
   canCancel: boolean;
   cooldownUntil: number | null;
+  checkError: string | null;
   completion: { success: boolean; message: string } | null;
+}
+
+// This stays mounted in the control panel even when Settings is closed.
+export function useUpdateAttention() {
+  const [attention, setAttention] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      void invoke<UpdateInfo>('update_status')
+        .then((value) => {
+          if (active) setAttention(!!value.availableVersion || value.completion?.success === false);
+        })
+        .catch(() => {});
+    };
+    refresh();
+    const timer = setInterval(refresh, 1000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, []);
+  return attention;
 }
 
 export function Updates({
@@ -182,9 +205,9 @@ export function Updates({
         {(stageMessage || message) && (
           <p role="status">{cancelling ? 'Cancelling download…' : stageMessage || message}</p>
         )}
-        {error && (
+        {(error || info?.checkError) && (
           <p className="error" role="alert">
-            {error}
+            {error || info?.checkError}
           </p>
         )}
       </details>

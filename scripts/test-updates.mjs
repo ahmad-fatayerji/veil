@@ -53,7 +53,7 @@ const fixture = createServer(
       response.setHeader('Content-Type', 'application/json');
       response.end(
         JSON.stringify({
-          version: '999.0.0',
+          version: mode === 'current' ? currentVersion : '999.0.0',
           platforms: {
             'windows-x86_64': {
               url: `https://127.0.0.1:${fixture.address().port}/installer`,
@@ -109,7 +109,7 @@ async function launch() {
     stdio: 'ignore',
     env: {
       ...process.env,
-      VEIL_TEST_LEGACY: '1',
+      VEIL_TEST_LEGACY: '0',
       VEIL_TEST_SETTINGS_DIR: directory,
       VEIL_TEST_UPDATE_URL: fixtureUrl,
       VEIL_TEST_UPDATE_CA: certificate,
@@ -124,7 +124,7 @@ async function launch() {
   await waitFor(() => pages().some((page) => !page.url().includes('?overlay')));
   const page = pages().find((item) => !item.url().includes('?overlay'));
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.locator('.desktop-updates summary').waitFor();
+  await page.locator('.desktop-updates summary').waitFor({ state: 'attached' });
   if (await page.locator('.desktop-updates summary').isVisible()) {
     await page.locator('.desktop-updates summary').click();
   } else {
@@ -160,6 +160,17 @@ try {
   await page.screenshot({ path: resolve(directory, 'update-success.png') });
   await page.getByRole('button', { name: 'Dismiss update result' }).click();
   await waitFor(async () => !(await invoke(page, 'update_status')).completion);
+  await waitFor(async () => (await invoke(page, 'update_status')).availableVersion === '999.0.0');
+  await page.locator('.desktop-settings-button .settings-attention-dot').waitFor();
+  assert.equal(
+    (await invoke(page, 'update_status')).busy,
+    false,
+    'Startup check completes without installation',
+  );
+  await page.getByRole('button', { name: 'Close Settings', exact: true }).click();
+  await page.locator('.desktop-settings-button .settings-attention-dot').waitFor();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('heading', { name: 'Updates', exact: true }).waitFor();
   assert.equal(await page.getByLabel('Update channel').inputValue(), 'stable');
   await page.getByLabel('Update channel').selectOption('beta');
   await waitFor(
@@ -203,6 +214,12 @@ try {
     async () =>
       JSON.parse(await readFile(resolve(directory, 'update-channel.json'), 'utf8')) === 'stable',
   );
+  mode = 'current';
+  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  await waitFor(async () => !(await invoke(page, 'update_status')).availableVersion);
+  await page
+    .locator('.desktop-settings-button .settings-attention-dot')
+    .waitFor({ state: 'detached' });
   for (const fault of ['corrupt', 'retry', 'slow', 'throttle']) {
     mode = fault;
     downloads = 0;
@@ -269,6 +286,12 @@ try {
     'Manifest 429 triggers a conservative manual cooldown',
   );
   await assert.rejects(invoke(page, 'update_check'));
+  assert.equal(
+    (await invoke(page, 'update_status')).availableVersion,
+    '999.0.0',
+    'Failed refresh preserves the known update',
+  );
+  await page.locator('.desktop-settings-button .settings-attention-dot').waitFor();
   await close();
   await writeFile(
     resolve(directory, 'update-receipt.json'),

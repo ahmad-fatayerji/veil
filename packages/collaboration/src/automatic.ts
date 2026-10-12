@@ -21,12 +21,25 @@ import {
   verifyHandshake,
   establishLink,
   newShareId,
+  clientCompatibility,
+  compatibilityWarning,
+  protocolGenerations,
+  requireServerCompatibility,
+  signCompatibility,
+  verifyCompatibility,
+  type ClientCompatibility,
   type ShareInvitation,
   type ShareHandshake,
 } from '@veil/protocol';
 import { createPeerSession, type PeerSession, type AutomaticCallbacks } from './peer';
 
+export interface CompatibilityCallbacks {
+  client: () => Promise<ClientCompatibility>;
+  confirm: (message: string) => Promise<boolean>;
+  warning: (message: string) => void;
+}
 export interface SignalingTransport {
+  compatibility?: CompatibilityCallbacks;
   request: (
     server: string,
     path: string,
@@ -69,6 +82,8 @@ interface GroupBootstrap {
   remoteId: number;
   handshake?: ShareHandshake;
   signature?: string;
+  hostCompatibility?: ClientCompatibility;
+  compatibilitySignature?: string;
 }
 interface Signal {
   kind: 'offer' | 'answer' | 'candidate' | 'request' | 'cancel';
@@ -134,6 +149,12 @@ export class AutomaticSession {
   get sessionEnded() {
     return this.ended;
   }
+  private client?: ClientCompatibility;
+  private compatibilityExtension = false;
+  private expectedHost: ClientCompatibility | null = null;
+  private approvedWarning = '';
+  private authentication?: { resolve: () => void; reject: (error: Error) => void };
+  private authenticationTimer?: ReturnType<typeof setTimeout>;
   private ticket = '';
   private sessionId = '';
   private discovery: RTCIceServer[] = [];
@@ -167,8 +188,72 @@ export class AutomaticSession {
       await this.transport.request(this.server, path, method, body, this.ticket || undefined),
     );
   }
+  private async prepareCompatibility() {
+    if (!this.transport.compatibility) return;
+    this.client = clientCompatibility(await this.transport.compatibility.client());
+    const capabilities = await this.request('/v2/capabilities', {}, 'GET');
+    if (capabilities.compatibility !== undefined && capabilities.compatibility !== 1)
+      throw new Error(
+        'This server uses an unsupported compatibility contract. Update Veil or ask the operator to update the server.',
+      );
+    this.compatibilityExtension = capabilities.compatibility === 1;
+    if (this.compatibilityExtension)
+      requireServerCompatibility(this.client, protocolGenerations(capabilities.serverProtocols));
+  }
+  private compatibilityBody() {
+    return this.compatibilityExtension && this.client ? { compatibility: this.client } : {};
+  }
+  private async approveHost(host: ClientCompatibility | null, changed = false) {
+    if (!this.client || !this.transport.compatibility) return;
+    const warning = compatibilityWarning(this.client, host);
+    const prompt = changed
+      ? `Host compatibility information changed after the preview. ${warning || 'Confirm joining this session.'}`
+      : warning;
+    if (prompt && prompt !== this.approvedWarning) {
+      if (!(await this.transport.compatibility.confirm(prompt)))
+        throw new Error('Joining cancelled.');
+      if (this.stopped) throw new Error('Joining cancelled.');
+      this.approvedWarning = prompt;
+    }
+    const visibleWarning =
+      !this.compatibilityExtension && host
+        ? `Server compatibility could not be verified. ${warning}`.trim()
+        : warning;
+    this.transport.compatibility.warning(visibleWarning);
+  }
+  private async preflight(invite: ServerInvitation | ShareInvitation) {
+    await this.prepareCompatibility();
+    if (!this.client) return;
+    let host: ClientCompatibility | null = null;
+    if (this.compatibilityExtension) {
+      const reusable = invite.version === 4;
+      const admission = reusable
+        ? await shareAdmission(invite)
+        : (await invitationKeys(invite)).admission;
+      const data = await this.request('/v3/compatibility', {
+        sessionId: invite.sessionId,
+        admission,
+        ...this.compatibilityBody(),
+        ...(reusable ? { groupId: invite.groupId } : { inviteId: invite.inviteId }),
+      });
+      if (data.hostClientId !== invite.hostClientId)
+        throw new Error('Server substituted the invited host identity.');
+      if (
+        !this.client.serverProtocols.includes(data.serverProtocol as number) ||
+        !this.client.peerProtocols.includes(data.peerProtocol as number)
+      )
+        throw new Error('The server selected an unsupported protocol. Update Veil or the server.');
+      host = data.hostCompatibility === null ? null : clientCompatibility(data.hostCompatibility);
+    }
+    this.expectedHost = host;
+    await this.approveHost(host);
+  }
   async startHost() {
-    const data = await this.request('/v2/sessions', { clientId: this.session.doc.clientID });
+    await this.prepareCompatibility();
+    const data = await this.request('/v2/sessions', {
+      clientId: this.session.doc.clientID,
+      ...this.compatibilityBody(),
+    });
     this.ticket = token(data.ticket);
     this.sessionId = identity(data.sessionId);
     this.session.provider.sessionId = this.sessionId;
@@ -177,20 +262,27 @@ export class AutomaticSession {
     this.session.provider.connect();
   }
   async startGuest(invite: ServerInvitation) {
+    await this.preflight(invite);
     const keys = await invitationKeys(invite);
     const data = await this.request('/v2/join', {
       sessionId: invite.sessionId,
       inviteId: invite.inviteId,
       admission: keys.admission,
       clientId: this.session.doc.clientID,
+      ...this.compatibilityBody(),
     });
-    if (data.hostClientId !== invite.hostClientId)
-      throw new Error('Server substituted the invited host identity.');
     this.ticket = token(data.ticket);
     this.sessionId = invite.sessionId;
     this.session.provider.sessionId = this.sessionId;
     this.discovery = stunServers(data.stunUrls);
     this.links.set(invite.inviteId, this.link(invite, keys, invite.hostClientId));
+    if (data.hostClientId !== invite.hostClientId)
+      throw new Error('Server substituted the invited host identity.');
+    if (this.client && this.compatibilityExtension) {
+      const host =
+        data.hostCompatibility === null ? null : clientCompatibility(data.hostCompatibility);
+      await this.approveHost(host, JSON.stringify(host) !== JSON.stringify(this.expectedHost));
+    }
     await this.openSocket();
     await this.send(this.links.get(invite.inviteId)!, {
       kind: 'request',
@@ -277,6 +369,7 @@ export class AutomaticSession {
     this.sharingLink = '';
   }
   async startGroupGuest(group: ShareInvitation) {
+    await this.preflight(group);
     const inviteId = newShareId();
     const exchange = await createExchange();
     const data = await this.request('/v3/join', {
@@ -286,9 +379,8 @@ export class AutomaticSession {
       inviteId,
       clientId: this.session.doc.clientID,
       guestPublic: exchange.publicKey,
+      ...this.compatibilityBody(),
     });
-    if (data.hostClientId !== group.hostClientId)
-      throw new Error('Server substituted the invited host identity.');
     this.ticket = token(data.ticket);
     this.sessionId = group.sessionId;
     this.session.provider.sessionId = this.sessionId;
@@ -301,7 +393,33 @@ export class AutomaticSession {
       remoteId: group.hostClientId,
     });
     this.groupGuestId = inviteId;
-    await this.openSocket();
+    if (data.hostClientId !== group.hostClientId)
+      throw new Error('Server substituted the invited host identity.');
+    if (this.client && this.compatibilityExtension) {
+      const host =
+        data.hostCompatibility === null ? null : clientCompatibility(data.hostCompatibility);
+      const changed = JSON.stringify(host) !== JSON.stringify(this.expectedHost);
+      await this.approveHost(host, changed);
+      this.expectedHost = host;
+    }
+    if (!this.client) {
+      await this.openSocket();
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      this.authentication = { resolve, reject };
+      this.authenticationTimer = setTimeout(
+        () =>
+          reject(
+            new Error('Host authentication timed out. Ask the host to keep Veil open and retry.'),
+          ),
+        30_000,
+      );
+      void this.openSocket().catch(reject);
+    }).finally(() => {
+      clearTimeout(this.authenticationTimer);
+      this.authentication = undefined;
+    });
   }
   private async bootstrapSend(id: string, payload: unknown) {
     const bootstrap = this.bootstraps.get(id);
@@ -350,7 +468,25 @@ export class AutomaticSession {
       handshake,
       signature: await signHandshake(group.signingKey, handshake),
     });
-    await this.bootstrapSend(id, { handshake, signature: this.bootstraps.get(id)!.signature });
+    const bootstrap = this.bootstraps.get(id)!;
+    if (this.client) {
+      bootstrap.hostCompatibility = this.client;
+      bootstrap.compatibilitySignature = await signCompatibility(
+        group.signingKey,
+        handshake,
+        this.client,
+      );
+    }
+    await this.bootstrapSend(id, {
+      handshake,
+      signature: bootstrap.signature,
+      ...(bootstrap.hostCompatibility
+        ? {
+            hostCompatibility: bootstrap.hostCompatibility,
+            compatibilitySignature: bootstrap.compatibilitySignature,
+          }
+        : {}),
+    });
   }
   private async receiveBootstrap(envelope: SignalEnvelope) {
     const bootstrap = this.bootstraps.get(envelope.inviteId);
@@ -364,6 +500,12 @@ export class AutomaticSession {
       await this.bootstrapSend(envelope.inviteId, {
         handshake: bootstrap.handshake,
         signature: bootstrap.signature,
+        ...(bootstrap.hostCompatibility
+          ? {
+              hostCompatibility: bootstrap.hostCompatibility,
+              compatibilitySignature: bootstrap.compatibilitySignature,
+            }
+          : {}),
       });
       return;
     }
@@ -383,6 +525,23 @@ export class AutomaticSession {
       hostExchange: received.hostExchange,
     };
     await verifyHandshake(bootstrap.group, handshake, payload.signature);
+    if (this.client) {
+      let host: ClientCompatibility | null = null;
+      if (payload.hostCompatibility !== undefined) {
+        host = clientCompatibility(payload.hostCompatibility);
+        if (typeof payload.compatibilitySignature !== 'string')
+          throw new Error('Missing host compatibility signature.');
+        await verifyCompatibility(bootstrap.group, handshake, host, payload.compatibilitySignature);
+      } else if (this.expectedHost)
+        throw new Error('The host did not authenticate its advertised compatibility information.');
+      // User confirmation has no timeout; no document negotiation has started.
+      clearTimeout(this.authenticationTimer);
+      await this.approveHost(
+        host,
+        !!this.expectedHost && JSON.stringify(host) !== JSON.stringify(this.expectedHost),
+      );
+      if (this.stopped) return;
+    }
     const established = await establishLink(
       bootstrap.group,
       handshake,
@@ -392,6 +551,7 @@ export class AutomaticSession {
     const link = this.link(established.invite, established.keys, bootstrap.remoteId);
     this.links.set(envelope.inviteId, link);
     await this.send(link, { kind: 'request', clientId: this.session.doc.clientID });
+    this.authentication?.resolve();
   }
   private async openSocket() {
     this.socketOnline = true;
@@ -399,9 +559,12 @@ export class AutomaticSession {
       await this.transport.connect(this.server, this.sessionId, this.ticket, (message) => {
         this.input = this.input
           .then(() => this.receive(message))
-          .catch((error: unknown) =>
-            this.notice(error instanceof Error ? error.message : 'Invalid signaling.'),
-          );
+          .catch((error: unknown) => {
+            this.authentication?.reject(
+              error instanceof Error ? error : new Error('Invalid signaling.'),
+            );
+            this.notice(error instanceof Error ? error.message : 'Invalid signaling.');
+          });
       });
     } catch (error) {
       this.socketOnline = false;
@@ -426,6 +589,7 @@ export class AutomaticSession {
     if (this.stopped || this.ended) return;
     const message = record(value);
     if (message.kind === 'ended') {
+      this.authentication?.reject(new Error('The session ended before joining.'));
       this.ended = true;
       this.stopTimers();
       this.session.provider.disconnect();
@@ -882,6 +1046,7 @@ export class AutomaticSession {
     }
   }
   private stopTimers() {
+    clearTimeout(this.authenticationTimer);
     clearInterval(this.telemetry);
     clearTimeout(this.reconnectTimer);
     for (const link of this.links.values()) {
@@ -909,6 +1074,7 @@ export class AutomaticSession {
   async close(preserveDocument = false) {
     if (this.stopped) return;
     this.stopped = true;
+    this.authentication?.reject(new Error('Joining cancelled.'));
     this.stopTimers();
     this.connectivity?.removeEventListener('change', this.networkChanged);
     window.removeEventListener('online', this.networkChanged);

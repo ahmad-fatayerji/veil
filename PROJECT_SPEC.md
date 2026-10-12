@@ -45,6 +45,10 @@ Reusable `veil://join/...` links pin the host identity and admit separate guest
 tickets. Reset link and Stop sharing revoke new admission, while already admitted
 guests retain their authenticated links until the session ends. Compatible servers
 advertise reusable-sharing support; do not silently substitute a legacy invitation.
+Release-maintained server API and peer protocol generations determine admission.
+Before joining, compatible host/guest app-version differences or missing legacy
+compatibility information require confirmation. Unsupported protocols block joining.
+Reusable links authenticate host compatibility metadata before document exchange.
 Retained legacy formats and LAN/browser tools are regression infrastructure, not
 the primary user journey. See [automatic networking](docs/automatic-networking.md).
 
@@ -103,7 +107,11 @@ release. Release actions use Prepare release, Publish beta, Finalize release, an
 requested. Do not manually bump versions, reuse published versions, overwrite
 published assets, or bypass branch protections. See [releasing](docs/releasing.md).
 
-Windows installation is per user. Updates use signed packages and reject invalid
+Windows installation is per user. Veil checks its selected update channel quietly
+at startup and every six hours while running, including in the tray. An available
+update or incomplete installation shows a persistent attention badge on Settings;
+viewing Updates does not clear it. Download and installation remain explicit.
+Updates use signed packages and reject invalid
 signatures; installation is blocked while a document session or embedded host is
 active. Preferences are distinct from temporary documents. Updater signatures do
 not imply Authenticode signing or remove SmartScreen warnings. Restrict signing

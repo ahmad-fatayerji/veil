@@ -1,12 +1,27 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { randomSecret } from '@veil/protocol';
-import type { SignalingTransport } from '@veil/collaboration';
+import { randomSecret, SERVER_PROTOCOLS, PEER_PROTOCOLS } from '@veil/protocol';
+import { getVersion } from '@tauri-apps/api/app';
+import type { CompatibilityCallbacks, SignalingTransport } from '@veil/collaboration';
 
-export function nativeSignaling(): SignalingTransport {
+export function nativeSignaling(
+  callbacks?: Pick<CompatibilityCallbacks, 'confirm' | 'warning'>,
+): SignalingTransport {
   let unlisten: UnlistenFn | undefined;
   let current = '';
   return {
+    ...(callbacks
+      ? {
+          compatibility: {
+            ...callbacks,
+            client: async () => ({
+              appVersion: await getVersion(),
+              serverProtocols: [...SERVER_PROTOCOLS],
+              peerProtocols: [...PEER_PROTOCOLS],
+            }),
+          },
+        }
+      : {}),
     request: (server, path, method, body, ticket) =>
       invoke('network_request', { server, path, method, body, ticket }),
     connect: async (server, sessionId, ticket, receive) => {

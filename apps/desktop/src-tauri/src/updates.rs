@@ -78,6 +78,7 @@ struct Transfer {
     progress: Progress,
     cancel: Option<watch::Sender<bool>>,
     cooldown_until: Option<u64>,
+    check_error: Option<String>,
 }
 impl Updates {
     fn cooldown(&self) -> Result<(), String> {
@@ -105,6 +106,19 @@ pub fn setup(app: &AppHandle) -> Result<(), String> {
             message,
         }),
     };
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let state = handle.state::<Updates>();
+            if let Ok(_operation) = state.operation.try_lock() {
+                if state.cooldown().is_ok() {
+                    let _ = refresh_candidate(&handle, &state).await;
+                }
+            }
+            // Sleep after completion: no queued catch-up checks after suspend.
+            tokio::time::sleep(Duration::from_secs(6 * 60 * 60)).await;
+        }
+    });
     Ok(())
 }
 
@@ -209,6 +223,7 @@ pub struct UpdateInfo {
     can_cancel: bool,
     cooldown_until: Option<u64>,
     completion: Option<receipt::Completion>,
+    check_error: Option<String>,
 }
 
 fn authorize(caller: &WebviewWindow) -> Result<(), String> {
@@ -242,6 +257,7 @@ pub async fn update_status(
         can_cancel: transfer.progress.cancellable(),
         cooldown_until: transfer.cooldown_until,
         completion: state.completion.lock().unwrap().clone(),
+        check_error: transfer.check_error.clone(),
     })
 }
 
@@ -259,6 +275,9 @@ pub async fn update_set_channel(
         .map_err(|_| "An update operation is already running.")?;
     save_channel(&channel_path(&app)?, channel)?;
     *state.candidate.lock().await = None;
+    if state.cooldown().is_ok() {
+        let _ = refresh_candidate(&app, &state).await;
+    }
     update_status(app, caller, state.clone()).await
 }
 
@@ -274,19 +293,34 @@ pub async fn update_check(
         .try_lock()
         .map_err(|_| "An update operation is already running.")?;
     state.cooldown()?;
+    refresh_candidate(&app, &state).await?;
+    update_status(app, caller, state.clone()).await
+}
+
+async fn refresh_candidate(app: &AppHandle, state: &Updates) -> Result<(), String> {
     state.stage("checking");
-    // No startup polling: network access occurs only after an explicit click.
-    *state.candidate.lock().await = None;
-    let result = find_candidate(&app, &state).await;
-    state.stage("idle");
-    let candidate = result?;
-    if let Some(ref update) = candidate {
-        if update.download_url.scheme() != "https" {
+    let result = find_candidate(app, state).await.and_then(|candidate| {
+        if candidate
+            .as_ref()
+            .is_some_and(|u| u.download_url.scheme() != "https")
+        {
             return Err("The release download must use HTTPS.".into());
         }
+        Ok(candidate)
+    });
+    state.stage("idle");
+    match result {
+        Ok(candidate) => {
+            *state.candidate.lock().await = candidate;
+            state.transfer.lock().unwrap().check_error = None;
+            Ok(())
+        }
+        Err(message) => {
+            // Failed refreshes must not erase an already discovered update.
+            state.transfer.lock().unwrap().check_error = Some(message.clone());
+            Err(message)
+        }
     }
-    *state.candidate.lock().await = candidate;
-    update_status(app, caller, state.clone()).await
 }
 
 #[tauri::command]
