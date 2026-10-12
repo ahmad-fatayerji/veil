@@ -240,7 +240,7 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
                   >
                     Recheck native setting
                   </button>
-                  {state.capture.status === 'error' && (
+                  {(state.settings.captureExclusion || state.capture.status === 'error') && (
                     <button
                       className="quiet-button"
                       disabled={busy}

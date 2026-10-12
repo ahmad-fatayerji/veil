@@ -5,7 +5,7 @@ use tauri_runtime::ResizeDirection;
 use windows::Wdk::System::SystemServices::RtlGetVersion;
 use windows::Win32::{
     Foundation::{GetLastError, SetLastError, COLORREF, HWND, WIN32_ERROR},
-    Graphics::Dwm::DwmIsCompositionEnabled,
+    Graphics::Dwm::{DwmFlush, DwmIsCompositionEnabled},
     System::SystemInformation::OSVERSIONINFOW,
     UI::WindowsAndMessaging::{
         GetWindowDisplayAffinity, GetWindowLongPtrW, SetLayeredWindowAttributes,
@@ -225,6 +225,43 @@ pub fn capture_exclusion(
         GetWindowDisplayAffinity(handle, &mut actual).map_err(OverlayError::native)?;
         if actual != expected.0 {
             return Err(OverlayError::new("CAPTURE_MISMATCH", "Windows did not confirm the requested capture setting. Reapply it and test your capture mode."));
+        }
+    }
+    Ok(())
+}
+
+pub fn refresh_capture_surface(window: &WebviewWindow) -> Result<(), OverlayError> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, IsWindowVisible, ShowWindow, SW_HIDE, SW_SHOW, SW_SHOWNOACTIVATE,
+    };
+    let handle = HWND(window.hwnd().map_err(OverlayError::native)?.0);
+    unsafe {
+        if !IsWindowVisible(handle).as_bool() {
+            return Ok(());
+        }
+        let was_foreground = GetForegroundWindow() == handle;
+        // Discord can retain a black surface despite confirmed exclusion and an
+        // affinity refresh. Wait for presentation between hide and show.
+        // The caller has already confirmed EXCLUDEFROMCAPTURE; never clear it.
+        let _ = ShowWindow(handle, SW_HIDE);
+        let hidden = DwmFlush().map_err(OverlayError::native);
+        // Always restore visibility, including when the compositor flush fails.
+        // Restore activation only when the overlay was already in the foreground.
+        let _ = ShowWindow(
+            handle,
+            if was_foreground {
+                SW_SHOW
+            } else {
+                SW_SHOWNOACTIVATE
+            },
+        );
+        hidden?;
+        DwmFlush().map_err(OverlayError::native)?;
+        if !IsWindowVisible(handle).as_bool() {
+            return Err(OverlayError::new(
+                "CAPTURE_REFRESH_FAILED",
+                "The overlay could not be shown after refreshing capture exclusion.",
+            ));
         }
     }
     Ok(())
