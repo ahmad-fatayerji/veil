@@ -159,3 +159,41 @@ it('joins matching authenticated versions without a warning prompt', async () =>
     await joined.close();
   }
 });
+
+it('allows confirmed legacy servers while retaining their original request shapes', async () => {
+  const f = await fixture();
+  const request = f.transport.request;
+  f.transport.request = async (server, path, method, body, ticket) => {
+    if (path === '/v2/capabilities') return {};
+    expect(path).not.toBe('/v3/compatibility');
+    if (path === '/v3/join') expect(body).not.toHaveProperty('compatibility');
+    return request(server, path, method, body, ticket);
+  };
+  const joined = await joinShareLink(f.code, 'Guest', f.transport, () => {});
+  try {
+    expect(f.confirm).toHaveBeenCalledTimes(1);
+    expect(f.confirm).toHaveBeenCalledWith(expect.stringContaining('could not be verified'));
+    expect(f.transport.compatibility?.warning).toHaveBeenLastCalledWith(
+      'Server compatibility could not be verified.',
+    );
+  } finally {
+    await joined.close();
+  }
+});
+it('asks about supported version differences before issuing an admission request', async () => {
+  const f = await fixture();
+  const request = f.transport.request;
+  f.transport.request = async (server, path, method, body, ticket) => {
+    const response = await request(server, path, method, body, ticket);
+    return path === '/v3/compatibility'
+      ? { ...(response as object), hostCompatibility: { ...client, appVersion: '0.4.0' } }
+      : response;
+  };
+  f.confirm.mockResolvedValue(false);
+  await expect(joinShareLink(f.code, 'Guest', f.transport, () => {})).rejects.toThrow('cancelled');
+  expect(f.confirm).toHaveBeenCalledWith(
+    expect.stringContaining('Some features may not work properly'),
+  );
+  expect(f.requests).not.toContain('/v3/join');
+  expect(f.transport.connect).not.toHaveBeenCalled();
+});
