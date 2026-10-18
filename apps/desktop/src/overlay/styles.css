@@ -53,6 +53,8 @@
   display: grid;
   gap: 4px;
   margin-right: auto;
+  flex: 1;
+  min-width: 0;
 }
 .overlay-controls-title {
   font-size: 14px;
@@ -62,27 +64,6 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
-}
-.overlay-controls-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  background: var(--hover);
-  padding: 4px 9px;
-  border-radius: 20px;
-  font-size: 11px;
-  white-space: nowrap;
-}
-.overlay-controls-status::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.overlay-controls-status.is-visible {
-  color: var(--success);
 }
 .overlay-controls .outline-button {
   padding: 7px 12px;
@@ -354,8 +335,12 @@
   align-items: center;
   width: 100%;
   margin-top: 14px;
-  padding: 10px 0 0;
+  padding: 12px 0 0;
+  border: 0;
   border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   text-align: left;
   font-size: 12px;
 }
@@ -391,9 +376,6 @@
   }
   .overlay-controls-row {
     flex-wrap: wrap;
-  }
-  .overlay-heading {
-    flex-basis: calc(100% - 90px);
   }
   .overlay-setting-group {
     padding: 14px;

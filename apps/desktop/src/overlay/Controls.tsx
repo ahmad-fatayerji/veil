@@ -62,9 +62,6 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
           <span className="overlay-controls-title">Desktop overlay</span>
           <span className="overlay-controls-subtitle">Your document, above other windows.</span>
         </div>
-        <span className={`overlay-controls-status ${state?.settings.visible ? 'is-visible' : ''}`}>
-          {state ? (state.settings.visible ? 'Visible' : 'Hidden') : 'Loading'}
-        </span>
         <button
           className="outline-button"
           disabled={!state || busy}
