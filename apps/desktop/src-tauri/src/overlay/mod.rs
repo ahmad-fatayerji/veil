@@ -380,6 +380,11 @@ pub fn flush_checked(app: &AppHandle) -> Result<(), OverlayError> {
 fn set_visible(app: &AppHandle, visible: bool) -> Result<(), OverlayError> {
     let overlay = window(app)?;
     if visible {
+        // A failed native capture refresh can hide the HWND without updating Tao's
+        // visibility flag. Synchronize it so show cannot become an unchanged no-op.
+        if !overlay.is_visible().map_err(OverlayError::native)? {
+            overlay.hide().map_err(OverlayError::native)?;
+        }
         let mut preferences = snapshot(app).settings;
         preferences.fit(&areas(&overlay)?);
         overlay

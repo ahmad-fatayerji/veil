@@ -763,6 +763,14 @@ try {
   for (const property of ['x', 'y', 'width', 'height', 'alpha', 'topmost', 'clickThrough'])
     assert.equal(afterReapply[property], beforeReapply[property], `Reapply preserves ${property}`);
   await captureExcluded('explicit-reapply');
+  // Simulate a refresh failure hiding the HWND without updating Tao's visible flag.
+  native('Hide');
+  assert.equal(native('Probe').visible, false, 'Native-only hide fixture');
+  await command(main, 'overlay_visibility', { visible: true });
+  assert.equal(native('Probe').visible, true, 'Show recovers a natively hidden overlay');
+  assert.equal((await snapshot(main)).settings.visible, true);
+  assert.equal((await snapshot(main)).capture.status, 'applied');
+  await captureExcluded('native-hide-recovery');
   await main.screenshot({ path: resolve(directory, 'control-panel.png'), fullPage: true });
   await command(main, 'overlay_capture_test', { enabled: false });
   await main.getByRole('button', { name: 'Close Settings', exact: true }).click();
