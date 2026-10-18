@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { errorMessage, invoke, useOverlay, type OverlayPatch, type OverlaySnapshot } from './api';
 
 export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boolean }) {
@@ -52,12 +52,18 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
     }
   }
   const update = (patch: OverlayPatch) => run('overlay_update', { patch });
+  const windowOpacity = Math.round((draft.opacity ?? state?.settings.opacity ?? 0.85) * 100);
+  const textOpacity = Math.round((draft.textOpacity ?? state?.settings.textOpacity ?? 1) * 100);
+  const fontSize = draft.fontSize ?? state?.settings.fontSize ?? 20;
   return (
     <section className="overlay-controls" aria-label="Overlay controls">
       <div className="overlay-controls-row">
-        <span className="overlay-controls-title">Desktop overlay</span>
-        <span className="overlay-controls-status">
-          {state?.settings.visible ? 'Visible' : 'Hidden'}
+        <div className="overlay-heading">
+          <span className="overlay-controls-title">Desktop overlay</span>
+          <span className="overlay-controls-subtitle">Your document, above other windows.</span>
+        </div>
+        <span className={`overlay-controls-status ${state?.settings.visible ? 'is-visible' : ''}`}>
+          {state ? (state.settings.visible ? 'Visible' : 'Hidden') : 'Loading'}
         </span>
         <button
           className="outline-button"
@@ -79,117 +85,156 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
       </div>
       {expanded && state && (
         <div id="overlay-settings" className="overlay-settings">
-          <div className="overlay-settings-grid">
-            <label className="overlay-range" htmlFor="overlay-opacity">
-              Window opacity{' '}
-              <output>{Math.round((draft.opacity ?? state.settings.opacity) * 100)}%</output>
-              <input
-                id="overlay-opacity"
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={Math.round((draft.opacity ?? state.settings.opacity) * 100)}
-                disabled={!state.capabilities.transparency}
-                onChange={(event) => range({ opacity: Number(event.target.value) / 100 })}
-              />
-            </label>
-            <label className="overlay-range" htmlFor="overlay-text-opacity">
-              Text opacity{' '}
-              <output>
-                {Math.round((draft.textOpacity ?? state.settings.textOpacity) * 100)}%
-              </output>
-              <input
-                id="overlay-text-opacity"
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={Math.round((draft.textOpacity ?? state.settings.textOpacity) * 100)}
-                onChange={(event) => range({ textOpacity: Number(event.target.value) / 100 })}
-              />
-            </label>
-            <label className="overlay-range" htmlFor="overlay-font-size">
-              Font size <output>{draft.fontSize ?? state.settings.fontSize}px</output>
-              <input
-                id="overlay-font-size"
-                type="range"
-                min="12"
-                max="48"
-                step="2"
-                value={draft.fontSize ?? state.settings.fontSize}
-                onChange={(event) => range({ fontSize: Number(event.target.value) })}
-              />
-            </label>
-            <label className="overlay-check">
+          <section className="overlay-setting-group" aria-labelledby="overlay-appearance-heading">
+            <div className="overlay-group-heading">
+              <h4 id="overlay-appearance-heading">Appearance</h4>
+              <span>Saved on this device</span>
+            </div>
+            <div className="overlay-settings-grid">
+              <label className="overlay-range" htmlFor="overlay-opacity">
+                Window opacity <output>{windowOpacity}%</output>
+                <span className="overlay-range-description">Background only</span>
+                <input
+                  id="overlay-opacity"
+                  aria-label="Window opacity"
+                  aria-valuetext={`${windowOpacity}%`}
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={windowOpacity}
+                  disabled={!state.capabilities.transparency}
+                  style={{ '--range-progress': `${windowOpacity}%` } as CSSProperties}
+                  onChange={(event) => range({ opacity: Number(event.target.value) / 100 })}
+                />
+              </label>
+              <label className="overlay-range" htmlFor="overlay-text-opacity">
+                Text opacity <output>{textOpacity}%</output>
+                <span className="overlay-range-description">Independent of background</span>
+                <input
+                  id="overlay-text-opacity"
+                  aria-label="Text opacity"
+                  aria-valuetext={`${textOpacity}%`}
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={textOpacity}
+                  style={{ '--range-progress': `${textOpacity}%` } as CSSProperties}
+                  onChange={(event) => range({ textOpacity: Number(event.target.value) / 100 })}
+                />
+              </label>
+              <label className="overlay-range overlay-font-range" htmlFor="overlay-font-size">
+                Font size <output>{fontSize} px</output>
+                <input
+                  id="overlay-font-size"
+                  aria-label="Font size"
+                  aria-valuetext={`${fontSize} pixels`}
+                  type="range"
+                  min="12"
+                  max="48"
+                  step="2"
+                  value={fontSize}
+                  style={
+                    { '--range-progress': `${((fontSize - 12) / 36) * 100}%` } as CSSProperties
+                  }
+                  onChange={(event) => range({ fontSize: Number(event.target.value) })}
+                />
+                <span className="overlay-range-limits" aria-hidden="true">
+                  <span>A</span>
+                  <span>A</span>
+                </span>
+              </label>
+            </div>
+          </section>
+          <section className="overlay-setting-group" aria-labelledby="overlay-behavior-heading">
+            <div className="overlay-group-heading">
+              <h4 id="overlay-behavior-heading">Window behavior</h4>
+            </div>
+            <label className="overlay-toggle-row">
+              <span>
+                <strong>Always on top</strong>
+                <small>Keep the overlay above other windows.</small>
+              </span>
               <input
                 type="checkbox"
+                aria-label="Always on top"
                 checked={state.settings.alwaysOnTop}
                 disabled={!state.capabilities.alwaysOnTop || busy}
                 onChange={(event) => void update({ alwaysOnTop: event.target.checked })}
-              />{' '}
-              Always on top
+              />
             </label>
-            <label className="overlay-check">
+            <label className="overlay-toggle-row">
+              <span>
+                <strong>Click-through</strong>
+                <small>Send clicks to the window underneath. Turn off to edit.</small>
+              </span>
               <input
                 type="checkbox"
+                aria-label="Click-through"
                 checked={state.settings.clickThrough}
                 disabled={!state.capabilities.clickThrough || !state.recoveryAvailable || busy}
                 onChange={(event) => void update({ clickThrough: event.target.checked })}
-              />{' '}
-              Click-through
+              />
             </label>
-          </div>
-          <div className="overlay-settings-actions">
-            <button
-              className="quiet-button"
-              disabled={busy}
-              onClick={() => void run('overlay_recover')}
-            >
-              Restore interaction
-            </button>
-            <button
-              className="quiet-button"
-              disabled={busy}
-              onClick={() => void run('overlay_reset_position')}
-            >
-              Reset position & size
-            </button>
-            <span>
-              {state.settings.width} × {state.settings.height}
-            </span>
-          </div>
-          <p className="overlay-help">
-            Drag the overlay header to move it, or an edge to resize it. Appearance is saved on this
-            device. Window opacity fades only the background; text opacity independently fades the
-            document content.
-          </p>
-          <p className="overlay-help">
-            {state.recoveryAvailable ? (
-              <>
-                <kbd>Ctrl+Alt+V</kbd> restores interaction and opens this control panel.
-              </>
-            ) : (
-              'Recovery shortcut unavailable. Click-through is disabled.'
-            )}{' '}
-            {state.hideShortcutAvailable && (
-              <>
-                <kbd>Ctrl+Alt+Shift+V</kbd> hides or shows the overlay.
-              </>
+            <div className="overlay-shortcuts">
+              {state.recoveryAvailable ? (
+                <div>
+                  <span>Restore interaction</span>
+                  <kbd>Ctrl+Alt+V</kbd>
+                </div>
+              ) : (
+                <p className="overlay-help">
+                  Recovery shortcut unavailable. Click-through is disabled.
+                </p>
+              )}
+              {state.hideShortcutAvailable && (
+                <div>
+                  <span>Show / hide overlay</span>
+                  <kbd>Ctrl+Alt+Shift+V</kbd>
+                </div>
+              )}
+            </div>
+            <div className="overlay-settings-actions">
+              <button
+                className="outline-button"
+                disabled={busy}
+                onClick={() => void run('overlay_recover')}
+              >
+                Restore interaction
+              </button>
+              <button
+                className="quiet-button"
+                disabled={busy}
+                onClick={() => void run('overlay_reset_position')}
+              >
+                Reset position & size
+              </button>
+              <span>
+                {state.settings.width} &times; {state.settings.height} px
+              </span>
+            </div>
+            <p className="overlay-help">
+              Drag the overlay header to move it, or an edge to resize.
+            </p>
+            {(!state.capabilities.transparency ||
+              !state.capabilities.alwaysOnTop ||
+              !state.capabilities.clickThrough) && (
+              <p className="overlay-help">Some window controls are unavailable on this platform.</p>
             )}
-          </p>
-          {(!state.capabilities.transparency ||
-            !state.capabilities.alwaysOnTop ||
-            !state.capabilities.clickThrough) && (
-            <p className="overlay-help">Some window controls are unavailable on this platform.</p>
-          )}
-          <p className="overlay-help">
-            The overlay edits the same document. Turn off click-through to write in it.
-          </p>
-          <div className="capture-settings">
-            <label className="overlay-check">
+          </section>
+          <div className="capture-settings overlay-setting-group">
+            <div className="overlay-group-heading">
+              <h4>Screen capture</h4>
+            </div>
+            <label className="overlay-toggle-row">
+              <span>
+                <strong>Capture exclusion</strong>
+                <small>Exclude the overlay from compatible captures.</small>
+              </span>
               <input
                 type="checkbox"
+                aria-label="Exclude overlay from compatible captures"
                 checked={state.settings.captureExclusion}
                 disabled={
                   busy ||
@@ -198,22 +243,26 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
                 }
                 onChange={(event) => void update({ captureExclusion: event.target.checked })}
               />
-              Exclude overlay from compatible captures
             </label>
-            <p className="overlay-help" role="status" data-capture-status={state.capture.status}>
+            <p
+              className="overlay-help overlay-capture-status"
+              role="status"
+              data-capture-status={state.capture.status}
+            >
               {state.capture.message}
             </p>
             <p className="overlay-help">
-              Applies only to the overlay. The control panel remains capturable. Results depend on
-              the recording or sharing tool and mode; test before sharing sensitive content.
+              The control panel remains capturable. Results vary by tool and mode; test before
+              sharing.
             </p>
             <button
-              className="quiet-button"
+              className="quiet-button overlay-disclosure"
               aria-expanded={captureExpanded}
               aria-controls="capture-compatibility"
               onClick={() => setCaptureExpanded(!captureExpanded)}
             >
-              Capture compatibility test
+              Capture compatibility test{' '}
+              <span aria-hidden="true">{captureExpanded ? '\u2212' : '+'}</span>
             </button>
             {captureExpanded && (
               <section
