@@ -129,12 +129,16 @@ export function PeoplePanel({
   role,
   onClose,
   children,
+  id,
+  introduction,
 }: {
   connection: DemoConnection;
   peers?: PeerSummary[];
   role?: 'host' | 'guest';
   onClose: () => void;
   children?: ReactNode;
+  id?: string;
+  introduction?: ReactNode;
 }) {
   const [participants, set] = useState(() => readParticipants(connection));
   useEffect(() => {
@@ -144,7 +148,7 @@ export function PeoplePanel({
     return () => connection.provider.awareness.off('change', update);
   }, [connection]);
   return (
-    <aside className="people-panel" aria-label="Session">
+    <aside id={id} className="people-panel" aria-label="Session">
       <div className="panel-heading">
         <h2>
           People <span className="count">{participants.length}</span>
@@ -153,6 +157,7 @@ export function PeoplePanel({
           {'\u00d7'}
         </button>
       </div>
+      {introduction}
       <ul aria-label="Participants">
         {participants.map((person) => {
           const peer = peers.find((p) => p.clientId === person.id);

@@ -29,6 +29,8 @@ import { OverlayControls } from './overlay/Controls';
 import { Updates, useUpdateAttention } from './Updates';
 import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
+import { WorkspaceIcon } from './WorkspaceIcon';
+import './workspace.css';
 
 type Section = 'General' | 'Appearance' | 'Hosting server' | 'Overlay' | 'Updates' | 'About';
 const sections: Section[] = [
@@ -68,6 +70,7 @@ export function AutomaticApp() {
   const busyRef = useRef(false);
   const [development, setDevelopment] = useState(false);
   const [people, setPeople] = useState(() => window.innerWidth >= 900);
+  const peopleToggle = useRef<HTMLButtonElement>(null);
   const updateAttention = useUpdateAttention();
   const [settings, setSettings] = useState(false);
   const [section, setSection] = useState<Section>('General');
@@ -358,17 +361,20 @@ export function AutomaticApp() {
           ? 'Sharing enabled'
           : 'Local document';
   return (
-    <div className="app-shell desktop-shell">
+    <div className="app-shell desktop-shell automatic-workspace">
       <div className="desktop-content" inert={updating} aria-busy={busy || updating}>
         <header className="app-header">
           <Brand />
+          <span className="workspace-header-label">
+            {document ? 'Workspace' : 'A shared space'}
+          </span>
           {document && (
             <span className={`status ${connected ? 'status-synced' : ''}`} role="status">
               <span className="status-dot" />
               {status}
             </span>
           )}
-          <div className="header-actions">
+          <div className="header-actions" hidden={!document}>
             {document && (
               <>
                 {!guest && (
@@ -377,14 +383,18 @@ export function AutomaticApp() {
                     disabled={busy}
                     onClick={() => void run(() => share())}
                   >
+                    <WorkspaceIcon name="link" size={16} />
                     Share
                   </button>
                 )}
                 <button
+                  ref={peopleToggle}
                   className="secondary-button"
                   aria-expanded={people}
+                  aria-controls="workspace-people"
                   onClick={() => setPeople(!people)}
                 >
+                  <WorkspaceIcon name="people" size={16} />
                   People{pendingGuests.length > 0 ? ` (${pendingGuests.length} waiting)` : ''}
                 </button>
                 <button
@@ -400,6 +410,7 @@ export function AutomaticApp() {
                     })
                   }
                 >
+                  <WorkspaceIcon name="overlay" size={16} />
                   {overlay.state?.settings.visible ? 'Hide overlay' : 'Show overlay'}
                 </button>
               </>
@@ -409,14 +420,47 @@ export function AutomaticApp() {
         {!document ? (
           <main className="welcome">
             <div className="welcome-intro">
-              <span className="eyebrow">A LITTLE SPACE TO THINK TOGETHER</span>
+              <span className="welcome-symbol">
+                <WorkspaceIcon name="document" size={28} />
+              </span>
+              <span className="eyebrow">ROOM FOR YOUR NEXT IDEA</span>
               <h1>
                 Your words.
-                <br />A shared space.
+                <br />
+                <span>A shared space.</span>
               </h1>
               <p>
                 Create a document, invite your people, and keep it close with the desktop overlay.
               </p>
+              <ul className="welcome-features">
+                <li>
+                  <span className="feature-icon">
+                    <WorkspaceIcon name="document" />
+                  </span>
+                  <div>
+                    <strong>Start on your own</strong>
+                    <span>A blank page, ready when you are.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="feature-icon">
+                    <WorkspaceIcon name="people" />
+                  </span>
+                  <div>
+                    <strong>Bring people in</strong>
+                    <span>Share a link and write together.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className="feature-icon">
+                    <WorkspaceIcon name="overlay" />
+                  </span>
+                  <div>
+                    <strong>Keep it in view</strong>
+                    <span>Put your document in a desktop overlay.</span>
+                  </div>
+                </li>
+              </ul>
             </div>
             <section className="welcome-card" aria-label="Get started">
               <div
@@ -446,6 +490,7 @@ export function AutomaticApp() {
                   tabIndex={tab === 'create' ? 0 : -1}
                   onClick={() => setTab('create')}
                 >
+                  <WorkspaceIcon name="document" size={16} />
                   Create document
                 </button>
                 <button
@@ -456,6 +501,7 @@ export function AutomaticApp() {
                   tabIndex={tab === 'join' ? 0 : -1}
                   onClick={() => setTab('join')}
                 >
+                  <WorkspaceIcon name="link" size={16} />
                   Join session
                 </button>
               </div>
@@ -468,6 +514,9 @@ export function AutomaticApp() {
                   void run(tab === 'create' ? create : join);
                 }}
               >
+                <span className="start-panel-icon">
+                  <WorkspaceIcon name={tab === 'create' ? 'document' : 'link'} size={24} />
+                </span>
                 <h2>{tab === 'create' ? 'Start with a blank page' : 'Join your people'}</h2>
                 <p>
                   {tab === 'create'
@@ -480,12 +529,16 @@ export function AutomaticApp() {
                 <input
                   id="automatic-name"
                   autoComplete="nickname"
+                  aria-describedby="name-hint"
                   placeholder="e.g. Alex"
                   value={name}
                   maxLength={40}
                   disabled={busy}
                   onChange={(e) => updateName(e.target.value)}
                 />
+                <p className="field-hint" id="name-hint">
+                  This is how you appear to others in the document.
+                </p>
                 {tab === 'join' && (
                   <>
                     <label htmlFor="automatic-invitation">Session link</label>
@@ -505,10 +558,16 @@ export function AutomaticApp() {
                   disabled={busy || (tab === 'join' && (!name.trim() || !invitation.trim()))}
                 >
                   {busy ? 'Connecting…' : tab === 'create' ? 'Create document' : 'Join session'}
+                  <WorkspaceIcon name="arrow" size={17} />
                 </button>
               </form>
               <p className="welcome-footnote">
-                Documents are temporary. Keep Veil open to keep your work.
+                <WorkspaceIcon name="clock" size={16} />
+                <span>
+                  Just for this session.
+                  <br />
+                  Documents are temporary. Copy anything you want to keep.
+                </span>
               </p>
             </section>
           </main>
@@ -517,12 +576,14 @@ export function AutomaticApp() {
             <section className="document-workspace" aria-label="Collaborative workspace">
               <div className="document-heading">
                 <div>
-                  <span className="eyebrow">
+                  <span className="eyebrow document-eyebrow">
+                    <WorkspaceIcon name="document" size={14} />
                     {guest ? 'JOINED SESSION' : session ? 'YOUR SHARED DOCUMENT' : 'YOUR DOCUMENT'}
                   </span>
                   <h1>Untitled document</h1>
                 </div>
                 <button className="quiet-button danger-text" disabled={busy} onClick={requestLeave}>
+                  <WorkspaceIcon name="close" size={16} />
                   {guest ? 'Leave session' : 'Close document'}
                 </button>
               </div>
@@ -530,16 +591,30 @@ export function AutomaticApp() {
                 <DesktopEditor connection={document} />
               </div>
               <footer className="document-footer">
-                <span>Temporary document · not saved to disk</span>
-                <span>{guest ? 'Host must stay online' : 'Saved only in this open session'}</span>
+                <span>
+                  <WorkspaceIcon name="clock" size={14} />
+                  Temporary document · not saved to disk
+                </span>
+                <span>{guest ? 'Host must stay online' : 'Copy anything you want to keep'}</span>
               </footer>
             </section>
             {people && (
               <PeoplePanel
+                id="workspace-people"
                 connection={document}
                 peers={peers}
                 role={guest ? 'guest' : 'host'}
-                onClose={() => setPeople(false)}
+                onClose={() => {
+                  setPeople(false);
+                  peopleToggle.current?.focus();
+                }}
+                introduction={
+                  <p className="workspace-people-hint">
+                    {session
+                      ? 'Everyone here can edit this document.'
+                      : 'Your space for now. Share to write together.'}
+                  </p>
+                }
               >
                 <details className="connection-details">
                   <summary>Connection details</summary>
@@ -631,6 +706,9 @@ export function AutomaticApp() {
           </div>
         )}
         <footer className="desktop-footer">
+          <span className="workspace-footer-note">
+            {document ? 'A little space to think together.' : 'Write. Share. Stay in your flow.'}
+          </span>
           <button
             className="desktop-settings-button"
             aria-label="Settings"
@@ -652,6 +730,7 @@ export function AutomaticApp() {
               <path d="m9.5 3-.5 2-2 .9-1.9-.6-2.5 4.3 1.5 1.4v2l-1.5 1.4 2.5 4.3 1.9-.6 2 .9.5 2h5l.5-2 2-.9 1.9.6 2.5-4.3-1.5-1.4v-2l1.5-1.4-2.5-4.3-1.9.6-2-.9-.5-2z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
+            <span>Settings</span>
             {updateAttention && <span className="settings-attention-dot" aria-hidden="true" />}
           </button>
         </footer>
