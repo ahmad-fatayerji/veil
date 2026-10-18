@@ -621,7 +621,7 @@ try {
   await main.getByRole('button', { name: 'Capture compatibility test', exact: true }).click();
   await main.getByRole('button', { name: 'Show test card', exact: true }).click();
   await overlay.getByLabel('Capture test card').waitFor();
-  const opacitySlider = main.getByRole('slider', { name: /Opacity/ });
+  const opacitySlider = main.getByRole('slider', { name: /Window opacity/ });
   assert.deepEqual(
     await opacitySlider.evaluate((node) => {
       const style = getComputedStyle(node);
