@@ -130,8 +130,14 @@ function ffmpeg(args) {
   });
 }
 async function capture(mode, phase, held = false) {
-  // Keep the known background above unrelated normal windows, below the topmost overlay.
-  if (!held) native('Raise', {}, 'main', underlay.pid);
+  // Keep the known background above unrelated windows without covering the overlay.
+  if (!held) {
+    native('Raise', {}, 'main', underlay.pid);
+    if (!native('Probe').topmost) {
+      native('Focus');
+      assert.equal(native('Probe').foreground, true, 'Non-topmost overlay above the underlay');
+    }
+  }
   await delay(200);
   const bounds = native('Probe');
   const imagePath = resolve(directory, `${mode}-${phase}.png`);
@@ -721,6 +727,8 @@ try {
     await command(main, 'overlay_update', { patch });
     assert.equal(native('Probe').affinity, 0x11);
     assert.equal((await snapshot(main)).capture.status, 'applied');
+    // Check pixels before hide/show or Reapply can repair a stale capture surface.
+    await captureExcluded(`appearance-${Object.keys(patch)[0]}-${Object.values(patch)[0]}`);
   }
   await command(main, 'overlay_visibility', { visible: false });
   await command(main, 'overlay_visibility', { visible: true });

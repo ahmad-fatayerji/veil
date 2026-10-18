@@ -482,7 +482,8 @@ pub fn overlay_update(
     next.validate()?;
     // Reapply the appearance after toolkit style changes replace the extended styles.
     let overlay = window(&app)?;
-    let result = if patch.always_on_top.is_some() || patch.click_through.is_some() {
+    let style_update = patch.always_on_top.is_some() || patch.click_through.is_some();
+    let result = if style_update {
         apply(&overlay, &next, &current.capabilities)
     } else if patch.opacity.is_some() {
         platform::opacity(&overlay, next.opacity)
@@ -503,14 +504,16 @@ pub fn overlay_update(
         return Err(error);
     }
     modify(&app, |model| model.settings = next);
-    // Toolkit style and alpha changes must preserve/reapply display affinity. Capture
-    // failure has its own status and must not disable unrelated overlay controls.
-    if patch.capture_exclusion.is_some()
-        || patch.always_on_top.is_some()
-        || patch.click_through.is_some()
-        || patch.opacity.is_some()
-    {
-        refresh_capture(&app, true, patch.capture_exclusion == Some(true))?;
+    // Toolkit style changes can replace the protected layered surface even when
+    // affinity readback matches. Rebuild it as on explicit enable/reapply; alpha-only
+    // changes still reapply affinity without hiding the overlay on every slider step.
+    // Capture failure has its own status and does not disable unrelated controls.
+    if patch.capture_exclusion.is_some() || style_update || patch.opacity.is_some() {
+        refresh_capture(
+            &app,
+            true,
+            patch.capture_exclusion == Some(true) || style_update,
+        )?;
     }
     Ok(snapshot(&app))
 }
