@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke, useOverlay, errorMessage } from './api';
 import { activityLabels, useAppearance } from '@veil/ui';
@@ -77,7 +77,12 @@ export function OverlayWindow() {
   return (
     <main
       className={`overlay-surface ${state?.settings.clickThrough ? 'is-click-through' : ''} ${excluded ? 'is-capture-excluded' : ''} ${active && interactive ? 'is-gesturing' : ''}`}
-      style={{ fontSize: `${state?.settings.fontSize ?? 20}px` }}
+      style={
+        {
+          fontSize: `${state?.settings.fontSize ?? 20}px`,
+          '--overlay-window-opacity': state?.settings.opacity ?? 0.85,
+        } as CSSProperties
+      }
       onContextMenu={visibilityMenu.onContextMenu}
       onDragStart={(event) => {
         if (gesturePending.current) event.preventDefault();
@@ -136,7 +141,7 @@ export function OverlayWindow() {
             <span>Local test card · no document changes</span>
           </div>
         )}
-        <div hidden={state?.captureTest}>
+        <div hidden={state?.captureTest} style={{ opacity: state?.settings.textOpacity ?? 1 }}>
           {document.connection ? (
             <SharedEditor
               key={document.connection.doc.clientID}

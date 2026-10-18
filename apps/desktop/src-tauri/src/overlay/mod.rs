@@ -97,7 +97,7 @@ fn refresh_capture(
     let enabled = preferences.capture_exclusion;
     let result = platform::capture_exclusion(&overlay, enabled, apply).and_then(|()| {
         if enabled && apply && refresh_surface {
-            platform::refresh_capture_surface(&overlay, preferences.opacity)?;
+            platform::refresh_capture_surface(&overlay, 1.0)?;
             // Showing the HWND must not invalidate its confirmed affinity.
             platform::capture_exclusion(&overlay, enabled, false)?;
         }
@@ -129,6 +129,7 @@ pub struct OverlayState {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Patch {
     opacity: Option<f64>,
+    text_opacity: Option<f64>,
     always_on_top: Option<bool>,
     click_through: Option<bool>,
     font_size: Option<u32>,
@@ -201,9 +202,10 @@ fn apply(
     if capabilities.always_on_top {
         platform::always_on_top(window, settings.always_on_top)?;
     }
-    // Toolkit style changes can replace extended styles; apply layered opacity last.
+    // Keep native alpha fully opaque: background and document opacity are separate
+    // WebView layers. Toolkit style changes can replace extended styles.
     if capabilities.transparency {
-        platform::opacity(window, settings.opacity)?;
+        platform::opacity(window, 1.0)?;
     }
     Ok(())
 }
@@ -470,6 +472,9 @@ pub fn overlay_update(
         }
         next.click_through = value;
     }
+    if let Some(value) = patch.text_opacity {
+        next.text_opacity = value;
+    }
     if let Some(value) = patch.font_size {
         next.font_size = value;
     }
@@ -484,8 +489,6 @@ pub fn overlay_update(
     let overlay = window(&app)?;
     let result = if patch.always_on_top.is_some() || patch.click_through.is_some() {
         apply(&overlay, &next, &current.capabilities)
-    } else if patch.opacity.is_some() {
-        platform::opacity(&overlay, next.opacity)
     } else {
         Ok(())
     };
@@ -508,7 +511,6 @@ pub fn overlay_update(
     if patch.capture_exclusion.is_some()
         || patch.always_on_top.is_some()
         || patch.click_through.is_some()
-        || patch.opacity.is_some()
     {
         refresh_capture(&app, true, patch.capture_exclusion == Some(true))?;
     }

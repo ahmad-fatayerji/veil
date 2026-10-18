@@ -11,6 +11,7 @@ pub struct Settings {
     pub width: u32,
     pub height: u32,
     pub opacity: f64,
+    pub text_opacity: f64,
     pub always_on_top: bool,
     pub click_through: bool,
     pub capture_exclusion: bool,
@@ -28,6 +29,7 @@ impl Default for Settings {
             width: 520,
             height: 320,
             opacity: 0.85,
+            text_opacity: 1.0,
             always_on_top: true,
             click_through: false,
             capture_exclusion: true,
@@ -42,7 +44,9 @@ impl Settings {
     pub fn validate(&self) -> Result<(), OverlayError> {
         if self.version != 1
             || !self.opacity.is_finite()
-            || !(0.2..=1.0).contains(&self.opacity)
+            || !(0.0..=1.0).contains(&self.opacity)
+            || !self.text_opacity.is_finite()
+            || !(0.0..=1.0).contains(&self.text_opacity)
             || !(280..=4096).contains(&self.width)
             || !(180..=4096).contains(&self.height)
             || !(12..=48).contains(&self.font_size)
@@ -116,6 +120,7 @@ mod tests {
         settings.validate().unwrap();
         assert!(Settings::default().capture_exclusion);
         assert!(settings.capture_exclusion);
+        assert_eq!(settings.text_opacity, 1.0);
         assert_eq!(
             settings.close_behavior,
             crate::lifecycle::CloseBehavior::Tray
@@ -143,7 +148,8 @@ mod tests {
         assert_eq!(load(&path).unwrap(), Settings::default());
         let mut value = Settings {
             x: -1200,
-            opacity: 0.42,
+            opacity: 0.0,
+            text_opacity: 0.42,
             click_through: true,
             ..Settings::default()
         };
@@ -157,8 +163,17 @@ mod tests {
         assert!(load(&path).is_err());
         value.opacity = f64::NAN;
         assert!(save(&path, &value).is_err());
-        value.opacity = 0.1;
+        value.opacity = -0.1;
         assert!(value.validate().is_err());
+        value.opacity = 1.0;
+        for opacity in [0.0, 1.0] {
+            value.text_opacity = opacity;
+            value.validate().unwrap();
+        }
+        for opacity in [f64::NAN, -0.1, 1.1] {
+            value.text_opacity = opacity;
+            assert!(value.validate().is_err());
+        }
     }
 
     #[test]
