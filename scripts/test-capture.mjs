@@ -133,7 +133,9 @@ async function capture(mode, phase, held = false) {
   // Keep the known background above unrelated windows without covering the overlay.
   if (!held) {
     native('Raise', {}, 'main', underlay.pid);
-    if (!native('Probe').topmost) {
+    const current = native('Probe');
+    assert.equal(current.visible, true, 'Overlay visible before capture');
+    if (!current.topmost) {
       native('Focus');
       assert.equal(native('Probe').foreground, true, 'Non-topmost overlay above the underlay');
     }
