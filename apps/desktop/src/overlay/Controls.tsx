@@ -161,8 +161,8 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
           </div>
           <p className="overlay-help">
             Drag the overlay header to move it, or an edge to resize it. Appearance is saved on this
-            device. Window opacity fades the entire overlay; text opacity fades the document
-            content. At 0% window opacity, use this control panel to make the overlay visible again.
+            device. Window opacity fades only the background; text opacity independently fades the
+            document content.
           </p>
           <p className="overlay-help">
             {state.recoveryAvailable ? (

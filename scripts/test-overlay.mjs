@@ -223,10 +223,31 @@ try {
     async () => (await snapshot(main)).settings.opacity === 0,
     'zero window opacity saved',
   );
-  assert.equal(native('Probe').alpha, 0, 'Window opacity can reach 0%.');
+  assert.equal(native('Probe').alpha, 255, 'Zero background opacity never fades native text.');
+  assert.equal(
+    await overlay
+      .locator('.overlay-surface')
+      .evaluate((node) => getComputedStyle(node, '::before').opacity),
+    '0',
+    'Window background reaches zero opacity.',
+  );
+  assert.equal(
+    await overlay
+      .locator('.overlay-document > div[style]')
+      .evaluate((node) => getComputedStyle(node).opacity),
+    '1',
+    'Document stays fully opaque over a transparent window background.',
+  );
   await setRange(main, 'Window opacity', 40);
   await waitFor(async () => (await snapshot(main)).settings.opacity === 0.4, 'opacity applied');
-  assert.equal(native('Probe').alpha, 102, 'Win32 layered opacity is 40%.');
+  assert.equal(native('Probe').alpha, 255, 'Window opacity leaves native alpha at 100%.');
+  assert.equal(
+    await overlay
+      .locator('.overlay-surface')
+      .evaluate((node) => getComputedStyle(node, '::before').opacity),
+    '0.4',
+    'Window background opacity is 40%.',
+  );
   await setRange(main, 'Text opacity', 0);
   await waitFor(
     async () =>
@@ -236,7 +257,7 @@ try {
         .evaluate((node) => getComputedStyle(node).opacity)) === '0',
     'text opacity reaches zero without changing window opacity',
   );
-  assert.equal(native('Probe').alpha, 102, 'Text opacity preserves native window alpha.');
+  assert.equal(native('Probe').alpha, 255, 'Text opacity preserves native window alpha.');
   await setRange(main, 'Text opacity', 65);
   await waitFor(
     async () => (await snapshot(main)).settings.textOpacity === 0.65,
@@ -245,11 +266,15 @@ try {
   await main.getByLabel('Always on top', { exact: true }).click();
   await waitFor(async () => !(await snapshot(main)).settings.alwaysOnTop, 'always-on-top disabled');
   assert.equal(native('Probe').topmost, false);
-  assert.equal(native('Probe').alpha, 102, 'Changing topmost preserves opacity.');
+  assert.equal(native('Probe').alpha, 255, 'Changing topmost preserves fully opaque native alpha.');
   await main.getByLabel('Always on top', { exact: true }).click();
   await waitFor(async () => (await snapshot(main)).settings.alwaysOnTop, 'always-on-top enabled');
   assert.equal(native('Probe').topmost, true);
-  assert.equal(native('Probe').alpha, 102, 'Restoring topmost preserves opacity.');
+  assert.equal(
+    native('Probe').alpha,
+    255,
+    'Restoring topmost preserves fully opaque native alpha.',
+  );
   await setRange(main, 'Font size', 28);
   await waitFor(
     async () =>
@@ -572,7 +597,7 @@ try {
   await main.getByLabel('Click-through', { exact: true }).click();
   await waitFor(async () => (await snapshot(main)).settings.clickThrough, 'click-through enabled');
   assert.equal(native('Probe').clickThrough, true);
-  assert.equal(native('Probe').alpha, 102, 'Click-through preserves opacity.');
+  assert.equal(native('Probe').alpha, 255, 'Click-through preserves fully opaque native alpha.');
   // Clicking the control panel raised it above the underlay; restore the test target.
   native('Raise', {}, 'main', underlay.pid);
   // Windows can refuse SetForegroundWindow from a helper process. An actual
@@ -618,7 +643,7 @@ try {
     'real global shortcut restores interaction',
   );
   assert.equal(native('Probe').clickThrough, false);
-  assert.equal(native('Probe').alpha, 102, 'Recovery preserves opacity.');
+  assert.equal(native('Probe').alpha, 255, 'Recovery preserves fully opaque native alpha.');
   native('Toggle');
   await waitFor(async () => !(await snapshot(main)).settings.visible, 'overlay hidden by shortcut');
   assert.equal(native('Probe').visible, false);
@@ -687,7 +712,7 @@ try {
     'visible',
   ])
     assert.equal(after[field], before[field], `${field} restored after restart`);
-  assert.equal(native('Probe').alpha, 191);
+  assert.equal(native('Probe').alpha, 255);
   assert.equal(native('Probe').visible, true);
   assert.equal(native('Probe').topmost, false);
   assert.equal(native('Probe').clickThrough, true);

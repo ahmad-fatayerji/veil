@@ -186,9 +186,10 @@ html.overlay-mode,
   flex-direction: column;
   position: relative;
   height: 100%;
-  border: 1px solid #e3e3e3;
+  border: 1px solid transparent;
   border-radius: 0;
-  background: var(--surface);
+  background: transparent;
+  isolation: isolate;
   color: var(--text);
   overflow: hidden;
 }
@@ -384,9 +385,20 @@ html.overlay-mode,
 }
 
 .overlay-surface {
-  background: var(--surface);
+  background: transparent;
   color: var(--text);
-  border-color: var(--border);
+  border-color: transparent;
+}
+/* Fade the backdrop separately so document opacity never inherits window opacity. */
+.overlay-surface::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  opacity: var(--overlay-window-opacity, 0.85);
 }
 .overlay-drag-handle {
   padding: 10px 16px;
