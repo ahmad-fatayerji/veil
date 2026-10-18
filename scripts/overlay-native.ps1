@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Focus','Probe','CursorProbe','MovePointer','Escape','Click','RightClick','MenuLast','Drag','HoldDrag','Move','Recover','Toggle','Capture','Pixel','Close')][string]$Action,
+  [Parameter(Mandatory=$true)][ValidateSet('Underlay','Raise','Focus','Hide','Probe','CursorProbe','MovePointer','Escape','Click','RightClick','MenuLast','Drag','HoldDrag','Move','Recover','Toggle','Capture','Pixel','Close')][string]$Action,
   [Parameter(Mandatory=$true)][int]$AppProcessId,
   [ValidateSet('main','overlay')][string]$Window = 'overlay',
   [int]$X = 0, [int]$Y = 0, [int]$ToX = 0, [int]$ToY = 0,
@@ -138,6 +138,7 @@ switch ($Action) {
     [VeilNativeTest]::SetWindowPos($handle,[IntPtr]::Zero,0,0,0,0,0x13) | Out-Null
     [VeilNativeTest]::SetForegroundWindow($handle) | Out-Null
   }
+  'Hide' { [VeilNativeTest]::ShowWindow($handle,0) | Out-Null }
   'Raise' {
     [VeilNativeTest]::ShowWindow($handle,9) | Out-Null
     [VeilNativeTest]::SetWindowPos($handle,[IntPtr](-1),0,0,0,0,0x13) | Out-Null
