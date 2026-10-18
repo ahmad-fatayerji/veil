@@ -16,6 +16,7 @@ export interface OverlaySettings {
   width: number;
   height: number;
   opacity: number;
+  textOpacity: number;
   alwaysOnTop: boolean;
   clickThrough: boolean;
   captureExclusion: boolean;
@@ -40,7 +41,13 @@ export interface OverlaySnapshot {
 export type OverlayPatch = Partial<
   Pick<
     OverlaySettings,
-    'opacity' | 'alwaysOnTop' | 'clickThrough' | 'fontSize' | 'captureExclusion' | 'closeBehavior'
+    | 'opacity'
+    | 'textOpacity'
+    | 'alwaysOnTop'
+    | 'clickThrough'
+    | 'fontSize'
+    | 'captureExclusion'
+    | 'closeBehavior'
   >
 >;
 

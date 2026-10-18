@@ -136,7 +136,7 @@ export function OverlayWindow() {
             <span>Local test card · no document changes</span>
           </div>
         )}
-        <div hidden={state?.captureTest}>
+        <div hidden={state?.captureTest} style={{ opacity: state?.settings.textOpacity ?? 1 }}>
           {document.connection ? (
             <SharedEditor
               key={document.connection.doc.clientID}

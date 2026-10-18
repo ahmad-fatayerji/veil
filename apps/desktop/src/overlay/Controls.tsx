@@ -22,7 +22,7 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
         }
         setDraft((current) => {
           const next = { ...current };
-          for (const key of ['opacity', 'fontSize'] as const) {
+          for (const key of ['opacity', 'textOpacity', 'fontSize'] as const) {
             if (next[key] === patch[key]) delete next[key];
           }
           return next;
@@ -81,17 +81,32 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
         <div id="overlay-settings" className="overlay-settings">
           <div className="overlay-settings-grid">
             <label className="overlay-range" htmlFor="overlay-opacity">
-              Opacity{' '}
+              Window opacity{' '}
               <output>{Math.round((draft.opacity ?? state.settings.opacity) * 100)}%</output>
               <input
                 id="overlay-opacity"
                 type="range"
-                min="20"
+                min="0"
                 max="100"
                 step="1"
                 value={Math.round((draft.opacity ?? state.settings.opacity) * 100)}
                 disabled={!state.capabilities.transparency}
                 onChange={(event) => range({ opacity: Number(event.target.value) / 100 })}
+              />
+            </label>
+            <label className="overlay-range" htmlFor="overlay-text-opacity">
+              Text opacity{' '}
+              <output>
+                {Math.round((draft.textOpacity ?? state.settings.textOpacity) * 100)}%
+              </output>
+              <input
+                id="overlay-text-opacity"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={Math.round((draft.textOpacity ?? state.settings.textOpacity) * 100)}
+                onChange={(event) => range({ textOpacity: Number(event.target.value) / 100 })}
               />
             </label>
             <label className="overlay-range" htmlFor="overlay-font-size">
@@ -146,7 +161,8 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
           </div>
           <p className="overlay-help">
             Drag the overlay header to move it, or an edge to resize it. Appearance is saved on this
-            device.
+            device. Window opacity fades the entire overlay; text opacity fades the document
+            content. At 0% window opacity, use this control panel to make the overlay visible again.
           </p>
           <p className="overlay-help">
             {state.recoveryAvailable ? (

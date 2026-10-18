@@ -129,6 +129,7 @@ pub struct OverlayState {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Patch {
     opacity: Option<f64>,
+    text_opacity: Option<f64>,
     always_on_top: Option<bool>,
     click_through: Option<bool>,
     font_size: Option<u32>,
@@ -469,6 +470,9 @@ pub fn overlay_update(
             ));
         }
         next.click_through = value;
+    }
+    if let Some(value) = patch.text_opacity {
+        next.text_opacity = value;
     }
     if let Some(value) = patch.font_size {
         next.font_size = value;

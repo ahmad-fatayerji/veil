@@ -186,16 +186,21 @@ try {
     async () => !(await snapshot(main)).settings.captureExclusion,
     'capture exclusion disabled for compositor checks',
   );
-  await dragRange(main, 'Opacity');
+  await dragRange(main, 'Window opacity');
   await waitFor(async () => (await snapshot(main)).settings.opacity === 1, 'drag opacity saved');
   assert.equal(native('Probe').alpha, 255);
+  await dragRange(main, 'Text opacity');
+  await waitFor(
+    async () => (await snapshot(main)).settings.textOpacity === 1,
+    'drag text opacity saved',
+  );
   await dragRange(main, 'Font size');
   await waitFor(
     async () => (await snapshot(main)).settings.fontSize === 48,
     'drag font size saved',
   );
   console.log(
-    'PASS: continuous real mouse drags keep both sliders enabled and save their final value',
+    'PASS: continuous real mouse drags keep all three sliders enabled and save their final value',
   );
   await main.getByRole('button', { name: 'Show overlay' }).click();
   await waitFor(async () => (await snapshot(main)).settings.visible, 'overlay shown');
@@ -213,9 +218,30 @@ try {
     0,
     'Overlay has no cursors before joining a document.',
   );
-  await setRange(main, 'Opacity', 40);
+  await setRange(main, 'Window opacity', 0);
+  await waitFor(
+    async () => (await snapshot(main)).settings.opacity === 0,
+    'zero window opacity saved',
+  );
+  assert.equal(native('Probe').alpha, 0, 'Window opacity can reach 0%.');
+  await setRange(main, 'Window opacity', 40);
   await waitFor(async () => (await snapshot(main)).settings.opacity === 0.4, 'opacity applied');
   assert.equal(native('Probe').alpha, 102, 'Win32 layered opacity is 40%.');
+  await setRange(main, 'Text opacity', 0);
+  await waitFor(
+    async () =>
+      (await snapshot(main)).settings.textOpacity === 0 &&
+      (await overlay
+        .locator('.overlay-document > div[style]')
+        .evaluate((node) => getComputedStyle(node).opacity)) === '0',
+    'text opacity reaches zero without changing window opacity',
+  );
+  assert.equal(native('Probe').alpha, 102, 'Text opacity preserves native window alpha.');
+  await setRange(main, 'Text opacity', 65);
+  await waitFor(
+    async () => (await snapshot(main)).settings.textOpacity === 0.65,
+    'text opacity saved',
+  );
   await main.getByLabel('Always on top', { exact: true }).click();
   await waitFor(async () => !(await snapshot(main)).settings.alwaysOnTop, 'always-on-top disabled');
   assert.equal(native('Probe').topmost, false);
@@ -607,7 +633,7 @@ try {
     const value = (await snapshot(main)).settings;
     return value.width === 520 && value.height === 320;
   }, 'reset bounds');
-  await setRange(main, 'Opacity', 75);
+  await setRange(main, 'Window opacity', 75);
   native('Focus');
   bounds = native('Probe');
   native('Drag', { X: bounds.x + 50, Y: bounds.y + 22, ToX: bounds.x + 100, ToY: bounds.y + 72 });
@@ -638,7 +664,7 @@ try {
   await waitFor(async () => {
     try {
       const saved = JSON.parse(await readFile(resolve(directory, 'overlay.json'), 'utf8'));
-      return saved.opacity === 0.75 && saved.width === before.width;
+      return saved.opacity === 0.75 && saved.textOpacity === 0.65 && saved.width === before.width;
     } catch {
       return false;
     }
@@ -654,6 +680,7 @@ try {
     'width',
     'height',
     'opacity',
+    'textOpacity',
     'fontSize',
     'alwaysOnTop',
     'clickThrough',
