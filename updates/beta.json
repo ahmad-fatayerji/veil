@@ -1,11 +1,11 @@
 {
-  "version": "0.8.0-beta.1",
-  "notes": "# Veil 0.8.0-beta.1\n\n## Fixes\n\n- fix(overlay): refresh capture surface after window style updates\n\n## Other changes\n\n- perf: load desktop surfaces on demand and isolate editor rendering\n- chore: advance beta feed to 0.7.2\n\n## Features\n\n- feat: redesign overlay settings with independent opacity controls\n",
-  "pub_date": "2026-10-18T09:14:35.653Z",
+  "version": "0.8.0-beta.2",
+  "notes": "# Veil 0.8.0-beta.2\n\n## Features\n\n- feat(desktop): add the Veil mark as a backdrop on the start screen\n- feat(desktop): match window and tray icons to app appearance\n- feat: add opt-in Windows startup in tray\n- feat: add settings tab for customizable keybinds\n- feat: add Discord Rich Presence with privacy controls\n- feat(ui): move document actions to title menu and status bar\n- feat: redesign overlay settings with independent opacity controls\n\n## Fixes\n\n- fix: remove duplicate shortcut rows from overlay settings\n- fix(overlay): refresh capture surface after window style updates\n\n## Other changes\n\n- Add new styles for editor components, legacy UI, and design tokens\n- chore: advance beta feed to 0.8.0-beta.1\n- perf: load desktop surfaces on demand and isolate editor rendering\n- chore: advance beta feed to 0.7.2\n",
+  "pub_date": "2026-10-22T11:54:13.749Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDVOWFhqWi9uZ0FUdWdoNjZOc1lMK3hpY0JuZ3B6QkJvZEN6Z3VreTBMWDVJb2hMZ3RkY1krYm1kbGI5TjErR056aEduNjVBR2svNEJZdmVBbkxHQXdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyMzE0ODc1CWZpbGU6VmVpbF8wLjguMC1iZXRhLjFfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuOC4wLWJldGEuMQpZYWVtNXpkTitkSEI4M0w3NEtnYnVqRUsrNmI5RkxmRlNMZS9MYlJtSDVtdFJ6TTJrNlQxcm1tTFBBUnFCN0E4d01xbWp1Z0ZReXRlUktKUlhlNUhDdz09Cg==",
-      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.8.0-beta.1/Veil_0.8.0-beta.1_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRYWpjRlMweEs1TDRMZkxwOWFGbU9XY1pjWXJtSnoxMUhVVWtmblR3eTVtRy9HSDNmNlEvY2JoTERwdTcyOFlvcm5ENWFhOVVBYW13ays5S2xFdUJuelhZOWltVW0rWEFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNjcwMDUzCWZpbGU6VmVpbF8wLjguMC1iZXRhLjJfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuOC4wLWJldGEuMgpMUi8wZG12dEprK1Z0MFhVcDUvOVFOQzNuN09HRTdDa1pXa2tKUExmYzRMeVRNQmMxczVFeEI5QlpsZ0R0Ni8rUTdaVWRzOE5KbExGSlpOVUVUSWtBZz09Cg==",
+      "url": "https://github.com/ahmad-fatayerji/veil/releases/download/v0.8.0-beta.2/Veil_0.8.0-beta.2_x64-setup.exe"
     }
   }
 }
