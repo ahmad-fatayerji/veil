@@ -755,6 +755,11 @@
     gap: 2px;
     font-size: var(--text-sm);
   }
+  .about-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
 
   .desktop-updates {
     display: grid;

@@ -8,6 +8,10 @@ use tauri::{image::Image, AppHandle, Manager, WebviewWindow, Window};
 
 const DARK: &[u8] = include_bytes!("../icons/theme/dark.ico");
 const LIGHT: &[u8] = include_bytes!("../icons/theme/light.ico");
+// The window ICOs simplify to a solid V at 16-20 px for menus and title bars;
+// the tray keeps the ribbon fold at those sizes so it matches the taskbar.
+const TRAY_DARK: &[u8] = include_bytes!("../icons/theme/tray-dark.ico");
+const TRAY_LIGHT: &[u8] = include_bytes!("../icons/theme/tray-light.ico");
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -22,6 +26,13 @@ impl IconTheme {
         match self {
             Self::Light => LIGHT,
             Self::Dark => DARK,
+        }
+    }
+
+    fn tray_ico(self) -> &'static [u8] {
+        match self {
+            Self::Light => TRAY_LIGHT,
+            Self::Dark => TRAY_DARK,
         }
     }
 }
@@ -65,7 +76,7 @@ fn tray_size() -> u32 {
 }
 
 pub fn tray_icon(theme: IconTheme) -> Option<Image<'static>> {
-    Image::from_bytes(frame(theme.ico(), tray_size())?).ok()
+    Image::from_bytes(frame(theme.tray_ico(), tray_size())?).ok()
 }
 
 #[cfg(windows)]
