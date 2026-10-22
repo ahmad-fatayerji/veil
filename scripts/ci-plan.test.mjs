@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planChecks, reusableGate, validatedSource, checkNames } from './ci-plan.mjs';
+import {
+  planChecks,
+  reusableGate,
+  validatedFullTree,
+  validatedSource,
+  checkNames,
+} from './ci-plan.mjs';
 
 const selected = (paths) => checkNames.filter((name) => planChecks(paths)[name]);
 test('docs, UI, collaboration, native and tooling changes select their dependencies', () => {
@@ -87,4 +93,26 @@ test('metadata reuse verifies the tested merge SHA from the successful gate log'
   assert.equal(validatedSource('CI_SOURCE_SHA=' + 'b'.repeat(40) + '\n', sha), false);
   assert.equal(validatedSource('old gate without source evidence', sha), false);
   assert.equal(validatedSource('CI_SOURCE_SHA=' + sha + 'extra\n', sha), false);
+});
+
+test('stable publication reuses only a full gate on the identical source tree', () => {
+  const tree = 'c'.repeat(40);
+  const log = (lines) => lines.map((line) => `2026-10-22T19:00:00Z ${line}`).join('\n') + '\n';
+  assert.equal(
+    validatedFullTree(log([`CI_SOURCE_TREE=${tree}`, 'CI_FULL_VALIDATION=true']), tree),
+    true,
+  );
+  assert.equal(
+    validatedFullTree(log([`CI_SOURCE_TREE=${tree}`, 'CI_FULL_VALIDATION=false']), tree),
+    false,
+  );
+  assert.equal(
+    validatedFullTree(log([`CI_SOURCE_TREE=${'d'.repeat(40)}`, 'CI_FULL_VALIDATION=true']), tree),
+    false,
+  );
+  assert.equal(validatedFullTree(log(['CI_FULL_VALIDATION=true']), tree), false);
+  assert.equal(
+    validatedFullTree(log([`CI_SOURCE_TREE=${tree}extra`, 'CI_FULL_VALIDATION=true']), tree),
+    false,
+  );
 });
