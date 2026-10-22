@@ -3,11 +3,16 @@ import { X } from 'lucide-react';
 import { readParticipants, type DemoConnection, type PeerSummary } from '@veil/collaboration';
 import { DOCUMENT_FRAGMENT, DOCUMENT_TITLE } from '@veil/protocol';
 import { Avatar, activityLabels } from './components/people';
-import veilIcon from './assets/veil-icon-small.png';
 import { version as appVersion } from '../../../package.json';
 
+// Same drawing as the 40 px Windows icon frame; colours follow the theme tokens.
 export function BrandMark({ size = 20 }: { size?: number }) {
-  return <img className="brand-mark" src={veilIcon} alt="" width={size} height={size} />;
+  return (
+    <svg className="brand-mark" viewBox="2 2 36 36" width={size} height={size} aria-hidden="true">
+      <rect x="2.5" y="2.5" width="35" height="35" rx="7.5" />
+      <path d="M8 10 L15 10 L23.5 32 L16.5 32 Z M25 10 L32 10 L24.5 29.41 L21 20.35 Z" />
+    </svg>
+  );
 }
 
 export function Dialog({

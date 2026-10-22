@@ -69,6 +69,9 @@
     --scrim: #00000066;
     --shadow-flyout: 0 8px 16px #00000024, 0 0 0 1px #0000000f;
     --shadow-dialog: 0 32px 64px #0000003d, 0 0 0 1px #0000000f;
+    --brand-tile: #ffffff;
+    --brand-tile-border: #cfcfcf;
+    --brand-glyph: #161616;
 
     /* Aliases kept for the legacy shell and overlay controls. */
     --canvas: var(--bg);
@@ -104,5 +107,8 @@
     --scrim: #00000099;
     --shadow-flyout: 0 8px 16px #00000066, 0 0 0 1px #ffffff14;
     --shadow-dialog: 0 32px 64px #00000080, 0 0 0 1px #ffffff14;
+    --brand-tile: #161616;
+    --brand-tile-border: #161616;
+    --brand-glyph: #ffffff;
   }
 }

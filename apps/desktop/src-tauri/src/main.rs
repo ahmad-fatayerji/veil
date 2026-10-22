@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod app_icon;
 #[cfg(windows)]
 mod browser_shortcuts;
 mod discord;
@@ -72,6 +73,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             lifecycle::app_quit,
             lifecycle::app_complete_quit,
+            app_icon::app_set_icon_theme,
             startup::startup_status,
             startup::startup_configure,
             files::file_open,
@@ -113,6 +115,9 @@ fn main() {
             updates::update_dismiss_result,
         ])
         .on_window_event(|window, event| {
+            if let tauri::WindowEvent::ScaleFactorChanged { .. } = event {
+                app_icon::scale_changed(window);
+            }
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
