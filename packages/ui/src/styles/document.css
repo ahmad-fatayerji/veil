@@ -283,14 +283,21 @@
     background: transparent;
     font-size: inherit;
   }
+  /* The rule is drawn as a 1px line centered in a taller box, so the whole band is a
+     comfortable click target for selecting it. */
   .document-editor hr {
-    height: 0;
-    margin-block: 1.5em;
+    height: 1.5em;
+    margin-block: 0.75em;
     border: 0;
-    border-top: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(var(--border-strong), var(--border-strong)) center / 100% 1px
+      no-repeat;
+    cursor: pointer;
   }
   .document-editor hr.ProseMirror-selectednode {
-    border-top-color: var(--accent);
+    background:
+      linear-gradient(var(--accent), var(--accent)) center / 100% 2px no-repeat,
+      color-mix(in srgb, var(--accent) 12%, transparent);
   }
   .document-editor:has(> p:only-child > br:only-child)::before {
     content: attr(data-placeholder);
