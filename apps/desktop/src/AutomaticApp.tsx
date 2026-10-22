@@ -79,6 +79,7 @@ export function AutomaticApp() {
   const [resumeShare, setResumeShare] = useState(false);
   const [pendingLink, setPendingLink] = useState('');
   const [confirmExit, setConfirmExit] = useState(false);
+  const [startAfterLeave, setStartAfterLeave] = useState<'new' | 'join' | null>(null);
   const [updating, setUpdating] = useState(false);
   const [connected, setConnected] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
@@ -364,7 +365,25 @@ export function AutomaticApp() {
       setPeople(false);
     }
   }
+  async function openStartAction(action: 'new' | 'join') {
+    if (documentRef.current) await leave();
+    setStartAfterLeave(null);
+    if (action === 'new') await create();
+    else setJoinOpen(true);
+  }
+  function requestStartAction(action: 'new' | 'join') {
+    if (document) {
+      // Switching documents must never silently discard temporary content or peers.
+      setStartAfterLeave(action);
+      setConfirmExit(true);
+    } else void run(() => openStartAction(action));
+  }
+  function cancelLeave() {
+    setStartAfterLeave(null);
+    setConfirmExit(false);
+  }
   function requestLeave() {
+    setStartAfterLeave(null);
     if (document && hasDocumentContent(document)) setConfirmExit(true);
     else void run(leave);
   }
@@ -396,7 +415,6 @@ export function AutomaticApp() {
   }
   useEffect(() => {
     if (
-      !document ||
       busy ||
       updating ||
       settings ||
@@ -408,16 +426,27 @@ export function AutomaticApp() {
       return;
     const onKey = (event: KeyboardEvent) => {
       if (window.document.querySelector('dialog[open]')) return;
-      if (matchesShortcut(event, keybinds.closeDocument)) {
+      if (matchesShortcut(event, keybinds.newDocument)) {
         event.preventDefault();
+        event.stopPropagation();
+        requestStartAction('new');
+      } else if (matchesShortcut(event, keybinds.joinDocument)) {
+        event.preventDefault();
+        event.stopPropagation();
+        requestStartAction('join');
+      } else if (document && matchesShortcut(event, keybinds.closeDocument)) {
+        event.preventDefault();
+        event.stopPropagation();
         requestLeave();
-      } else if (matchesShortcut(event, keybinds.copyInvite) && !guest && link) {
+      } else if (document && matchesShortcut(event, keybinds.copyInvite) && !guest && link) {
         event.preventDefault();
+        event.stopPropagation();
         copyInvite();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // App bindings take priority over editor shortcuts, which can consume bubbling events.
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   });
   const connection: ConnectionState = !session
     ? 'local'
@@ -641,7 +670,7 @@ export function AutomaticApp() {
                     )
                   }
                   disabled={busy}
-                  title={`${leaveLabel} (Ctrl+W)`}
+                  title={`${leaveLabel} (${keybinds.closeDocument})`}
                   onClick={requestLeave}
                 >
                   {leaveLabel}
@@ -814,18 +843,34 @@ export function AutomaticApp() {
       />
       <Dialog
         open={confirmExit}
-        title={`${leaveLabel}?`}
+        title={
+          startAfterLeave === 'join'
+            ? 'Join another document?'
+            : startAfterLeave === 'new'
+              ? 'Start a new document?'
+              : `${leaveLabel}?`
+        }
         dismissOnBackdrop
-        onClose={() => setConfirmExit(false)}
+        onClose={cancelLeave}
       >
         <p>
           This document is temporary. Copy any text you want to keep before{' '}
           {guest ? 'leaving' : 'closing'}. {!guest && session && 'Everyone will be disconnected.'}
         </p>
         <div className="dialog-actions">
-          <Button onClick={() => setConfirmExit(false)}>Cancel</Button>
-          <Button variant="danger" disabled={busy} onClick={() => void run(leave)}>
-            {leaveLabel}
+          <Button onClick={cancelLeave}>Cancel</Button>
+          <Button
+            variant="danger"
+            disabled={busy}
+            onClick={() =>
+              void run(() => (startAfterLeave ? openStartAction(startAfterLeave) : leave()))
+            }
+          >
+            {startAfterLeave === 'join'
+              ? `${leaveLabel} and open join form`
+              : startAfterLeave === 'new'
+                ? `${leaveLabel} and create new`
+                : leaveLabel}
           </Button>
         </div>
       </Dialog>

@@ -11,11 +11,15 @@ export type Keybinds = typeof defaultKeybinds;
 export type KeybindAction = keyof Keybinds;
 
 export const keybindActions: { id: KeybindAction; label: string; description: string }[] = [
-  { id: 'newDocument', label: 'New document', description: 'From the start screen.' },
+  {
+    id: 'newDocument',
+    label: 'New document',
+    description: 'Create a document. Confirms before replacing an open document.',
+  },
   {
     id: 'joinDocument',
     label: 'Join with a link',
-    description: 'Open the join form on the start screen.',
+    description: 'Open the join form. Confirms before leaving an open document.',
   },
   { id: 'copyInvite', label: 'Copy invite link', description: 'While hosting a shared document.' },
   {

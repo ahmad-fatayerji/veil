@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, FilePlus2, Link2 } from 'lucide-react';
-import { matchesShortcut, type Keybinds } from '../keybinds';
+import { type Keybinds } from '../keybinds';
 import { parseShareLink, decodeServerInvitation } from '@veil/protocol';
 import { Button, Field, Input, Kbd, Textarea } from '@veil/ui';
 
@@ -75,16 +75,6 @@ export function StartScreen({
   }, [joinOpen]);
 
   useEffect(() => {
-    const keydown = (event: KeyboardEvent) => {
-      if (busy || shortcutsDisabled || document.querySelector('dialog[open]')) return;
-      if (matchesShortcut(event, keybinds.newDocument)) {
-        event.preventDefault();
-        onCreate();
-      } else if (matchesShortcut(event, keybinds.joinDocument)) {
-        event.preventDefault();
-        onJoinOpenChange(true);
-      }
-    };
     // Pasting an invitation anywhere on the start screen opens the join form with it.
     const paste = (event: ClipboardEvent) => {
       if (
@@ -102,22 +92,11 @@ export function StartScreen({
       if (joinOpen) (name.trim() ? joinButton : nameInput).current?.focus();
       else onJoinOpenChange(true);
     };
-    window.addEventListener('keydown', keydown);
     window.addEventListener('paste', paste);
     return () => {
-      window.removeEventListener('keydown', keydown);
       window.removeEventListener('paste', paste);
     };
-  }, [
-    busy,
-    shortcutsDisabled,
-    keybinds,
-    joinOpen,
-    name,
-    onCreate,
-    onInvitationChange,
-    onJoinOpenChange,
-  ]);
+  }, [busy, shortcutsDisabled, joinOpen, name, onInvitationChange, onJoinOpenChange]);
 
   const card = (
     props: {
