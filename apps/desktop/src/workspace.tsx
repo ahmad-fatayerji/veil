@@ -677,7 +677,12 @@ export function DocumentWorkspace() {
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
   }, [workspace, keybinds]);
-  if (!workspace.ready) return <p role="status">Opening workspace…</p>;
+  if (!workspace.ready)
+    return (
+      <p role="status" className="visually-hidden">
+        Opening workspace…
+      </p>
+    );
   const toasts = (
     <>
       {workspace.notice && (

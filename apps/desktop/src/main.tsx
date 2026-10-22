@@ -30,7 +30,13 @@ const App = lazy(() =>
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Suspense fallback={<p role="status">Loading Veil…</p>}>
+    <Suspense
+      fallback={
+        <p role="status" className="visually-hidden">
+          Loading Veil…
+        </p>
+      }
+    >
       <App />
     </Suspense>
   </StrictMode>,

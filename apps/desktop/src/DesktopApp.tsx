@@ -35,7 +35,12 @@ export function DesktopApp() {
     };
   }, [legacy]);
   // Resolve the saved mode before mounting either app and starting its effects.
-  const loading = <p role="status">Loading Veil…</p>;
+  // Announced to assistive technology only; startup shows just the window background.
+  const loading = (
+    <p role="status" className="visually-hidden">
+      Loading Veil…
+    </p>
+  );
   if (legacy === null) return loading;
   return <Suspense fallback={loading}>{legacy ? <LegacyApp /> : <AutomaticApp />}</Suspense>;
 }
