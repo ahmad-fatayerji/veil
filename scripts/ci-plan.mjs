@@ -84,21 +84,59 @@ export function validatedSource(log, sha) {
   );
 }
 
-async function validatedMetadataEdit(event) {
-  if (event.action !== 'edited' || event.changes?.base || !event.pull_request) return false;
-  const repository = process.env.GITHUB_REPOSITORY;
-  const sha = process.env.GITHUB_SHA;
-  const api = async (route, logs = false) => {
-    const response = await fetch(`https://api.github.com/repos/${repository}/${route}`, {
+// Stable publication may reuse the release PR's gate when that gate ran full validation
+// on exactly the source tree being published (the merge of an up-to-date release PR).
+export function validatedFullTree(log, tree) {
+  return (
+    /CI_FULL_VALIDATION=true(?:\r?\n|$)/.test(log) &&
+    Array.from(log.matchAll(/CI_SOURCE_TREE=([a-f0-9]{40})(?:\r?\n|$)/g)).some(
+      (match) => match[1] === tree,
+    )
+  );
+}
+
+const githubApi = async (route, logs = false) => {
+  const response = await fetch(
+    `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/${route}`,
+    {
       signal: AbortSignal.timeout(10_000),
       headers: {
         Authorization: `Bearer ${process.env.GH_TOKEN}`,
         Accept: 'application/vnd.github+json',
       },
-    });
-    if (!response.ok) throw new Error('Prior validation lookup unavailable.');
-    return logs ? response.text() : response.json();
-  };
+    },
+  );
+  if (!response.ok) throw new Error('Prior validation lookup unavailable.');
+  return logs ? response.text() : response.json();
+};
+
+async function priorFullValidation(head, tree) {
+  const repository = process.env.GITHUB_REPOSITORY;
+  try {
+    const checks = await githubApi(`commits/${head}/check-runs?per_page=100`);
+    for (const check of checks.check_runs) {
+      if (check.name !== 'CI gate' || check.conclusion !== 'success') continue;
+      const id = check.details_url?.match(/\/actions\/runs\/(\d+)/)?.[1];
+      const job = check.details_url?.match(/\/job\/(\d+)/)?.[1];
+      if (
+        id &&
+        job &&
+        reusableGate(check, await githubApi(`actions/runs/${id}`), head, repository, '') &&
+        validatedFullTree(await githubApi(`actions/jobs/${job}/logs`, true), tree)
+      )
+        return true;
+    }
+  } catch {
+    console.log('Could not confirm prior full validation of this source; validating again.');
+  }
+  return false;
+}
+
+async function validatedMetadataEdit(event) {
+  if (event.action !== 'edited' || event.changes?.base || !event.pull_request) return false;
+  const repository = process.env.GITHUB_REPOSITORY;
+  const sha = process.env.GITHUB_SHA;
+  const api = githubApi;
   try {
     // GitHub attaches PR checks to the head SHA, while checkout tests the merge SHA.
     const head = event.pull_request.head.sha;
@@ -132,10 +170,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (!checkGate(JSON.parse(process.env.RESULTS), process.env.FULL_VALIDATION === 'true')) {
       console.error('CI gate rejected missing, failed, cancelled or unexpectedly skipped checks.');
       process.exitCode = 1;
-    } else
-      console.log(
-        `CI_SOURCE_SHA=${execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()}`,
-      );
+    } else {
+      const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+      console.log(`CI_SOURCE_SHA=${git('rev-parse', 'HEAD')}`);
+      console.log(`CI_SOURCE_TREE=${git('rev-parse', 'HEAD^{tree}')}`);
+      console.log(`CI_FULL_VALIDATION=${process.env.FULL_VALIDATION === 'true'}`);
+    }
+  } else if (process.argv[2] === 'reuse') {
+    const head = process.env.PR_HEAD_SHA;
+    const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
+    const reuse = /^[a-f0-9]{40}$/.test(head ?? '') && (await priorFullValidation(head, tree));
+    appendFileSync(process.env.GITHUB_OUTPUT, `reuse=${reuse}\n`);
+    console.log(
+      reuse
+        ? `Reusing full validation of identical source tree ${tree} from release PR head ${head}.`
+        : 'No reusable full validation of this exact source; validating again.',
+    );
   } else {
     const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
     const full =
