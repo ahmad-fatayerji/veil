@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Info, Keyboard, Monitor, PictureInPicture2, Share2 } from 'lucide-react';
+import {
+  ChevronDown,
+  ExternalLink,
+  Globe,
+  Info,
+  Keyboard,
+  Monitor,
+  PictureInPicture2,
+  Server,
+  Share2,
+} from 'lucide-react';
 import {
   AppVersion,
   Banner,
@@ -83,6 +93,70 @@ function AccentPicker({ value, onChange }: { value: Accent; onChange: (value: Ac
     </div>
   );
 }
+const publicLimits = [
+  'Up to 5 guests per document',
+  'A few shared documents at a time',
+  'Limited relay for strict networks',
+  'No uptime guarantee',
+];
+
+/** Which server sharing uses: our free public servers by default, or the user's own. */
+function ServerChoice({
+  official,
+  busy,
+  onUseAnother,
+  onUseOfficial,
+  onSelfHosting,
+}: {
+  official: boolean;
+  busy: boolean;
+  onUseAnother: () => void;
+  onUseOfficial: () => void;
+  onSelfHosting: () => void;
+}) {
+  const Icon = official ? Globe : Server;
+  return (
+    <div className="settings-card server-choice">
+      <div className="setting-row">
+        <div className="server-choice-title">
+          <span className="server-choice-icon" aria-hidden="true">
+            <Icon size={18} />
+          </span>
+          <div className="setting-row-text">
+            <span className="setting-row-label">
+              {official ? 'Our own public servers' : 'Your own server'}
+            </span>
+            <p>
+              {official
+                ? 'Free and ready to use. No setup or credential needed.'
+                : 'Enter the address and, when required, the credential from its operator.'}
+            </p>
+          </div>
+        </div>
+        <Button size="sm" disabled={busy} onClick={official ? onUseAnother : onUseOfficial}>
+          {official ? 'Use another server' : 'Use our own public servers'}
+        </Button>
+      </div>
+      {official && (
+        <div className="setting-row server-choice-details">
+          <ul className="server-limits" aria-label="Public server limits">
+            {publicLimits.map((limit) => (
+              <li key={limit}>{limit}</li>
+            ))}
+          </ul>
+          <p className="setting-row-hint">
+            For reliable or larger sessions, use your own server.{' '}
+            <button type="button" className="text-link" onClick={onSelfHosting}>
+              Self-hosting guide
+              <ExternalLink size={12} aria-hidden="true" />
+            </button>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export type HostingForm = {
   server: string;
   credential: string;
@@ -366,33 +440,13 @@ export function SettingsDialog({
                   Save your server settings to continue sharing this document.
                 </Banner>
               )}
-              {!sameServer(hosting.server, hosting.official) && (
-                <div className="dialog-actions dialog-actions-start">
-                  <Button size="sm" disabled={busy} onClick={hosting.onUseOfficial}>
-                    Use our own public servers
-                  </Button>
-                </div>
-              )}
-              {sameServer(hosting.server, hosting.official) && (
-                <Banner
-                  tone="info"
-                  actions={
-                    <>
-                      <Button size="sm" disabled={busy} onClick={hosting.onUseAnother}>
-                        Use another server
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => onOpenUrl(SELF_HOSTING_URL)}>
-                        Self-hosting guide
-                      </Button>
-                    </>
-                  }
-                >
-                  You're using our own public servers, free for everyone. They have limits: up to 5
-                  guests per document, a few sessions at a time, and limited relay for hard-to-reach
-                  networks. Availability isn't guaranteed. For reliable or larger sessions,
-                  self-host the Veil server or use another server.
-                </Banner>
-              )}
+              <ServerChoice
+                official={sameServer(hosting.server, hosting.official)}
+                busy={busy}
+                onUseAnother={hosting.onUseAnother}
+                onUseOfficial={hosting.onUseOfficial}
+                onSelfHosting={() => onOpenUrl(SELF_HOSTING_URL)}
+              />
               <form
                 className="settings-card setting-form"
                 onSubmit={(event) => {
