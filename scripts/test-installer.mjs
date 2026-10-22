@@ -156,7 +156,7 @@ try {
   assert.equal(
     await invoke(page, 'update_install').then(
       () => false,
-      (error) => String(error).includes('End or leave'),
+      (error) => /End or leave|close all tabs/.test(String(error)),
     ),
     true,
   );

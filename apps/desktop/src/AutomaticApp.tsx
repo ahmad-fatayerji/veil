@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
-import { listen } from '@tauri-apps/api/event';
 import { ChevronDown, Copy, Eye, EyeOff, Link, LogOut, Pencil, Settings, X } from 'lucide-react';
 import {
   createPeerSession,
@@ -14,7 +12,7 @@ import {
   type JoinMode,
 } from '@veil/collaboration';
 import { parseShareLink, decodeServerInvitation } from '@veil/protocol';
-import { useDocumentTitle } from '@veil/editor';
+import { loadMarkdown, useDocumentTitle } from '@veil/editor';
 import {
   Banner,
   Button,
@@ -24,12 +22,11 @@ import {
   MenuItem,
   MenuSeparator,
   ToastRegion,
-  hasDocumentContent,
   useAppearance,
   useParticipants,
 } from '@veil/ui';
 import { nativeSignaling } from './networking';
-import { SessionBridge } from './overlay/session';
+import type { Workspace, WorkspaceTab } from './workspace';
 import { useUpdateAttention } from './Updates';
 import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
@@ -39,14 +36,28 @@ import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
 import { ShareDialog } from './dialogs/ShareDialog';
-import { useDiscordPresence } from './discord';
+import type { useDiscordPresence } from './discord';
 
-export function AutomaticApp() {
+export function AutomaticApp({
+  tab,
+  workspace,
+  active,
+  appearanceSettings,
+  discord,
+}: {
+  tab: WorkspaceTab;
+  workspace: Workspace;
+  active: boolean;
+  appearanceSettings: ReturnType<typeof useAppearance>;
+  discord: ReturnType<typeof useDiscordPresence>;
+}) {
   const [document, setDocument] = useState<PeerSession | null>(null);
+  const mounted = useRef(false);
+  const createInitial = useRef(() => void run(create));
   const documentRef = useRef<PeerSession | null>(null);
   const network = useRef<AutomaticSession | null>(null);
   const [session, setSession] = useState<AutomaticSession | null>(null);
-  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(tab.mode === 'join');
   const [server, setServer] = useState('');
   const [savedServer, setSavedServer] = useState('');
   const [credential, setCredential] = useState('');
@@ -54,7 +65,7 @@ export function AutomaticApp() {
   const [testingServer, setTestingServer] = useState(false);
   const [savingServer, setSavingServer] = useState(false);
   const [name, setName] = useState(readDisplayName);
-  const [invitation, setInvitation] = useState('');
+  const [invitation, setInvitation] = useState(tab.invitation ?? '');
   const [link, setLink] = useState('');
   const [joinMode, setJoinMode] = useState<JoinMode>('auto');
   const [pendingGuests, setPendingGuests] = useState<PendingGuest[]>([]);
@@ -76,19 +87,13 @@ export function AutomaticApp() {
   const [section, setSection] = useState<Section>('General');
   const [shareOpen, setShareOpen] = useState(false);
   const [resumeShare, setResumeShare] = useState(false);
-  const [pendingLink, setPendingLink] = useState('');
-  const [confirmExit, setConfirmExit] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [connected, setConnected] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
-  const { appearance, setAppearance } = useAppearance();
+  const { appearance, setAppearance } = appearanceSettings;
   const overlay = useOverlay();
   const participants = useParticipants(document);
   const title = useDocumentTitle(document?.doc);
-  const discord = useDiscordPresence(
-    document ? title : null,
-    participants.filter((person) => !person.local).length,
-  );
   const onUpdateBusy = useCallback((value: boolean) => setUpdating(value), []);
   function signaling() {
     return nativeSignaling({
@@ -124,12 +129,20 @@ export function AutomaticApp() {
       });
   }
   useEffect(() => {
-    const unlistenFailure = listen<string>('app-quit-failed', (event) => setError(event.payload));
+    mounted.current = true;
+    let initializing = true;
+    void Promise.resolve().then(() => {
+      if (initializing && tab.mode === 'new' && !documentRef.current) createInitial.current();
+    });
     return () => {
-      void unlistenFailure.then((stop) => stop()).catch(() => {});
+      initializing = false;
+      mounted.current = false;
+      void network.current?.close();
+      if (!network.current) documentRef.current?.destroy();
     };
-  }, []);
+  }, [tab.mode]);
   useEffect(() => {
+    if (!active) return;
     void invoke<{ server: string; development: boolean }>('network_preferences')
       .then((p) => {
         setServer(p.server);
@@ -137,41 +150,7 @@ export function AutomaticApp() {
         setDevelopment(p.development);
       })
       .catch((e) => setError(errorMessage(e)));
-    return () => {
-      void network.current?.close();
-      if (!network.current) documentRef.current?.destroy();
-    };
-  }, []);
-  useEffect(() => {
-    let active = true;
-    const receive = (urls: string[]) => {
-      if (!active) return;
-      const code = urls.find((url) => url.startsWith('veil:'));
-      if (!code) return;
-      try {
-        parseShareLink(code, development);
-        if (documentRef.current || busyRef.current) setPendingLink(code);
-        else {
-          setInvitation(code);
-          setJoinOpen(true);
-          setError('');
-        }
-      } catch {
-        setError('This invitation link is invalid. Ask the host for a new link.');
-      }
-    };
-    const listener = onOpenUrl(receive);
-    void listener
-      .then(() => getCurrent())
-      .then((urls) => {
-        if (urls) receive(urls);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-      void listener.then((unlisten) => unlisten()).catch(() => {});
-    };
-  }, [development]);
+  }, [active]);
   useEffect(() => {
     if (!document) return;
     const changed = () => {
@@ -218,15 +197,25 @@ export function AutomaticApp() {
     setDocument(value);
   }
   async function create() {
-    await invoke('document_open');
+    await invoke('document_open', { documentId: tab.id });
+    if (!mounted.current) {
+      await invoke('document_closed', { documentId: tab.id });
+      return;
+    }
     try {
       const local = createPeerSession('host', name.trim() || 'You');
-      local.provider.connect();
-      adopt(local);
+      try {
+        if (tab.source !== undefined) loadMarkdown(local.doc, tab.source, tab.file?.path);
+        local.provider.connect();
+        adopt(local);
+      } catch (cause) {
+        local.destroy();
+        throw cause;
+      }
       setJoinOpen(false);
       setNotice('');
     } catch (e) {
-      await invoke('document_closed');
+      await invoke('document_closed', { documentId: tab.id });
       throw e;
     }
   }
@@ -239,7 +228,7 @@ export function AutomaticApp() {
     setJoinInProgress(true);
     let opened = false;
     try {
-      await invoke('document_open');
+      await invoke('document_open', { documentId: tab.id });
       opened = true;
       setCompatibilityNotice('');
       setNotice('Connecting to host...');
@@ -257,7 +246,7 @@ export function AutomaticApp() {
       setInvitation('');
       setJoinOpen(false);
     } catch (e) {
-      if (opened) await invoke('document_closed');
+      if (opened) await invoke('document_closed', { documentId: tab.id });
       setNotice('');
       throw e;
     } finally {
@@ -278,7 +267,9 @@ export function AutomaticApp() {
       return;
     }
     if (network.current?.sessionEnded)
-      throw new Error('The sharing session ended. Keep this document open to copy its content.');
+      throw new Error(
+        'The sharing session ended. You can save this document locally before closing it.',
+      );
     if (!network.current) {
       const started = await shareDocument(
         documentRef.current,
@@ -339,14 +330,14 @@ export function AutomaticApp() {
       await share(saved.server);
     } else setNotice('Hosting settings saved on this device.');
   }
-  async function leave() {
+  const leave = useCallback(async () => {
     const current = network.current;
     network.current = null;
     try {
       if (current) await current.close();
       else documentRef.current?.destroy();
     } finally {
-      await invoke('document_closed');
+      await invoke('document_closed', { documentId: tab.id });
       documentRef.current = null;
       setDocument(null);
       setSession(null);
@@ -358,20 +349,11 @@ export function AutomaticApp() {
       setCompatibilityNotice('');
       setError('');
       setShareOpen(false);
-      setConfirmExit(false);
       setPeople(false);
     }
-  }
+  }, [tab.id]);
   function requestLeave() {
-    if (document && hasDocumentContent(document)) setConfirmExit(true);
-    else void run(leave);
-  }
-  async function acceptIncoming() {
-    const incoming = pendingLink;
-    await leave();
-    setPendingLink('');
-    setInvitation(incoming);
-    setJoinOpen(true);
+    void workspace.close(tab);
   }
   function togglePeople(open = !people) {
     setPeople(open);
@@ -393,14 +375,11 @@ export function AutomaticApp() {
     });
   }
   useEffect(() => {
-    if (!document || busy || updating) return;
+    if (!active || !document || busy || updating) return;
     const onKey = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
       const key = event.key.toLowerCase();
-      if (key === 'w' && !event.shiftKey) {
-        event.preventDefault();
-        requestLeave();
-      } else if (key === 'c' && event.shiftKey && !guest && link) {
+      if (key === 'c' && event.shiftKey && !guest && link) {
         event.preventDefault();
         copyInvite();
       }
@@ -423,6 +402,22 @@ export function AutomaticApp() {
           : 'local';
   const overlayVisible = !!overlay.state?.settings.visible;
   const leaveLabel = guest ? 'Leave session' : 'Close document';
+  useEffect(() => {
+    workspace.attach(tab, document);
+    return () => {
+      tab.unsubscribe?.();
+    };
+  }, [workspace, tab, document]);
+  useEffect(() => {
+    workspace.update(tab, {
+      close: leave,
+      busy: busy || updating,
+      status: connection,
+      hosted: !guest,
+      sharing: !!session,
+    });
+    // The tab controller always uses the latest closures without resetting its document.
+  }, [workspace, tab, busy, updating, connection, guest, session, leave]);
   const settingsButton = (
     <IconButton
       label="Settings"
@@ -459,9 +454,52 @@ export function AutomaticApp() {
                   }
                 >
                   <MenuItem
+                    shortcut="Ctrl+N"
+                    onSelect={workspace.newTab}
+                    disabled={workspace.working}
+                  >
+                    New document
+                  </MenuItem>
+                  <MenuItem
+                    shortcut="Ctrl+O"
+                    onSelect={() => void workspace.open()}
+                    disabled={workspace.working}
+                  >
+                    Open?
+                  </MenuItem>
+                  <MenuItem onSelect={() => workspace.joinTab()} disabled={workspace.working}>
+                    Join session?
+                  </MenuItem>
+                  <MenuSeparator />
+                  <MenuItem
+                    shortcut="Ctrl+S"
+                    disabled={busy || workspace.working}
+                    onSelect={() =>
+                      void workspace.run(async () => {
+                        await workspace.save(tab);
+                      })
+                    }
+                  >
+                    Save
+                  </MenuItem>
+                  <MenuItem
+                    shortcut="Ctrl+Shift+S"
+                    disabled={busy || workspace.working}
+                    onSelect={() =>
+                      void workspace.run(async () => {
+                        await workspace.save(tab, true);
+                      })
+                    }
+                  >
+                    Save As?
+                  </MenuItem>
+                  <MenuSeparator />
+                  <MenuItem
                     icon={<Pencil size={16} aria-hidden="true" />}
                     onSelect={() => {
-                      const input = window.document.querySelector<HTMLInputElement>('.doc-title');
+                      const input = window.document.querySelector<HTMLInputElement>(
+                        `#panel-${tab.id} .doc-title`,
+                      );
                       input?.focus();
                       input?.select();
                     }}
@@ -579,6 +617,9 @@ export function AutomaticApp() {
             onJoinOpenChange={setJoinOpen}
             busy={busy}
             development={development}
+            onOpen={() => void workspace.open()}
+            shortcuts={false}
+            active={active}
             onCreate={() => void run(create)}
             onJoin={() => void run(join)}
           />
@@ -615,6 +656,9 @@ export function AutomaticApp() {
           start={
             document ? (
               <>
+                <span className="statusbar-note" title={tab.file?.path}>
+                  {tab.dirty ? 'Unsaved changes' : tab.file ? 'Saved' : 'Not saved to a file'}
+                </span>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -663,9 +707,8 @@ export function AutomaticApp() {
           )}
         </ToastRegion>
       </div>
-      <SessionBridge connection={document} />
       <Dialog
-        open={!!compatibilityPrompt}
+        open={active && !!compatibilityPrompt}
         title="Session compatibility"
         onClose={() => decideCompatibility(false)}
       >
@@ -678,7 +721,7 @@ export function AutomaticApp() {
         </div>
       </Dialog>
       <SettingsDialog
-        open={settings}
+        open={active && settings}
         section={section}
         onSectionChange={setSection}
         onClose={() => {
@@ -694,6 +737,9 @@ export function AutomaticApp() {
         name={name}
         onNameChange={updateName}
         discord={discord}
+        restoreTabs={workspace.restore}
+        onRestoreTabsChange={(enabled) => void workspace.configureRestore(enabled)}
+        restoreTabsDisabled={workspace.working}
         closeBehavior={overlay.state?.settings.closeBehavior ?? 'tray'}
         closeBehaviorDisabled={!overlay.state || busy || updating}
         onCloseBehaviorChange={(closeBehavior) =>
@@ -737,7 +783,7 @@ export function AutomaticApp() {
           void openUrl(url).catch((cause) => setError(errorMessage(cause)));
         }}
       />
-      {joinInProgress && (
+      {active && joinInProgress && (
         <Dialog
           open
           title="Joining session"
@@ -761,7 +807,7 @@ export function AutomaticApp() {
         </Dialog>
       )}
       <ShareDialog
-        open={shareOpen}
+        open={active && shareOpen}
         onClose={() => setShareOpen(false)}
         started={!!session}
         link={link}
@@ -797,45 +843,6 @@ export function AutomaticApp() {
         notice={notice}
         error={error}
       />
-      <Dialog
-        open={confirmExit}
-        title={`${leaveLabel}?`}
-        dismissOnBackdrop
-        onClose={() => setConfirmExit(false)}
-      >
-        <p>
-          This document is temporary. Copy any text you want to keep before{' '}
-          {guest ? 'leaving' : 'closing'}. {!guest && session && 'Everyone will be disconnected.'}
-        </p>
-        <div className="dialog-actions">
-          <Button onClick={() => setConfirmExit(false)}>Cancel</Button>
-          <Button variant="danger" disabled={busy} onClick={() => void run(leave)}>
-            {leaveLabel}
-          </Button>
-        </div>
-      </Dialog>
-      <Dialog
-        open={!!pendingLink}
-        title="Open another session?"
-        dismissOnBackdrop
-        onClose={() => setPendingLink('')}
-      >
-        <p>
-          {document && hasDocumentContent(document)
-            ? 'Your current document contains temporary content. Copy anything you want to keep before leaving.'
-            : 'Leave your current document before opening this invitation.'}
-        </p>
-        <div className="dialog-actions">
-          <Button onClick={() => setPendingLink('')}>Cancel</Button>
-          <Button
-            variant="primary"
-            disabled={busy || updating}
-            onClick={() => void run(acceptIncoming)}
-          >
-            Leave and open invitation
-          </Button>
-        </div>
-      </Dialog>
     </div>
   );
 }

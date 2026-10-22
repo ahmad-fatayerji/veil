@@ -118,6 +118,10 @@ async function close() {
     .flatMap((context) => context.pages())
     .find((page) => !page.url().includes('?overlay'));
   await main.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
+  const unsaved = main.getByRole('dialog', { name: /^Save changes to / });
+  await waitFor(async () => app.exitCode !== null || (await unsaved.isVisible()), 'quit decision');
+  if (app.exitCode === null)
+    await unsaved.getByRole('button', { name: 'Discard', exact: true }).click();
   await waitFor(() => app.exitCode !== null, 'clean exit');
   await browser.close();
   browser = undefined;
@@ -774,7 +778,7 @@ try {
   await main.screenshot({ path: resolve(directory, 'control-panel.png'), fullPage: true });
   await command(main, 'overlay_capture_test', { enabled: false });
   await main.getByRole('button', { name: 'Close Settings', exact: true }).click();
-  await main.getByRole('button', { name: /^New document/ }).click();
+  await main.getByRole('button', { name: 'New document', exact: true }).click();
   await overlay.locator('.tiptap').waitFor();
   for (const excluded of [true, false]) {
     await command(main, 'overlay_update', { patch: { captureExclusion: excluded, opacity: 1 } });
@@ -798,8 +802,8 @@ try {
   await main.getByRole('button', { name: /^Document menu/ }).click();
   await main.getByRole('menuitem', { name: 'Close document', exact: true }).click();
   await main
-    .getByRole('dialog', { name: 'Close document?', exact: true })
-    .getByRole('button', { name: 'Close document', exact: true })
+    .getByRole('dialog', { name: /^Save changes to / })
+    .getByRole('button', { name: 'Discard', exact: true })
     .click();
   await close();
   ({ main, overlay } = await launch());

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, FilePlus2, Link2 } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { ArrowLeft, FilePlus2, FolderOpen, Link2 } from 'lucide-react';
 import { parseShareLink, decodeServerInvitation } from '@veil/protocol';
 import { Button, Field, Input, Kbd, Textarea } from '@veil/ui';
 
@@ -34,6 +34,9 @@ export function StartScreen({
   development,
   onCreate,
   onJoin,
+  onOpen,
+  shortcuts = true,
+  active = true,
 }: {
   name: string;
   onNameChange: (value: string) => void;
@@ -45,7 +48,11 @@ export function StartScreen({
   development: boolean;
   onCreate: () => void;
   onJoin: () => void;
+  onOpen?: () => void;
+  shortcuts?: boolean;
+  active?: boolean;
 }) {
+  const formId = useId();
   const joinRow = useRef<HTMLButtonElement>(null);
   const joinButton = useRef<HTMLButtonElement>(null);
   const invitationInput = useRef<HTMLTextAreaElement>(null);
@@ -71,6 +78,7 @@ export function StartScreen({
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
+      if (!active || !shortcuts) return;
       if (busy || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
       const key = event.key.toLowerCase();
       if (key === 'n') {
@@ -83,7 +91,7 @@ export function StartScreen({
     };
     // Pasting an invitation anywhere on the start screen opens the join form with it.
     const paste = (event: ClipboardEvent) => {
-      if (busy || isEditable(document.activeElement)) return;
+      if (!active || busy || isEditable(document.activeElement)) return;
       const text = event.clipboardData?.getData('text').trim() ?? '';
       if (!text.startsWith('veil://')) return;
       event.preventDefault();
@@ -98,7 +106,7 @@ export function StartScreen({
       window.removeEventListener('keydown', keydown);
       window.removeEventListener('paste', paste);
     };
-  }, [busy, joinOpen, name, onCreate, onInvitationChange, onJoinOpenChange]);
+  }, [busy, joinOpen, name, onCreate, onInvitationChange, onJoinOpenChange, shortcuts, active]);
 
   const card = (
     props: {
@@ -131,7 +139,7 @@ export function StartScreen({
       <div className="launcher-inner">
         <div className="launcher-intro">
           <h1>Veil</h1>
-          <p>Temporary shared notes with a private overlay.</p>
+          <p>Shared notes with a private overlay.</p>
         </div>
         {!joinOpen ? (
           <div className="start-cards">
@@ -143,6 +151,13 @@ export function StartScreen({
               onClick: onCreate,
             })}
             {card({
+              title: 'Open document',
+              description: 'Open a Markdown file from your computer',
+              shortcut: 'Ctrl+O',
+              icon: <FolderOpen size={20} />,
+              onClick: () => onOpen?.(),
+            })}
+            {card({
               ref: joinRow,
               title: 'Join with a link',
               description: 'Paste an invitation from the host',
@@ -150,12 +165,12 @@ export function StartScreen({
               icon: <Link2 size={20} />,
               onClick: () => onJoinOpenChange(true),
               'aria-expanded': false,
-              'aria-controls': 'join-panel',
+              'aria-controls': `${formId}-join-panel`,
             })}
           </div>
         ) : (
           <form
-            id="join-panel"
+            id={`${formId}-join-panel`}
             className="join-panel"
             aria-label="Join a session"
             onSubmit={(event) => {
@@ -174,10 +189,10 @@ export function StartScreen({
               <ArrowLeft size={16} aria-hidden="true" />
               Back
             </button>
-            <Field label="Invite link" htmlFor="automatic-invitation" error={error}>
+            <Field label="Invite link" htmlFor={`${formId}-automatic-invitation`} error={error}>
               <Textarea
                 ref={invitationInput}
-                id="automatic-invitation"
+                id={`${formId}-automatic-invitation`}
                 placeholder="veil://join/…"
                 autoComplete="off"
                 rows={2}
@@ -185,25 +200,25 @@ export function StartScreen({
                 maxLength={4096}
                 disabled={busy}
                 aria-invalid={!!error || undefined}
-                aria-describedby={error ? 'automatic-invitation-error' : undefined}
+                aria-describedby={error ? `${formId}-automatic-invitation-error` : undefined}
                 onChange={(event) => onInvitationChange(event.target.value)}
                 onBlur={() => setInvitationTouched(true)}
               />
             </Field>
             <Field
               label="Your name"
-              htmlFor="automatic-name"
+              htmlFor={`${formId}-automatic-name`}
               hint="Shown to the host and everyone in the document."
             >
               <Input
                 ref={nameInput}
-                id="automatic-name"
+                id={`${formId}-automatic-name`}
                 autoComplete="nickname"
                 placeholder="e.g. Alex"
                 value={name}
                 maxLength={40}
                 disabled={busy}
-                aria-describedby="automatic-name-hint"
+                aria-describedby={`${formId}-automatic-name-hint`}
                 onChange={(event) => onNameChange(event.target.value)}
               />
             </Field>

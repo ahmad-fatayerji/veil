@@ -75,7 +75,7 @@ export function DocumentStatus({ state, count }: { state: ConnectionState; count
       className="status-pill"
       data-tone={tone}
       data-state={state}
-      title="Temporary document · not saved to disk"
+      title="Document connection status"
     >
       <span className="status-dot" aria-hidden="true" />
       <span className="status-label" role="status">

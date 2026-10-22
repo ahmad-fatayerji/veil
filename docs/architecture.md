@@ -1,6 +1,6 @@
 ﻿# Architecture
 
-Veil's normal desktop experience creates a temporary local document, then attaches
+Veil's normal desktop experience creates or opens a local document, then attaches
 sharing when the user chooses Share. Hosts use a self-hosted HTTPS signaling
 server; guests join through reusable session links. There is no bundled public
 service or cloud document store.
@@ -43,8 +43,24 @@ and [capture compatibility](capture-compatibility.md).
 
 ## Memory, credentials, and updates
 
-Documents and session keys stay in memory; quitting discards them. Preferences
-persist separately and host credentials live in Windows Credential Manager.
+Each workspace tab owns its editor, Y.Doc, file association, and optional session.
+Inactive tabs stay mounted to retain editor undo and selection; their sessions
+continue independently. The native signaling registry scopes sockets, sends, and
+disconnects by connection ID. Update installation tracks every open document and
+connection, independently of the overlay selection.
+
+The shared editor package converts Markdown with the same schema used for editing.
+The desktop file commands restrict access to the control panel, validate UTF-8 and
+size, use native Windows pickers, detect external changes, and replace files
+atomically. File handles and paths never enter the shared document. The overlay
+bridge routes delayed updates by document identity and drains outgoing edits
+before saves or document closure.
+
+Manual saves write Markdown files; opt-in workspace recovery stores local content
+snapshots without session secrets. Quit requests from window controls and the tray
+are resolved by the workspace before the native exit command. Saved tabs restore
+from disk after a normal quit, and unsaved crash drafts can be recovered locally.
+Preferences persist separately and host credentials live in Windows Credential Manager.
 The sharing server does not store documents. Every admitted participant can edit
 and read content, regardless of display name.
 

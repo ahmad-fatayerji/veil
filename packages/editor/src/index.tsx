@@ -1,7 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import { TaskItem, TaskList } from '@tiptap/extension-list';
+import { documentExtensions } from './schema';
 import Collaboration, { isChangeOrigin } from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -30,6 +29,7 @@ import {
 } from '@veil/collaboration';
 
 export { DocumentTitle, useDocumentTitle, applyText, transformIndex } from './title';
+export { loadMarkdown, saveMarkdown, documentFingerprint, suggestedFilename } from './markdown';
 
 export type EditorConnection = Pick<DemoConnection, 'doc'> & {
   provider: Pick<DemoConnection['provider'], 'awareness'>;
@@ -53,14 +53,7 @@ export function SharedEditor({
     {
       shouldRerenderOnTransaction: false,
       extensions: [
-        StarterKit.configure({
-          undoRedo: false,
-          link: false,
-          underline: false,
-          heading: { levels: [1, 2, 3] },
-        }),
-        TaskList,
-        TaskItem.configure({ nested: true }),
+        ...documentExtensions,
         Collaboration.configure({ document: doc, field: DOCUMENT_FRAGMENT }),
         CollaborationCaret.configure({
           provider,
@@ -201,7 +194,7 @@ const inlineCommands: Command[] = [
   {
     id: 'strike',
     label: 'Strikethrough',
-    shortcut: 'Ctrl+Shift+S',
+    shortcut: 'Ctrl+Shift+X',
     icon: Strikethrough,
     run: (editor) => editor.chain().focus().toggleStrike().run(),
   },

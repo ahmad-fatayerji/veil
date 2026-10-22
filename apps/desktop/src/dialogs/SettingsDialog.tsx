@@ -83,6 +83,9 @@ export function SettingsDialog({
   name,
   onNameChange,
   discord,
+  restoreTabs = false,
+  onRestoreTabsChange,
+  restoreTabsDisabled = false,
   closeBehavior,
   closeBehaviorDisabled,
   onCloseBehaviorChange,
@@ -104,6 +107,9 @@ export function SettingsDialog({
   name: string;
   onNameChange: (value: string) => void;
   discord: ReturnType<typeof useDiscordPresence>;
+  restoreTabs?: boolean;
+  onRestoreTabsChange?: (enabled: boolean) => void;
+  restoreTabsDisabled?: boolean;
   closeBehavior: string;
   closeBehaviorDisabled: boolean;
   onCloseBehaviorChange: (value: string) => void;
@@ -151,6 +157,20 @@ export function SettingsDialog({
           <section hidden={section !== 'General'}>
             <h3>General</h3>
             <div className="settings-card">
+              {onRestoreTabsChange && (
+                <SettingRow
+                  label="Reopen tabs and unsaved drafts"
+                  htmlFor="restore-tabs"
+                  description="Reopen saved files and recover drafts after an unexpected exit. Draft contents are stored locally on this device. Quitting still asks you to save or discard changes."
+                >
+                  <Switch
+                    id="restore-tabs"
+                    checked={restoreTabs}
+                    disabled={restoreTabsDisabled || updating}
+                    onChange={(event) => onRestoreTabsChange(event.target.checked)}
+                  />
+                </SettingRow>
+              )}
               <SettingRow
                 label="Your name"
                 htmlFor="settings-name"

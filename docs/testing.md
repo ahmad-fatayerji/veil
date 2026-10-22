@@ -1,5 +1,43 @@
 # Verification record
 
+## Save, Open, tabs, and recovery acceptance
+
+The following cases require user testing on Windows 10/11 with WebView2. They are
+acceptance instructions, not verification records. Regression tests were added
+for Markdown conversion, workspace decisions, connection isolation, atomic writes,
+encoding and size failures, and update gating; execution remains with the user.
+
+1. Save and reopen Unicode titles, all formatting commands, nested tasks/lists,
+   quotes, code, and dividers. Repeat with BOM/CRLF, empty notes, unsupported
+   links/images/HTML/tables, and invalid UTF-8 or oversized files.
+2. Cancel Open and Save As; try read-only and unavailable locations. Confirm notes
+   and unsaved state survive. Edit a saved file externally and exercise Overwrite,
+   Save As, and Cancel. Make edits during a save; newer changes must stay unsaved.
+   Reopen the same path without duplicating its tab; Save As must not overwrite a
+   file open in another tab.
+3. Host one tab, join another, and edit a third locally. Check each tab's People,
+   Share, and Discord activity. Reconnect or close one session without interrupting
+   the others. Verify editor undo and selection survive tab switches.
+4. Edit in the overlay while switching tabs, then immediately save or close.
+   Verify edits reach their originating document and the overlay follows selection.
+   Check Ctrl+N/O/S/Shift+S/Tab/Shift+Tab/W, strikethrough on Ctrl+Shift+X, and
+   arrow/Home/End navigation in the tab strip.
+5. Exercise tab close, tray Quit, Alt+F4, and window close configured as Quit.
+   Check Save / Discard / Cancel across several tabs, failed/cancelled saves,
+   remote edits during prompts, and the hosted-session warning. Cancel must keep
+   all sessions alive; closing to the tray must preserve the workspace.
+6. Enable restoration, leave saved and unsaved tabs open, force an unexpected
+   exit, and reopen. Restore content/order locally without reconnecting sessions.
+   Repeat normal quit with Save and Discard: discarded unnamed drafts must not
+   return. Disable restoration and verify snapshots disappear while current notes
+   remain. Check missing files, damaged recovery, and recovery write failures.
+7. Install a local test build and use Explorer's Open with on paths containing
+   spaces and Unicode, with Veil closed and running. The default editor must stay
+   unchanged; uninstall must remove only Veil's association. No publication is
+   required for this acceptance test.
+8. Updates must remain blocked with any document or background connection open,
+   including after closing the selected tab or selecting Welcome.
+
 ## Discord Rich Presence - 22 October 2026
 
 Added default-on Windows Discord activity and independent title/count privacy

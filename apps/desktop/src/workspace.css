@@ -1,0 +1,89 @@
+@layer app {
+  .document-workspace {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+  .workspace-tabs {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 36px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border);
+    padding: 0 var(--space-2);
+    gap: 3px;
+  }
+  .workspace-tab {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    max-width: 260px;
+    border-radius: var(--radius-sm);
+    color: var(--fg-muted);
+  }
+  .workspace-tab[data-active='true'] {
+    background: var(--hover);
+    color: var(--fg);
+  }
+  .workspace-tab > button,
+  .workspace-tab-action {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--text-xs);
+    min-height: 32px;
+  }
+  .workspace-tab > button[role='tab'] {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 8px;
+    padding: 0 8px;
+  }
+  .workspace-tab-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+  }
+  .workspace-tab-status {
+    font-size: 10px;
+    color: var(--fg-muted);
+  }
+  .workspace-tab-close,
+  .workspace-tab-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0 8px;
+  }
+  .workspace-tabs button:hover {
+    background: var(--hover);
+  }
+  .workspace-tabs button:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+  }
+  .workspace-panel {
+    flex: 1;
+    min-height: 0;
+  }
+  .workspace-panel[hidden] {
+    display: none;
+  }
+  .workspace-panel .desktop-shell {
+    height: 100%;
+  }
+  .workspace-feedback {
+    position: fixed;
+    bottom: 48px;
+    right: 16px;
+    max-width: min(480px, calc(100vw - 32px));
+    z-index: 110;
+  }
+}

@@ -37,6 +37,7 @@
       },
       "nsis": {
         "installMode": "currentUser",
+        "installerHooks": "nsis/markdown.nsh",
         "displayLanguageSelector": false
       }
     },

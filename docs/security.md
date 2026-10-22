@@ -8,12 +8,24 @@ connectivity on every network.
 
 ## Documents and participants
 
-Documents and session secrets are held in memory, rather than saved as durable
-documents by the desktop app or sharing server. Closing a document, ending a
-session, or quitting discards that in-memory work. This is not a secure-erasure
-guarantee: operating-system paging, crash dumps, endpoint malware, or a participant
-copying content can retain information. Preferences and server configuration are
-stored separately from documents.
+Document editing and session secrets stay in memory. Participants can manually
+save the shared title and body to UTF-8 Markdown files on their own devices;
+file paths, save state, credentials, and invitation links are not shared or written
+into these files. Optional workspace recovery is off by default. Enabling it
+stores document snapshots, local file paths, tab order, and the selected tab in
+`workspace.json` under Veil's local app data. This is a content snapshot, without
+collaboration credentials, participant awareness, or reconnectable session state.
+
+Saved Markdown and recovery drafts are not encrypted by Veil. Closing to the tray
+keeps documents and sessions running. Closing an unsaved tab or quitting asks to
+save or discard; discard removes its recovery snapshot. After a normal quit,
+restoration reopens saved files from disk; after an unexpected exit, recovery can
+also restore unsaved content. Disabling recovery removes stored snapshots without
+closing current documents. Damaged recovery files are backed up before replacement
+so manual recovery remains possible. Deleting or discarding is not a secure-erasure
+guarantee: operating-system paging, crash dumps, backups, endpoint malware, or a
+participant copying content can retain information. Preferences and host credentials
+are stored separately.
 
 Anyone holding a reusable `veil://join/...` link can join and edit while sharing
 is active. There are no viewer roles, per-user permission controls, or verified
@@ -24,7 +36,7 @@ through a trusted channel and treat them as secrets.
 admissions. Neither removes guests already admitted: their authenticated tickets,
 recovery, and relay renewal remain valid until the session ends. End the session
 to disconnect everyone. The host must stay available; there is no host migration
-or durable recovery after quitting.
+or automatic reconnection after quitting. Restored documents start locally.
 
 ## Discord Rich Presence
 

@@ -36,29 +36,45 @@ export function nativeSignaling(
     request: (server, path, method, body, ticket) =>
       invoke('network_request', { server, path, method, body, ticket }),
     connect: async (server, sessionId, ticket, receive) => {
+      const previous = current;
       unlisten?.();
+      unlisten = undefined;
       current = randomSecret(16);
       const id = current;
-      unlisten = await listen<{ connectionId: string; message: unknown }>(
+      if (previous) await invoke('network_disconnect', { connectionId: previous });
+      const stop = await listen<{ connectionId: string; message: unknown }>(
         'veil:network',
         ({ payload }) => {
           if (payload.connectionId === id && current === id) receive(payload.message);
         },
       );
+      if (current !== id) {
+        stop();
+        throw new Error('Connection cancelled.');
+      }
+      unlisten = stop;
       try {
         await invoke('network_connect', { server, sessionId, ticket, connectionId: id });
+        if (current !== id) {
+          await invoke('network_disconnect', { connectionId: id });
+          throw new Error('Connection cancelled.');
+        }
       } catch (error) {
-        unlisten?.();
-        unlisten = undefined;
+        stop();
+        if (current === id) {
+          current = '';
+          unlisten = undefined;
+        }
         throw error;
       }
     },
-    send: (message) => invoke('network_send', { message }),
+    send: (message) => invoke('network_send', { message, connectionId: current }),
     disconnect: async () => {
+      const connectionId = current;
       current = '';
       unlisten?.();
       unlisten = undefined;
-      await invoke('network_disconnect');
+      if (connectionId) await invoke('network_disconnect', { connectionId });
     },
   };
 }

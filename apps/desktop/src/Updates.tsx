@@ -183,8 +183,8 @@ export function Updates({
                 Version {info.availableVersion} is available
               </span>
               <p>
-                End or leave your session first. Documents are temporary; copy any text you want to
-                keep. Local overlay preferences are retained.
+                Save your documents and close all tabs and sessions first. Local overlay preferences
+                are retained.
               </p>
             </div>
             <Button
