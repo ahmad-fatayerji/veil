@@ -87,6 +87,55 @@
     display: none;
     margin-left: auto;
   }
+  /* Rich text / Markdown view switch: a small segmented control at the toolbar's end. */
+  .editor-mode {
+    display: inline-flex;
+    flex-shrink: 0;
+    gap: 2px;
+    margin-left: var(--space-2);
+    padding: 2px;
+    border-radius: var(--radius-md);
+    background: var(--surface-sunken);
+  }
+  .editor-mode button {
+    height: 26px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--fg-muted);
+    font: inherit;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+  .editor-mode button:hover {
+    color: var(--fg);
+  }
+  .editor-mode button[aria-pressed='true'] {
+    background: var(--surface-raised);
+    color: var(--fg);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+  }
+  .editor-mode button:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+  }
+  .markdown-source {
+    display: block;
+    width: 100%;
+    min-height: 60vh;
+    field-sizing: content;
+    padding: 0;
+    border: 0;
+    outline: none;
+    resize: none;
+    background: transparent;
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    line-height: 1.65;
+    tab-size: 2;
+  }
   .menu-style-1,
   .menu-style-2,
   .menu-style-3 {

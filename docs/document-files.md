@@ -12,6 +12,13 @@ its file. The title becomes a leading `# Heading`; opening a leading H1 moves it
 into Veil's title field. Without a leading H1, the filename supplies the title.
 Headings, emphasis, lists, nested checklists, quotes, code, and dividers retain
 their formatting. Unsupported constructs remain visible as literal Markdown.
+
+The **Rich text / Markdown** switch at the end of the formatting toolbar changes
+only your own view of a tab. Edit in either view: Markdown edits apply to the
+shared document as you type and appear immediately for collaborators, and their
+edits flow into your Markdown view. A leading `# Heading` is the document title.
+Your Markdown keeps its exact spelling until someone else edits; Veil then shows
+the saved form, for example `*italic*` instead of `_italic_`.
 Files must be UTF-8 and at most 16 MiB; recovery data is also limited to 16 MiB.
 
 Tabs live in the window's title bar. Each tab shows a dot for unsaved changes,

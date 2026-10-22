@@ -1,9 +1,14 @@
 import { Extension, getSchema, type JSONContent } from '@tiptap/react';
 import { MarkdownManager } from '@tiptap/markdown';
-import { prosemirrorJSONToYXmlFragment, yDocToProsemirrorJSON } from '@tiptap/y-tiptap';
+import {
+  prosemirrorJSONToYXmlFragment,
+  updateYFragment,
+  yDocToProsemirrorJSON,
+} from '@tiptap/y-tiptap';
 import type * as Y from 'yjs';
 import { DOCUMENT_FRAGMENT, DOCUMENT_TITLE } from '@veil/protocol';
 import { documentExtensions } from './schema';
+import { applyText } from './title';
 
 const literal = (value: string): JSONContent[] =>
   value
@@ -89,22 +94,48 @@ function nodeText(node: JSONContent): string {
   return node.text ?? (node.content ?? []).map(nodeText).join('');
 }
 
-/** Initialize a fresh, unshared document exactly once, before mounting its editors. */
-export function loadMarkdown(doc: Y.Doc, source: string, filename = '') {
+/** Parse Markdown into Veil's title and validated body; a leading H1 becomes the title. */
+function parseDocument(source: string) {
   const body = markdown.parse(source.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n'));
   const first = body.content?.[0];
-  let title = filename.replace(/^.*[\\/]/, '').replace(/\.md$/i, '');
+  let title: string | undefined;
   if (first?.type === 'heading' && first.attrs?.level === 1) {
     title = nodeText(first);
     body.content = body.content!.slice(1);
   }
   if (!body.content?.length) body.content = [{ type: 'paragraph' }];
-  // Validate before touching the Y.Doc; conversion never replaces a live session.
-  schema.nodeFromJSON(body).check();
+  // Validate before touching the Y.Doc.
+  const node = schema.nodeFromJSON(body);
+  node.check();
+  return { title, body, node };
+}
+
+/** Initialize a fresh, unshared document exactly once, before mounting its editors. */
+export function loadMarkdown(doc: Y.Doc, source: string, filename = '') {
+  const parsed = parseDocument(source);
+  const title = parsed.title ?? filename.replace(/^.*[\\/]/, '').replace(/\.md$/i, '');
   doc.transact(() => {
     if (title) doc.getText(DOCUMENT_TITLE).insert(0, title);
-    prosemirrorJSONToYXmlFragment(schema, body, doc.getXmlFragment(DOCUMENT_FRAGMENT));
+    prosemirrorJSONToYXmlFragment(schema, parsed.body, doc.getXmlFragment(DOCUMENT_FRAGMENT));
   });
+}
+
+/** Transaction origin of edits made in the Markdown source view. */
+export const markdownOrigin = Symbol('markdown source');
+
+/**
+ * Apply edited Markdown to a live, possibly shared document. Only the differing title text
+ * and nodes change, so concurrent edits elsewhere in the document are preserved.
+ */
+export function applyMarkdown(doc: Y.Doc, source: string) {
+  const { title, node } = parseDocument(source);
+  doc.transact(() => {
+    applyText(doc.getText(DOCUMENT_TITLE), title ?? '');
+    updateYFragment(doc, doc.getXmlFragment(DOCUMENT_FRAGMENT), node, {
+      mapping: new Map(),
+      isOMark: new Map(),
+    });
+  }, markdownOrigin);
 }
 
 export function saveMarkdown(doc: Y.Doc): string {

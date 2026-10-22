@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { DOCUMENT_FRAGMENT, DOCUMENT_TITLE } from '@veil/protocol';
-import { documentFingerprint, loadMarkdown, saveMarkdown, suggestedFilename } from './markdown';
+import {
+  applyMarkdown,
+  documentFingerprint,
+  loadMarkdown,
+  saveMarkdown,
+  suggestedFilename,
+} from './markdown';
 
 describe('Markdown document files', () => {
   it('round trips the title and supported rich formatting, including nested tasks and Unicode', () => {
@@ -85,6 +91,39 @@ describe('Markdown document files', () => {
     } finally {
       doc.destroy();
       reopened.destroy();
+    }
+  });
+
+  it('applies edited Markdown source to a live document', () => {
+    const doc = new Y.Doc();
+    try {
+      loadMarkdown(doc, '# Plan\n\nFirst\n');
+      applyMarkdown(doc, '# Renamed\n\n## Agenda\n\nFirst and *more*\n');
+      expect(doc.getText(DOCUMENT_TITLE).toString()).toBe('Renamed');
+      expect(saveMarkdown(doc)).toBe('# Renamed\n\n## Agenda\n\nFirst and *more*\n');
+      applyMarkdown(doc, 'No heading\n');
+      expect(doc.getText(DOCUMENT_TITLE).toString()).toBe('');
+    } finally {
+      doc.destroy();
+    }
+  });
+
+  it('keeps a collaborator’s concurrent edit when Markdown source changes elsewhere', () => {
+    const editor = new Y.Doc();
+    const collaborator = new Y.Doc();
+    try {
+      loadMarkdown(editor, '# Notes\n\nFirst\n\nSecond\n');
+      Y.applyUpdate(collaborator, Y.encodeStateAsUpdate(editor));
+      applyMarkdown(editor, '# Notes\n\nFirst changed\n\nSecond\n');
+      const second = collaborator.getXmlFragment(DOCUMENT_FRAGMENT).get(1) as Y.XmlElement;
+      (second.get(0) as Y.XmlText).insert(6, ' too');
+      Y.applyUpdate(collaborator, Y.encodeStateAsUpdate(editor));
+      Y.applyUpdate(editor, Y.encodeStateAsUpdate(collaborator));
+      expect(saveMarkdown(editor)).toBe('# Notes\n\nFirst changed\n\nSecond too\n');
+      expect(saveMarkdown(collaborator)).toBe(saveMarkdown(editor));
+    } finally {
+      editor.destroy();
+      collaborator.destroy();
     }
   });
 });

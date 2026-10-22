@@ -1,6 +1,8 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
+import type * as Y from 'yjs';
 import { documentExtensions } from './schema';
+import { applyMarkdown, markdownOrigin, saveMarkdown } from './markdown';
 import Collaboration, { isChangeOrigin } from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -29,7 +31,14 @@ import {
 } from '@veil/collaboration';
 
 export { DocumentTitle, useDocumentTitle, applyText, transformIndex } from './title';
-export { loadMarkdown, saveMarkdown, documentFingerprint, suggestedFilename } from './markdown';
+export {
+  applyMarkdown,
+  documentFingerprint,
+  loadMarkdown,
+  markdownOrigin,
+  saveMarkdown,
+  suggestedFilename,
+} from './markdown';
 
 export type EditorConnection = Pick<DemoConnection, 'doc'> & {
   provider: Pick<DemoConnection['provider'], 'awareness'>;
@@ -49,6 +58,8 @@ export function SharedEditor({
   aside?: ReactNode;
 }) {
   const { doc, provider } = connection;
+  // Each person chooses their own view; both edit the same shared document.
+  const [mode, setMode] = useState<EditorMode>('rich');
   const editor = useEditor(
     {
       shouldRerenderOnTransaction: false,
@@ -144,10 +155,21 @@ export function SharedEditor({
   if (compact) return <EditorContent editor={editor} />;
   return (
     <>
-      <EditorToolbar editor={editor} />
+      {/* Formatting buttons stay in place, disabled, while the Markdown view is shown. */}
+      <EditorToolbar
+        editor={mode === 'rich' ? editor : null}
+        mode={mode}
+        onModeChange={(next) => {
+          setMode(next);
+          if (next === 'rich') requestAnimationFrame(() => editor?.commands.focus());
+        }}
+      />
       {aside}
+      {mode === 'markdown' && <MarkdownSource doc={doc} />}
+      {/* The rich editor stays mounted while hidden, keeping its undo history and binding. */}
       <div
         className="editor-scroll"
+        hidden={mode === 'markdown'}
         onMouseDown={(event) => {
           // Clicking the empty page below the text continues writing at the end.
           if (
@@ -165,6 +187,90 @@ export function SharedEditor({
         </div>
       </div>
     </>
+  );
+}
+
+export type EditorMode = 'rich' | 'markdown';
+
+/** Map a caret through a whole-text replacement, keeping it within unchanged text. */
+function mapCaret(previous: string, next: string, index: number) {
+  let start = 0;
+  while (start < previous.length && start < next.length && previous[start] === next[start]) start++;
+  if (index <= start) return index;
+  let end = 0;
+  while (
+    end < previous.length - start &&
+    end < next.length - start &&
+    previous[previous.length - 1 - end] === next[next.length - 1 - end]
+  )
+    end++;
+  if (index >= previous.length - end) return index + next.length - previous.length;
+  return next.length - end;
+}
+
+/**
+ * Editable Markdown for the shared document. Every change is applied to the document at
+ * once, so collaborators' edits arriving later are merged into the source, not overwritten.
+ */
+function MarkdownSource({ doc }: { doc: Y.Doc }) {
+  const area = useRef<HTMLTextAreaElement>(null);
+  const [text, setText] = useState(() => saveMarkdown(doc));
+  const current = useRef(text);
+  const caret = useRef<[number, number] | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const refresh = (_update: Uint8Array, origin: unknown) => {
+      // Own edits keep the text exactly as typed instead of re-serializing it.
+      if (origin === markdownOrigin) return;
+      const previous = current.current;
+      const next = saveMarkdown(doc);
+      if (next === previous) return;
+      const element = area.current;
+      if (element && document.activeElement === element)
+        caret.current = [
+          mapCaret(previous, next, element.selectionStart),
+          mapCaret(previous, next, element.selectionEnd),
+        ];
+      current.current = next;
+      setText(next);
+    };
+    doc.on('update', refresh);
+    return () => doc.off('update', refresh);
+  }, [doc]);
+  useLayoutEffect(() => {
+    if (!caret.current || !area.current) return;
+    area.current.setSelectionRange(...caret.current);
+    caret.current = null;
+  }, [text]);
+  return (
+    <div className="editor-scroll markdown-scroll">
+      <div className="editor-column">
+        <textarea
+          ref={area}
+          className="markdown-source"
+          aria-label="Markdown source"
+          spellCheck={false}
+          autoFocus
+          value={text}
+          onChange={(event) => {
+            const value = event.target.value;
+            current.current = value;
+            setText(value);
+            try {
+              applyMarkdown(doc, value);
+              setError('');
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : String(cause));
+            }
+          }}
+        />
+        {error && (
+          <p className="error" role="alert">
+            This Markdown could not be applied: {error}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -289,7 +395,15 @@ function ToolbarButton({
   );
 }
 
-function EditorToolbar({ editor }: { editor: Editor | null }) {
+function EditorToolbar({
+  editor,
+  mode,
+  onModeChange,
+}: {
+  editor: Editor | null;
+  mode: EditorMode;
+  onModeChange: (mode: EditorMode) => void;
+}) {
   const state = useEditorState({
     editor,
     selector: ({ editor }) => {
@@ -411,6 +525,23 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
+        <div className="editor-mode" role="group" aria-label="Editor view">
+          {(
+            [
+              ['rich', 'Rich text'],
+              ['markdown', 'Markdown'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={mode === value}
+              onClick={() => mode !== value && onModeChange(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

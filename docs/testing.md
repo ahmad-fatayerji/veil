@@ -27,6 +27,10 @@ encoding and size failures, and update gating; execution remains with the user.
    mouse wheel. New, Open, or Join from a blank Home tab must replace it. The
    People, overlay, Share, and ⋯ document menu controls must follow the selected
    tab; saving must not flicker or disable the tabs.
+   Switch a shared tab to Markdown and edit while a collaborator edits another
+   paragraph in rich text. Both edits must survive, your caret must stay put, the
+   title must follow the leading `# Heading`, and switching back must keep undo.
+   Italic text must render slanted in rich text.
 5. Exercise tab close, tray Quit, Alt+F4, and window close configured as Quit.
    Check Save / Discard / Cancel across several tabs, failed/cancelled saves,
    remote edits during prompts, and the hosted-session warning. Cancel must keep
