@@ -5205,7 +5205,7 @@ dependencies = [
 
 [[package]]
 name = "veil-desktop"
-version = "0.7.2"
+version = "0.8.0-beta.1"
 dependencies = [
  "base64 0.22.1",
  "discord-rich-presence",
