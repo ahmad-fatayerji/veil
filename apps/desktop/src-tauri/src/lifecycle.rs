@@ -79,8 +79,10 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
                 let _ = show_main(tray.app_handle());
             }
         });
-    if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(icon.clone());
+    // The bundle icon is the dark tile; the control panel switches it once the
+    // app appearance resolves.
+    if let Some(icon) = crate::app_icon::tray_icon(Default::default()) {
+        tray = tray.icon(icon);
     }
     tray.build(app)?;
     Ok(())
