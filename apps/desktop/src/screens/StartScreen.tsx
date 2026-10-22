@@ -126,6 +126,12 @@ export function StartScreen({
 
   return (
     <main className="launcher">
+      {/* Decorative oversized mark, clipped by the backdrop so it never adds scrolling. */}
+      <div className="launcher-backdrop" aria-hidden="true">
+        <svg className="launcher-watermark" viewBox="38 44 180 168">
+          <path d="M40.59 50.5 Q38 44 45 44 L77 44 Q84 44 86.59 50.5 L148.41 205.5 Q151 212 144 212 L112 212 Q105 212 102.41 205.5 Z M169.41 50.5 Q172 44 179 44 L211 44 Q218 44 215.41 50.5 L159.09 191.71 Q156.5 198.21 153.91 191.71 L136.09 147.04 Q133.5 140.54 136.09 134.04 Z" />
+        </svg>
+      </div>
       <div className="launcher-inner">
         <div className="launcher-intro">
           <h1>Veil</h1>
