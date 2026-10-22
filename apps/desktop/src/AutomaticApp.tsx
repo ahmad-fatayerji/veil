@@ -106,6 +106,8 @@ export function AutomaticApp({
   const [joinMode, setJoinMode] = useState<JoinMode>('auto');
   const [pendingGuests, setPendingGuests] = useState<PendingGuest[]>([]);
   const joining = useRef<AbortController | null>(null);
+  // The join session before the host admits it, so a rename can update the waiting request.
+  const admitting = useRef<AutomaticSession | null>(null);
   const [joinInProgress, setJoinInProgress] = useState(false);
   const [peers, setPeers] = useState<PeerSummary[]>([]);
   const [notice, setNotice] = useState('');
@@ -163,6 +165,9 @@ export function AutomaticApp({
     const shown = name.trim() || 'You';
     if (user?.name !== shown) awareness.setLocalStateField('user', { ...user, name: shown });
   }, [document, name]);
+  useEffect(() => {
+    (admitting.current ?? network.current)?.rename(name.trim());
+  }, [name]);
   useEffect(() => {
     mounted.current = true;
     let initializing = true;
@@ -288,6 +293,9 @@ export function AutomaticApp({
         setNotice,
         development,
         controller.signal,
+        (started) => {
+          admitting.current = started;
+        },
       );
       network.current = joined;
       setSession(joined);
@@ -300,6 +308,7 @@ export function AutomaticApp({
       throw e;
     } finally {
       joining.current = null;
+      admitting.current = null;
       setJoinInProgress(false);
     }
   }
