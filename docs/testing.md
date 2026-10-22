@@ -10,8 +10,8 @@ from temporary documents. Browser/legacy flows do not activate presence.
 
 Verified source compilation with TypeScript and Windows `cargo check` (including
 compilation of the Rust regression tests); desktop Clippy with warnings denied,
-changed-source ESLint, Prettier, rustfmt, and `git diff --check` passed. Local test suites, `pnpm check`, live
-Discord, and native UI acceptance were not run. The added Rust cases cover title
+changed-source ESLint, Prettier, rustfmt, and `git diff --check` passed. Local test
+suites, `pnpm check`, live Discord, and native UI acceptance were not run. The added Rust cases cover title
 and count privacy, solo/singular/plural wording, blank/Unicode titles, preference
 defaults/migration/round trips, corrupt preferences, and failed writes. They have
 not been executed.
@@ -25,7 +25,8 @@ Manual acceptance on Windows with Discord activity sharing enabled:
    yourself. Pending approval requests must not change the count; departures
    must update it. Rename the document from the other client.
 3. Exercise all title/count switch combinations. Hidden titles become "Editing a
-   document"; hidden counts disappear. Try blank, long Unicode, and single-letter
+   document" with a compact "Solo" / "With X others" count line rather than
+   repeating the editing message; hidden counts disappear. Try blank, long Unicode, and single-letter
    titles. Confirm privacy changes promptly remove previously visible fields.
 4. Disable Rich Presence and confirm activity clears. Both subordinate controls
    must be disabled with their values preserved. Restart Veil while disabled,

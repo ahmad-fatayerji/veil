@@ -72,13 +72,16 @@ fn display(preferences: Preferences, activity: &Activity) -> DisplayActivity {
         } else {
             "Editing a document".into()
         },
-        state: preferences
-            .show_participant_count
-            .then(|| match activity.others_count {
-                0 => "Editing a document solo".into(),
-                1 => "Editing a document with 1 other".into(),
-                count => format!("Editing a document with {count} others"),
-            }),
+        state: preferences.show_participant_count.then(|| {
+            match (preferences.show_document_title, activity.others_count) {
+                (true, 0) => "Editing a document solo".into(),
+                (true, 1) => "Editing a document with 1 other".into(),
+                (true, count) => format!("Editing a document with {count} others"),
+                (false, 0) => "Solo".into(),
+                (false, 1) => "With 1 other".into(),
+                (false, count) => format!("With {count} others"),
+            }
+        }),
     }
 }
 
@@ -329,7 +332,11 @@ mod tests {
                     if show_participant_count {
                         assert_eq!(
                             rendered.state.as_deref(),
-                            Some("Editing a document with 7 others")
+                            Some(if show_document_title {
+                                "Editing a document with 7 others"
+                            } else {
+                                "With 7 others"
+                            })
                         );
                     }
                     let idle = display(preferences, &Activity::default());
@@ -362,6 +369,25 @@ mod tests {
         assert!(shortened.len() <= 128);
         assert!(long.starts_with(&shortened));
         assert_eq!(title("\n Meeting\t notes \r"), "Meeting notes");
+    }
+
+    #[test]
+    fn hidden_titles_do_not_repeat_the_editing_message() {
+        let preferences = Preferences {
+            show_document_title: false,
+            ..Preferences::default()
+        };
+        for (others_count, expected) in [(0, "Solo"), (1, "With 1 other"), (2, "With 2 others")] {
+            let rendered = display(
+                preferences,
+                &Activity {
+                    document_title: Some("Private project".into()),
+                    others_count,
+                },
+            );
+            assert_eq!(rendered.details, "Editing a document");
+            assert_eq!(rendered.state.as_deref(), Some(expected));
+        }
     }
 
     #[test]
