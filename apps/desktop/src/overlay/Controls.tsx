@@ -1,6 +1,6 @@
-import { useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, Eye, EyeOff, RotateCcw } from 'lucide-react';
-import { Button, Slider, Switch } from '@veil/ui';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ChevronDown, Eye, EyeOff, Link2, RotateCcw, Unlink2 } from 'lucide-react';
+import { Button, IconButton, Slider, Switch } from '@veil/ui';
 import { errorMessage, invoke, useOverlay, type OverlayPatch, type OverlaySnapshot } from './api';
 
 function ToggleRow({
@@ -108,6 +108,25 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
   const textOpacity = Math.round((draft.textOpacity ?? state?.settings.textOpacity ?? 1) * 100);
   const fontSize = draft.fontSize ?? state?.settings.fontSize ?? 20;
   const visible = !!state?.settings.visible;
+  // Linked sliders keep the gap captured when linking, so clamping at 0/100 is undone on the way back.
+  const linked = !!state?.settings.opacityLinked && state.capabilities.transparency;
+  const gap = useRef(0);
+  useEffect(() => {
+    if (linked) gap.current = textOpacity - windowOpacity;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- capture only when the link turns on
+  }, [linked]);
+  function setOpacity(key: 'opacity' | 'textOpacity', percent: number) {
+    if (!linked)
+      return range(key === 'opacity' ? { opacity: percent / 100 } : { textOpacity: percent / 100 });
+    const clamp = (value: number) => Math.min(100, Math.max(0, value));
+    const background = key === 'opacity' ? percent : clamp(percent - gap.current);
+    const text = key === 'textOpacity' ? percent : clamp(percent + gap.current);
+    range({ opacity: background / 100, textOpacity: text / 100 });
+  }
+  function toggleLink() {
+    gap.current = textOpacity - windowOpacity;
+    void update({ opacityLinked: !linked });
+  }
   return (
     <section className="overlay-controls" aria-label="Overlay controls">
       <div className="overlay-controls-row">
@@ -145,37 +164,55 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
               <span>Saved on this device</span>
             </div>
             <div className="settings-card overlay-ranges">
-              <RangeRow
-                id="overlay-opacity"
-                label="Window opacity"
-                description="Background only"
-                output={`${windowOpacity}%`}
-              >
-                <Slider
+              <div className="overlay-opacity-pair" data-linked={linked}>
+                <RangeRow
                   id="overlay-opacity"
-                  aria-label="Window opacity"
-                  aria-valuetext={`${windowOpacity}%`}
-                  step={1}
-                  value={windowOpacity}
-                  disabled={!state.capabilities.transparency}
-                  onChange={(event) => range({ opacity: Number(event.target.value) / 100 })}
-                />
-              </RangeRow>
-              <RangeRow
-                id="overlay-text-opacity"
-                label="Text opacity"
-                description="Independent of the background"
-                output={`${textOpacity}%`}
-              >
-                <Slider
+                  label="Window opacity"
+                  description={linked ? 'Linked with text' : 'Background only'}
+                  output={`${windowOpacity}%`}
+                >
+                  <Slider
+                    id="overlay-opacity"
+                    aria-label="Window opacity"
+                    aria-valuetext={`${windowOpacity}%`}
+                    step={1}
+                    value={windowOpacity}
+                    disabled={!state.capabilities.transparency}
+                    onChange={(event) => setOpacity('opacity', Number(event.target.value))}
+                  />
+                </RangeRow>
+                <IconButton
+                  size="sm"
+                  className="overlay-link-toggle"
+                  label={linked ? 'Unlink opacities' : 'Link opacities'}
+                  aria-pressed={linked}
+                  disabled={!state.capabilities.transparency || busy}
+                  onClick={toggleLink}
+                >
+                  {linked ? (
+                    <Link2 size={14} aria-hidden="true" />
+                  ) : (
+                    <Unlink2 size={14} aria-hidden="true" />
+                  )}
+                </IconButton>
+                <RangeRow
                   id="overlay-text-opacity"
-                  aria-label="Text opacity"
-                  aria-valuetext={`${textOpacity}%`}
-                  step={1}
-                  value={textOpacity}
-                  onChange={(event) => range({ textOpacity: Number(event.target.value) / 100 })}
-                />
-              </RangeRow>
+                  label="Text opacity"
+                  description={
+                    linked ? 'Moves with the background' : 'Independent of the background'
+                  }
+                  output={`${textOpacity}%`}
+                >
+                  <Slider
+                    id="overlay-text-opacity"
+                    aria-label="Text opacity"
+                    aria-valuetext={`${textOpacity}%`}
+                    step={1}
+                    value={textOpacity}
+                    onChange={(event) => setOpacity('textOpacity', Number(event.target.value))}
+                  />
+                </RangeRow>
+              </div>
               <RangeRow id="overlay-font-size" label="Font size" output={`${fontSize} px`}>
                 <Slider
                   id="overlay-font-size"
