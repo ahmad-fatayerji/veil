@@ -11,10 +11,12 @@ import {
   Input,
   SegmentedControl,
   Select,
+  Switch,
   type Appearance,
 } from '@veil/ui';
 import { OverlayControls } from '../overlay/Controls';
 import { Updates } from '../Updates';
+import type { useDiscordPresence } from '../discord';
 
 export type Section = 'General' | 'Appearance' | 'Hosting server' | 'Overlay' | 'Updates' | 'About';
 const sections: { id: Section; icon: typeof Monitor }[] = [
@@ -80,6 +82,7 @@ export function SettingsDialog({
   onUpdateBusy,
   name,
   onNameChange,
+  discord,
   closeBehavior,
   closeBehaviorDisabled,
   onCloseBehaviorChange,
@@ -100,6 +103,7 @@ export function SettingsDialog({
   onUpdateBusy: (busy: boolean) => void;
   name: string;
   onNameChange: (value: string) => void;
+  discord: ReturnType<typeof useDiscordPresence>;
   closeBehavior: string;
   closeBehaviorDisabled: boolean;
   onCloseBehaviorChange: (value: string) => void;
@@ -178,6 +182,49 @@ export function SettingsDialog({
               </SettingRow>
             </div>
             <p>You can also reopen Veil, show or hide the overlay, or quit from the tray menu.</p>
+            <div className="settings-card">
+              <SettingRow
+                label="Discord Rich Presence"
+                htmlFor="discord-enabled"
+                description="Share your editing activity on Discord."
+              >
+                <Switch
+                  id="discord-enabled"
+                  checked={discord.preferences?.enabled ?? true}
+                  disabled={!discord.preferences || discord.saving || updating}
+                  onChange={(event) => void discord.configure({ enabled: event.target.checked })}
+                />
+              </SettingRow>
+              <SettingRow
+                label="Show document title"
+                htmlFor="discord-title"
+                description="Include your current document title in your Discord activity."
+              >
+                <Switch
+                  id="discord-title"
+                  checked={discord.preferences?.showDocumentTitle ?? true}
+                  disabled={!discord.preferences?.enabled || discord.saving || updating}
+                  onChange={(event) =>
+                    void discord.configure({ showDocumentTitle: event.target.checked })
+                  }
+                />
+              </SettingRow>
+              <SettingRow
+                label="Show participant count"
+                htmlFor="discord-count"
+                description="Include how many other people are connected to your document."
+              >
+                <Switch
+                  id="discord-count"
+                  checked={discord.preferences?.showParticipantCount ?? true}
+                  disabled={!discord.preferences?.enabled || discord.saving || updating}
+                  onChange={(event) =>
+                    void discord.configure({ showParticipantCount: event.target.checked })
+                  }
+                />
+              </SettingRow>
+            </div>
+            {discord.error && <Banner tone="danger">{discord.error}</Banner>}
           </section>
 
           <section hidden={section !== 'Appearance'}>

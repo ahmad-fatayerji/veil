@@ -1,5 +1,47 @@
 # Verification record
 
+## Discord Rich Presence - 22 October 2026
+
+Added default-on Windows Discord activity and independent title/count privacy
+switches in Settings > General. The native manager applies privacy before sending
+activity, keeps only the latest state, prioritizes privacy changes, and uses
+bounded IPC transactions and reconnect backoff. Preferences are stored separately
+from temporary documents. Browser/legacy flows do not activate presence.
+
+Verified source compilation with TypeScript and Windows `cargo check` (including
+compilation of the Rust regression tests); desktop Clippy with warnings denied,
+changed-source ESLint, Prettier, rustfmt, and `git diff --check` passed. Local test suites, `pnpm check`, live
+Discord, and native UI acceptance were not run. The added Rust cases cover title
+and count privacy, solo/singular/plural wording, blank/Unicode titles, preference
+defaults/migration/round trips, corrupt preferences, and failed writes. They have
+not been executed.
+
+Manual acceptance on Windows with Discord activity sharing enabled:
+
+1. Start with fresh preferences and confirm all three switches default on. With
+   no document open, confirm "No document open". Create a document, rename it,
+   and confirm its title and solo editing message appear.
+2. Connect one guest and then another. Confirm "1 other" and "2 others", excluding
+   yourself. Pending approval requests must not change the count; departures
+   must update it. Rename the document from the other client.
+3. Exercise all title/count switch combinations. Hidden titles become "Editing a
+   document"; hidden counts disappear. Try blank, long Unicode, and single-letter
+   titles. Confirm privacy changes promptly remove previously visible fields.
+4. Disable Rich Presence and confirm activity clears. Both subordinate controls
+   must be disabled with their values preserved. Restart Veil while disabled,
+   then re-enable it and confirm the saved privacy choices remain effective.
+5. Start Discord after Veil, restart Discord, and check recovery with current
+   privacy choices. Minimize Veil to the tray and keep editing through the
+   overlay; confirm activity remains current. Close the document and quit Veil;
+   confirm idle and then cleared activity.
+6. Navigate the switches by keyboard and verify labels, focus visibility, and
+   disabled states. In an isolated debug preferences directory, corrupt
+   `discord.json` and confirm presence pauses with a Settings warning. Simulate a
+   failed preference write and confirm the new privacy choices apply during that
+   run while Settings explains they were not saved.
+
+No server contract or protocol-generation changes, merge, or release publication.
+
 ## Overlay capture layer hotfix - 12 October 2026
 
 The user tested PR #43 with Discord full-desktop sharing started before Veil.
