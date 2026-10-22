@@ -189,7 +189,7 @@ export function OverlayWindow() {
           {document.connection && !state?.captureTest && (
             <OverlayPeople people={document.participants} />
           )}
-          {document.connection && !state?.captureTest && (
+          {document.connection && !state?.captureTest && interactive && (
             <button
               type="button"
               className="overlay-icon-button"
@@ -204,26 +204,29 @@ export function OverlayWindow() {
               <FileCode size={16} aria-hidden="true" />
             </button>
           )}
-          <button
-            type="button"
-            className="overlay-icon-button overlay-close"
-            aria-label="Hide overlay"
-            title={
-              state?.hideShortcutAvailable
-                ? `Hide overlay (${state.settings.keybinds.toggleOverlay} to show again)`
-                : 'Hide overlay (use the tray to show again)'
-            }
-            disabled={!interactive}
-            onPointerEnter={() => setHovered(null)}
-            onPointerDown={keepGesture}
-            onClick={() => {
-              void invoke('overlay_visibility', { visible: false }).catch((failure: unknown) =>
-                setError(errorMessage(failure)),
-              );
-            }}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
+          {/* Click-through can't reach header controls; the recovery hint replaces them. */}
+          {!state?.settings.clickThrough && (
+            <button
+              type="button"
+              className="overlay-icon-button overlay-close"
+              aria-label="Hide overlay"
+              title={
+                state?.hideShortcutAvailable
+                  ? `Hide overlay (${state.settings.keybinds.toggleOverlay} to show again)`
+                  : 'Hide overlay (use the tray to show again)'
+              }
+              disabled={!interactive}
+              onPointerEnter={() => setHovered(null)}
+              onPointerDown={keepGesture}
+              onClick={() => {
+                void invoke('overlay_visibility', { visible: false }).catch((failure: unknown) =>
+                  setError(errorMessage(failure)),
+                );
+              }}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </header>
       <article className="overlay-document" aria-label="Overlay document">

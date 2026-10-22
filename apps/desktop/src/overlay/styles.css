@@ -415,8 +415,11 @@
     flex-direction: column;
     min-height: 0;
   }
-  .overlay-editor .editor-compact {
+  /* Each view scrolls by itself, so a formatting toolbar above it never covers text. */
+  .overlay-editor :is(.editor-compact, .markdown-scroll) {
     flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
   /* Text opacity fades only the document, never its formatting controls. */
   .overlay-document :is(.document-editor, .markdown-source) {
@@ -434,32 +437,46 @@
   .overlay-document .markdown-source {
     min-height: 0;
     font-size: 0.85em;
+    font-weight: var(--weight-regular);
   }
-  /* The compact toolbar stays fixed under the header while the document scrolls. */
-  .overlay-document .editor-toolbar.is-compact {
-    position: sticky;
-    top: 0;
+  /* Toolbar mode: a slim row on the overlay's own translucent background, outside the
+     scrolling document, with the text style lined up with the document text. */
+  .overlay-editor .editor-toolbar.is-compact {
+    position: static;
     flex-shrink: 0;
-    min-height: 36px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    min-height: 0;
+    padding: 3px var(--space-2);
+    background: transparent;
   }
   .editor-toolbar.is-compact .toolbar-inner {
     justify-content: flex-start;
-    padding-inline: var(--space-2);
+    gap: 1px;
   }
-  .editor-toolbar.is-compact :is(.toolbar-button, .toolbar-style) {
+  .editor-toolbar.is-compact .toolbar-group {
+    gap: 1px;
+  }
+  .editor-toolbar.is-compact .toolbar-button {
+    width: 28px;
     height: 28px;
   }
   .editor-toolbar.is-compact .toolbar-style {
-    width: 104px;
+    width: auto;
+    height: 28px;
+    gap: var(--space-1);
+    padding: 0 var(--space-2) 0 var(--space-3);
+    font-size: var(--text-sm);
   }
+  .editor-toolbar.is-compact .toolbar-separator {
+    height: 16px;
+    margin: 0 var(--space-1);
+  }
+  /* Bubble mode: a compact floating bar above the selection. */
   .selection-toolbar > [role='toolbar'] {
     display: flex;
     align-items: center;
-    gap: 2px;
-    padding: 3px;
-    border: 1px solid var(--border);
+    gap: 1px;
+    padding: var(--space-1);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-lg);
     background: var(--surface-raised);
     box-shadow: var(--shadow-flyout);
@@ -469,7 +486,8 @@
     height: 28px;
   }
   .selection-toolbar .toolbar-separator {
-    height: 18px;
+    height: 16px;
+    margin: 0 var(--space-1);
   }
   .overlay-empty {
     display: grid;

@@ -495,7 +495,8 @@ function SelectionToolbar({ editor }: { editor: Editor }) {
     <BubbleMenu
       editor={editor}
       className="selection-toolbar"
-      options={{ placement: 'top', offset: 8 }}
+      // Keep the toolbar clear of the window edges in small windows.
+      options={{ placement: 'top', offset: 8, shift: { padding: 8 }, flip: { padding: 8 } }}
       shouldShow={({ editor, state }) =>
         editor.isEditable && !state.selection.empty && !editor.isActive('codeBlock')
       }
@@ -562,8 +563,9 @@ function EditorToolbar({
       return { active, level: level ?? 0 };
     },
   });
-  const active = state?.active ?? {};
-  const level = state?.level ?? 0;
+  // Without a rich editor (the Markdown view) nothing is active; don't show stale state.
+  const active = editor ? (state?.active ?? {}) : {};
+  const level = editor ? (state?.level ?? 0) : 0;
   return (
     <div
       className={`editor-toolbar${compact ? ' is-compact' : ''}`}
