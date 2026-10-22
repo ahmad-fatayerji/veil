@@ -103,7 +103,7 @@ try {
   const main = pages().find((page) => !page.url().includes('?overlay'));
   const overlay = pages().find((page) => page.url().includes('?overlay'));
   for (const page of pages()) page.on('pageerror', (error) => errors.push(error.message));
-  await main.getByRole('button', { name: 'Create document', exact: true }).click();
+  await main.getByRole('button', { name: /^New document/ }).click();
   await main.locator('.tiptap').fill('Tray keeps my temporary document');
   await invoke(main, 'overlay_visibility', { visible: true });
   await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
@@ -257,7 +257,7 @@ try {
     async () => (await invoke(restarted, 'overlay_snapshot')).settings.closeBehavior === 'quit',
   );
   await restarted.getByRole('button', { name: 'Close Settings', exact: true }).click();
-  await restarted.getByRole('button', { name: 'Create document', exact: true }).click();
+  await restarted.getByRole('button', { name: /^New document/ }).click();
   await restarted.locator('.tiptap').fill('Window close quits even with a temporary document');
   await invoke(restarted, 'overlay_visibility', { visible: true });
   assert.equal(native('Probe', 'overlay').visible, true);

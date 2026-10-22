@@ -23,7 +23,7 @@ export function LegacyApp() {
     }
   }
   return (
-    <>
+    <div className="legacy-shell">
       <Updates onBusy={setUpdating} />
       <div inert={updating} aria-busy={updating}>
         <nav className="connection-modes" aria-label="Connection mode">
@@ -52,6 +52,6 @@ export function LegacyApp() {
         )}
         {mode === 'peer' ? <PeerApp /> : <HostingApp />}
       </div>
-    </>
+    </div>
   );
 }

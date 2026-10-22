@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import * as Y from 'yjs';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
@@ -18,7 +18,15 @@ type Message =
 const relayOrigin = Symbol('desktop document relay');
 const send = (message: Message) => invoke('document_relay', { message });
 
-export function DesktopEditor({ connection }: { connection: DemoConnection }) {
+export function DesktopEditor({
+  connection,
+  header,
+  aside,
+}: {
+  connection: DemoConnection;
+  header?: ReactNode;
+  aside?: ReactNode;
+}) {
   const [view, setView] = useState<EditorConnection | null>(null);
   const [menuError, setMenuError] = useState('');
   const visibilityMenu = useVisibilityMenu(true, setMenuError);
@@ -60,10 +68,10 @@ export function DesktopEditor({ connection }: { connection: DemoConnection }) {
   }, [connection]);
   return view ? (
     <div style={{ display: 'contents' }} onContextMenu={visibilityMenu.onContextMenu}>
-      <SharedEditor connection={view} />
+      <SharedEditor connection={view} header={header} aside={aside} />
       {visibilityMenu.menu}
       {menuError && (
-        <p className="overlay-error" role="alert">
+        <p className="error editor-menu-error" role="alert">
           Overlay menu: {menuError}
         </p>
       )}

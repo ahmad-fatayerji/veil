@@ -233,14 +233,14 @@ async function capture(mode, phase, held = false) {
 
 const handles = {
   move: ['Move', 'move'],
-  north: ['Resize ↕', 'vertical'],
-  south: ['Resize ↕', 'vertical'],
-  east: ['Resize ↔', 'horizontal'],
-  west: ['Resize ↔', 'horizontal'],
-  northEast: ['Resize ↗', 'nesw'],
-  southWest: ['Resize ↗', 'nesw'],
-  northWest: ['Resize ↘', 'nwse'],
-  southEast: ['Resize ↘', 'nwse'],
+  north: ['Resize vertically', 'vertical'],
+  south: ['Resize vertically', 'vertical'],
+  east: ['Resize horizontally', 'horizontal'],
+  west: ['Resize horizontally', 'horizontal'],
+  northEast: ['Resize diagonally', 'nesw'],
+  southWest: ['Resize diagonally', 'nesw'],
+  northWest: ['Resize diagonally', 'nwse'],
+  southEast: ['Resize diagonally', 'nwse'],
 };
 const handleLocator = (overlay, handle) =>
   overlay.locator(handle === 'move' ? '.overlay-drag-handle' : `.overlay-resize-${handle}`);
@@ -774,7 +774,7 @@ try {
   await main.screenshot({ path: resolve(directory, 'control-panel.png'), fullPage: true });
   await command(main, 'overlay_capture_test', { enabled: false });
   await main.getByRole('button', { name: 'Close Settings', exact: true }).click();
-  await main.getByRole('button', { name: 'Create document', exact: true }).click();
+  await main.getByRole('button', { name: /^New document/ }).click();
   await overlay.locator('.tiptap').waitFor();
   for (const excluded of [true, false]) {
     await command(main, 'overlay_update', { patch: { captureExclusion: excluded, opacity: 1 } });
@@ -795,7 +795,8 @@ try {
     }
   }
   await command(main, 'overlay_update', { patch: { captureExclusion: true } });
-  await main.getByRole('button', { name: 'Close document', exact: true }).click();
+  await main.getByRole('button', { name: /^Document menu/ }).click();
+  await main.getByRole('menuitem', { name: 'Close document', exact: true }).click();
   await main
     .getByRole('dialog', { name: 'Close document?', exact: true })
     .getByRole('button', { name: 'Close document', exact: true })

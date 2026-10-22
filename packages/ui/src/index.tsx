@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   connectDemo,
   readParticipants,
@@ -9,6 +9,7 @@ import { parseInvitation, type SessionTarget } from '@veil/protocol';
 import { SharedEditor } from '@veil/editor';
 import { AppVersion, DeveloperCredit, Dialog, hasDocumentContent } from './workspace';
 import { useAppearance, type Appearance } from './appearance';
+import { Avatar, activityLabels } from './components/people';
 import veilIcon from './assets/veil-icon-small.png';
 
 // Read once before React Strict Mode mounts; remove the credential from browser history.
@@ -24,24 +25,6 @@ const initialTarget = (() => {
 })();
 
 type Status = 'offline' | 'connecting' | 'connected' | 'disconnected' | 'synced';
-const activityLabels = {
-  typing: 'Typing…',
-  selecting: 'Selecting text',
-  document: 'In document',
-  away: 'Away from document',
-};
-
-function Avatar({ person }: { person: Participant }) {
-  return (
-    <span
-      className="avatar"
-      style={{ '--person-color': person.color } as CSSProperties}
-      title={person.name}
-    >
-      {person.name.slice(0, 1).toUpperCase()}
-    </span>
-  );
-}
 
 export function DemoApp({
   surface,
@@ -171,7 +154,7 @@ export function DemoApp({
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell legacy-shell">
       <header className="app-header">
         <span className="brand">
           <img className="brand-icon" src={veilIcon} alt="" width="30" height="30" />
@@ -420,3 +403,9 @@ export function DemoApp({
 
 export * from './workspace';
 export * from './appearance';
+export * from './components/buttons';
+export * from './components/forms';
+export * from './components/feedback';
+export * from './components/Menu';
+export * from './components/people';
+export * from './components/Kbd';

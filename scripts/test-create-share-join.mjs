@@ -109,6 +109,10 @@ async function settings(page, section) {
     .click();
   return page.getByRole('dialog', { name: 'Settings', exact: true });
 }
+async function closeDocument(page) {
+  await page.getByRole('button', { name: /^Document menu/ }).click();
+  await page.getByRole('menuitem', { name: 'Close document', exact: true }).click();
+}
 async function screenshot(page, name) {
   await page.screenshot({
     path: resolve(directory, `${name}.png`),
@@ -124,17 +128,14 @@ try {
   launch(binary, [], serverEnv);
   await waitFor(async () => (await fetch(`${server}/health`).catch(() => null))?.ok, 'server');
   host = (await app(0)).page;
-  const createTab = host.getByRole('tab', { name: 'Create document' });
-  await createTab.focus();
-  await host.keyboard.press('ArrowRight');
-  await expect(host.getByRole('tab', { name: 'Join session' })).toBeFocused();
-  await expect(host.getByLabel('Session link')).toBeVisible();
-  await host.keyboard.press('Home');
-  await expect(createTab).toBeFocused();
+  await host.keyboard.press('Control+j');
+  await expect(host.getByLabel('Invite link')).toBeFocused();
+  await host.keyboard.press('Escape');
+  await expect(host.getByRole('button', { name: /^Join with a link/ })).toBeFocused();
+  await expect(host.getByLabel('Invite link')).toHaveCount(0);
   await screenshot(host, 'welcome-light');
-  await host.getByRole('textbox', { name: /Your name/ }).fill('Alex');
   assert.equal(await host.getByLabel('Server address').isVisible(), false);
-  await host.getByRole('button', { name: 'Create document', exact: true }).click();
+  await host.getByRole('button', { name: /^New document/ }).click();
   const editor = host.getByRole('textbox', { name: 'Shared document' });
   await editor.fill('Written before sharing.');
   assert.equal(
@@ -143,6 +144,10 @@ try {
     'local document blocks updates',
   );
   await host.getByRole('button', { name: 'Share', exact: true }).click();
+  // The first invitation asks who is hosting before any server setup.
+  const shareSetup = host.getByRole('dialog', { name: 'Share document', exact: true });
+  await shareSetup.getByRole('textbox', { name: /Your name/ }).fill('Alex');
+  await shareSetup.getByRole('button', { name: 'Create invite link', exact: true }).click();
   let dialog = host.getByRole('dialog', { name: 'Settings', exact: true });
   await expect(dialog.getByRole('heading', { name: 'Hosting server' })).toBeVisible();
   await dialog.getByLabel('Server address').fill(server);
@@ -220,7 +225,7 @@ try {
   await saveAndShare.click();
   const share = host.getByRole('dialog', { name: 'Share document', exact: true });
   await expect(share).toBeVisible();
-  const link = await share.getByLabel('Session link').inputValue();
+  const link = await share.getByLabel('Invite link').inputValue();
   assert.match(link, /^veil:\/\/join\/[^/]+\/[A-Za-z0-9_-]{22}$/);
   await share.getByRole('button', { name: 'Copy link', exact: true }).click();
   await expect(share.getByRole('status')).toHaveText('Link copied.');
@@ -235,13 +240,13 @@ try {
   ]) {
     if (name === 'Jo') {
       await host.getByRole('button', { name: 'Share', exact: true }).click();
-      await share.getByLabel('Join mode').selectOption('approval');
-      assert.equal(await share.getByLabel('Session link').inputValue(), link);
+      await share.getByRole('radio', { name: 'Only people I approve' }).click();
+      assert.equal(await share.getByLabel('Invite link').inputValue(), link);
       await share.getByRole('button', { name: 'Close Share document' }).click();
     }
-    await page.getByRole('tab', { name: 'Join session', exact: true }).click();
+    await page.getByRole('button', { name: /^Join with a link/ }).click();
+    await page.getByLabel('Invite link').fill(link);
     await page.getByRole('textbox', { name: /Your name/ }).fill(name);
-    await page.getByLabel('Session link').fill(link);
     await page.getByRole('button', { name: 'Join session', exact: true }).click();
     if (name === 'Jo') {
       await expect(
@@ -251,8 +256,8 @@ try {
       const requests = host.getByRole('region', { name: 'Join requests' });
       await expect(requests).toContainText('Jo');
       await host.getByRole('button', { name: 'Share', exact: true }).click();
-      await share.getByLabel('Join mode').selectOption('auto');
-      assert.equal(await share.getByLabel('Session link').inputValue(), link);
+      await share.getByRole('radio', { name: 'Anyone with the link' }).click();
+      assert.equal(await share.getByLabel('Invite link').inputValue(), link);
       await share.getByRole('button', { name: 'Close Share document' }).click();
       await expect(page.getByRole('textbox', { name: 'Shared document' })).toHaveCount(0);
       await requests.getByRole('button', { name: 'Approve', exact: true }).click();
@@ -267,12 +272,12 @@ try {
   await expect(editor).toContainText('From Sam.');
   await expect(other.getByRole('textbox', { name: 'Shared document' })).toContainText('From Sam.');
   await host.getByRole('button', { name: 'Share', exact: true }).click();
-  assert.equal(await share.getByLabel('Session link').inputValue(), link, 'Share reuses link');
+  assert.equal(await share.getByLabel('Invite link').inputValue(), link, 'Share reuses link');
   await share.getByRole('button', { name: 'Reset link', exact: true }).click();
-  await expect(share.getByLabel('Session link')).not.toHaveValue(link);
+  await expect(share.getByLabel('Invite link')).not.toHaveValue(link);
   await share.getByRole('button', { name: 'Stop sharing', exact: true }).click();
   await expect(
-    share.getByText('New people cannot join. Existing collaborators stay connected.'),
+    share.getByText('Sharing is off. New people can’t join; current collaborators stay connected.'),
   ).toBeVisible();
   await share.getByRole('button', { name: 'Close Share document' }).click();
   await other.getByRole('textbox', { name: 'Shared document' }).press('Control+End');
@@ -306,7 +311,7 @@ try {
   await dialog.getByRole('button', { name: 'Close Settings' }).click();
   await expect(editor).toContainText('After sharing stopped.');
   dialog = await settings(host, 'Appearance');
-  await dialog.getByLabel('Theme').selectOption('dark');
+  await dialog.getByRole('radio', { name: 'Dark', exact: true }).click();
   await dialog.getByRole('button', { name: 'Close Settings' }).click();
   await screenshot(host, 'workspace-dark');
   await host.getByRole('button', { name: 'Show overlay' }).click();
@@ -330,20 +335,22 @@ try {
   await screenshot(host, 'settings-dark');
   await dialog.getByRole('button', { name: 'Close Settings' }).click();
   await host.setViewportSize({ width: 480, height: 720 });
+  await host.getByRole('button', { name: /^People/ }).click();
   await host.getByRole('button', { name: 'Hide people' }).click();
+  await expect(host.getByRole('button', { name: /^People/ })).toBeFocused();
   await screenshot(host, 'workspace-narrow');
   assert.equal(
     await host.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     true,
   );
-  await host.getByRole('button', { name: 'Close document', exact: true }).click();
+  await closeDocument(host);
   const confirmation = host.getByRole('dialog', { name: 'Close document?', exact: true });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
   await expect(editor).toContainText('After sharing stopped.');
-  await host.getByRole('button', { name: 'Close document', exact: true }).click();
+  await closeDocument(host);
   await confirmation.getByRole('button', { name: 'Close document', exact: true }).click();
-  await expect(host.getByRole('tab', { name: 'Create document' })).toBeVisible();
+  await expect(host.getByRole('button', { name: /^New document/ })).toBeVisible();
   assert.equal((await invoke(host, 'update_status')).sessionActive, false);
   await expect(guest.getByRole('status').first()).toHaveText('Disconnected');
   assert.deepEqual(errors, []);
