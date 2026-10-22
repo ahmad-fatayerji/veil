@@ -30,7 +30,7 @@ describe('device-local keybind matching', () => {
   it('requires a supported non-modifier key with Ctrl or Alt', () => {
     expect(shortcutFromEvent(key({ ctrlKey: false }))).toBeNull();
     expect(shortcutFromEvent(key({ metaKey: true }))).toBeNull();
-    for (code of ['Escape', 'ControlLeft', 'Numpad1', 'F13']) {
+    for (const code of ['Escape', 'ControlLeft', 'Numpad1', 'F13']) {
       expect(shortcutFromEvent(key({ code }))).toBeNull();
     }
   });
