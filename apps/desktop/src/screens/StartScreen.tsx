@@ -225,7 +225,7 @@ export function StartScreen({
               />
             </Field>
             <div className="dialog-actions">
-              <Button variant="ghost" disabled={busy} onClick={closeJoin}>
+              <Button disabled={busy} onClick={closeJoin}>
                 Cancel
               </Button>
               <Button
