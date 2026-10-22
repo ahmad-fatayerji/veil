@@ -1,7 +1,7 @@
 // Must match the native messages in src-tauri/src/networking.rs.
 export const SERVER_FULL = 'This Veil server is at capacity right now.';
 export const PUBLIC_LIMIT = "You've reached this server's free hosting limit.";
-export const SELF_HOSTING_URL = 'https://github.com/ahmad-fatayerji/veil-server#deploy-on-linux';
+export const SELF_HOSTING_URL = 'https://github.com/ahmad-fatayerji/veil-server';
 
 export type CapacityProblem = 'full' | 'limit';
 
