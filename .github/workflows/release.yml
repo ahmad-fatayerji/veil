@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.source.outputs.sha }}
+      reuse: ${{ steps.reuse.outputs.reuse }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -34,8 +35,20 @@ jobs:
           fetch-depth: 0
       - id: source
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      # The release PR already ran full validation on its merge result. When the merged
+      # commit has that exact tree, validating it again only repeats the same checks.
+      - id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/ci-plan.mjs reuse
   validate:
     needs: source
+    if: needs.source.outputs.reuse != 'true'
     uses: ./.github/workflows/ci.yml
     with:
       ref: ${{ needs.source.outputs.sha }}
@@ -47,6 +60,10 @@ jobs:
       ref: ${{ needs.source.outputs.sha }}
   publish:
     needs: [source, validate, build]
+    if: >-
+      always() && needs.source.result == 'success' && needs.build.result == 'success' &&
+      (needs.validate.result == 'success' ||
+      (needs.validate.result == 'skipped' && needs.source.outputs.reuse == 'true'))
     uses: ./.github/workflows/publish.yml
     with:
       ref: ${{ needs.source.outputs.sha }}

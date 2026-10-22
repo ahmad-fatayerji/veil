@@ -6,7 +6,7 @@ import semver from 'semver';
 import { proposeFeedUpdate, distributionRepository } from './update-feed.mjs';
 import { assertPublication } from './release-lib.mjs';
 import { readJson, verifyVersions } from './release-files.mjs';
-import { findReleaseByTag } from './github-release.mjs';
+import { awaitRelease, findReleaseByTag } from './github-release.mjs';
 import {
   assertPublishedIdentity,
   assertReleaseManifest,
@@ -116,23 +116,28 @@ if (process.argv[2] === 'preflight') {
   }
   if (!existing || existing.draft) {
     const notes = `docs/releases/${version}.md`;
-    if (!existing)
-      gh(
-        'release',
-        'create',
-        tag,
-        '--repo',
-        repo,
-        '--target',
-        'main',
-        '--draft',
-        '--title',
-        `Veil ${version}`,
-        '--notes-file',
-        notes,
-        ...(semver.prerelease(version) ? ['--prerelease'] : []),
-      );
-    else
+    // Create through the API so the draft's ID is known immediately; reading by ID is
+    // consistent even while the release list has not caught up yet.
+    const id = existing
+      ? existing.id
+      : api(
+          `repos/${repo}/releases`,
+          '--method',
+          'POST',
+          '-f',
+          `tag_name=${tag}`,
+          '-f',
+          'target_commitish=main',
+          '-f',
+          `name=Veil ${version}`,
+          '-F',
+          `body=@${notes}`,
+          '-F',
+          'draft=true',
+          '-F',
+          `prerelease=${Boolean(semver.prerelease(version))}`,
+        ).id;
+    if (existing)
       gh(
         'release',
         'edit',
@@ -144,8 +149,10 @@ if (process.argv[2] === 'preflight') {
         '--notes-file',
         notes,
       );
-    const draft = findRelease();
-    if (!draft?.draft) throw new Error('Asset upload requires an unpublished release draft.');
+    const draft = api(`repos/${repo}/releases/${id}`);
+    if (!draft.draft || draft.tag_name !== tag)
+      throw new Error('Asset upload requires an unpublished release draft.');
+    awaitRelease(findRelease, id);
     // Replacing assets is allowed only while this version remains an unpublished draft.
     gh(
       'release',

@@ -12,9 +12,11 @@ import { join } from 'node:path';
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import {
   assertBranchPolicy,
+  feedOnlyDrift,
   nextBeta,
   proposeVersion,
   releaseNotes,
+  requestedVersion,
   stableVersion,
 } from './release-lib.mjs';
 import { readJson, setVersion, verifyVersions, writeJson } from './release-files.mjs';
@@ -310,13 +312,23 @@ async function main() {
     if (source !== 'develop' && !source.startsWith('hotfix/'))
       throw new Error('Prepare from develop or an existing hotfix branch.');
     // Back-merge the last release/hotfix first, so proposals never use a stale baseline.
-    git('merge-base', '--is-ancestor', 'origin/main', 'HEAD');
+    // Update-feed commits alone never change the baseline; finalize merges them in.
+    try {
+      git('merge-base', '--is-ancestor', 'origin/main', 'HEAD');
+    } catch {
+      if (!feedOnlyDrift(git('diff', '--name-only', 'HEAD...origin/main').split('\n')))
+        throw new Error('Back-merge main into the source first: main contains a newer release.');
+    }
     const baseline = readJson('.release/baseline.json');
-    const version = proposeVersion(
+    const proposed = proposeVersion(
       baseline.version,
       messagesSince(baseline.sourceRef),
       source.startsWith('hotfix/'),
     );
+    const requested = process.env.TARGET_VERSION?.trim();
+    const version = requested
+      ? requestedVersion(requested, baseline.version, source.startsWith('hotfix/'))
+      : proposed;
     const branch = source === 'develop' ? `release/${version}` : source;
     const existingPull = pullFor(branch);
     if (existingPull) {
@@ -331,8 +343,24 @@ async function main() {
       '--paginate',
       '--slurp',
     ).flat();
-    if (source === 'develop' && openPulls.some((item) => item.head.ref.startsWith('release/')))
-      throw new Error('Finish or explicitly retire the existing release branch first.');
+    const stale = openPulls.filter((item) => item.head.ref.startsWith('release/'));
+    if (source === 'develop' && stale.length) {
+      if (process.env.RETIRE_EXISTING !== 'true')
+        throw new Error(
+          `Finish or retire the open release candidate (#${stale[0].number}) first; rerun with retire enabled to replace it.`,
+        );
+      // Published betas, tags and the branch stay; only the review PR is closed.
+      for (const pull of stale)
+        gh(
+          'pr',
+          'close',
+          String(pull.number),
+          '--repo',
+          repo,
+          '--comment',
+          `Retired by Prepare release: superseded by the ${version} candidate. Published betas and tags are kept.`,
+        );
+    }
     if (releaseExists(version)) throw new Error('The proposed version already exists publicly.');
     const remoteBranches = api(
       `repos/${repo}/branches?per_page=100`,
@@ -417,6 +445,13 @@ async function main() {
     git('push', 'origin', `HEAD:refs/heads/${source}`);
     output('version', version);
   } else if (command === 'finalize') {
+    const feeds = api(`repos/${repo}/pulls?state=open&base=main&per_page=100`).filter((item) =>
+      isFeedBranch(item.head.ref),
+    );
+    if (feeds.length)
+      throw new Error(
+        `Update-feed PR #${feeds[0].number} is still open. Let it merge (approve its held CI run if needed), then finalize; otherwise the release PR falls behind main.`,
+      );
     // Checked feed PRs advance main during beta testing. Preserve that history
     // in the candidate before final review; conflicts stop without a push.
     try {

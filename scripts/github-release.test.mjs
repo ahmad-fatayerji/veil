@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findReleaseByTag } from './github-release.mjs';
+import { awaitRelease, findReleaseByTag } from './github-release.mjs';
 
 test('published release lookup avoids the draft list and preserves identity', () => {
   const published = { id: 12, tag_name: 'v0.2.0', draft: false };
@@ -78,4 +78,36 @@ test('authentication and service errors remain fatal rather than creating anothe
       ),
     /HTTP 500/,
   );
+});
+
+test('a new draft is awaited until the eventually consistent lookup returns it', () => {
+  const draft = { id: 21, tag_name: 'v1.0.0', draft: true };
+  const results = [null, null, draft];
+  const waits = [];
+  assert.equal(
+    awaitRelease(() => results.shift(), 21, { sleep: (ms) => waits.push(ms) }),
+    draft,
+  );
+  assert.deepEqual(waits, [1000, 2000]);
+});
+
+test('awaiting a draft fails closed on another release or after bounded retries', () => {
+  assert.throws(
+    () => awaitRelease(() => ({ id: 9, tag_name: 'v1.0.0' }), 21, { sleep: () => {} }),
+    /different release/,
+  );
+  let calls = 0;
+  assert.throws(
+    () =>
+      awaitRelease(
+        () => {
+          calls++;
+          return null;
+        },
+        21,
+        { attempts: 3, sleep: () => {} },
+      ),
+    /did not become discoverable/,
+  );
+  assert.equal(calls, 3);
 });
