@@ -47,15 +47,15 @@ The overlay shows the same live document in a separate window. Move it, resize i
 
 </details>
 
-| Make it yours           | What you can do                                                                                            |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Hidden from recordings  | Keep the overlay visible to you while excluding it from compatible screen recordings and screen sharing.   |
-| A document in seconds   | Write locally without setting up a server.                                                                 |
-| A shared space          | Invite multiple participants with a reusable session link. There is no application-level participant cap.  |
-| Notes that stay visible | Edit from the control panel or the movable, resizable overlay.                                             |
-| Your preferred look     | Choose light, dark, or system theme and an accent color, and save your overlay preferences on this device. |
-| Connections you control | Self-host the sharing server; peer connections use a direct path when available and TURN when needed.      |
-| Updates in the app      | Check for signed updates in Settings and choose the stable or beta channel.                                |
+| Make it yours           | What you can do                                                                                           |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| Hidden from recordings  | Keep the overlay visible to you while excluding it from compatible screen recordings and screen sharing.  |
+| A document in seconds   | Write locally without setting up a server.                                                                |
+| A shared space          | Invite multiple participants with a reusable session link. There is no application-level participant cap. |
+| Notes that stay visible | Edit from the control panel or the movable, resizable overlay.                                            |
+| Your preferred look     | Choose light, dark, or system theme and match your Windows accent color or pick your own.                 |
+| Connections you control | Self-host the sharing server; peer connections use a direct path when available and TURN when needed.     |
+| Updates in the app      | Check for signed updates in Settings and choose the stable or beta channel.                               |
 
 ## Get started
 

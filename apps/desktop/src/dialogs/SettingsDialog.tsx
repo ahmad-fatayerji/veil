@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Info, Keyboard, Monitor, PictureInPicture2, Share2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, Info, Keyboard, Monitor, PictureInPicture2, Share2 } from 'lucide-react';
 import {
   AppVersion,
   Banner,
@@ -12,7 +12,7 @@ import {
   SegmentedControl,
   Select,
   Switch,
-  accents,
+  windowsColors,
   type Accent,
   type Appearance,
 } from '@veil/ui';
@@ -34,19 +34,17 @@ const sections: { id: Section; icon: typeof Monitor }[] = [
 ];
 const updatesSection: Section = 'About & updates';
 
-const accentNames: Record<Accent, string> = {
-  blue: 'Blue',
-  purple: 'Purple',
-  pink: 'Pink',
-  orange: 'Orange',
-  green: 'Green',
-  teal: 'Teal',
-  graphite: 'Graphite',
-};
+const veilBlue = '#0f62d6';
+const columns = 9;
 
-/** Color swatches with radio semantics; each previews its accent through the shared tokens. */
+/**
+ * Veil blue followed by the Windows color grid, so a color can match the Windows accent
+ * exactly. Swatches have radio semantics; arrows move within the grid.
+ */
 function AccentPicker({ value, onChange }: { value: Accent; onChange: (value: Accent) => void }) {
   const group = useRef<HTMLDivElement>(null);
+  const options: Accent[] = ['veil', ...windowsColors];
+  const selected = options.indexOf(value);
   return (
     <div
       ref={group}
@@ -54,32 +52,36 @@ function AccentPicker({ value, onChange }: { value: Accent; onChange: (value: Ac
       role="radiogroup"
       aria-label="Accent color"
       onKeyDown={(event) => {
-        const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+        const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: columns, ArrowUp: -columns }[
+          event.key
+        ];
         if (!step) return;
         event.preventDefault();
-        const next = (accents.indexOf(value) + step + accents.length) % accents.length;
-        onChange(accents[next]);
+        const next = Math.min(options.length - 1, Math.max(0, Math.max(selected, 0) + step));
+        onChange(options[next]);
         group.current?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
       }}
     >
-      {accents.map((accent) => (
-        <button
-          key={accent}
-          type="button"
-          role="radio"
-          className="accent-swatch"
-          data-accent={accent}
-          aria-checked={accent === value}
-          aria-label={accentNames[accent]}
-          title={accentNames[accent]}
-          tabIndex={accent === value ? 0 : -1}
-          onClick={() => onChange(accent)}
-        />
-      ))}
+      {options.map((option, index) => {
+        const label = option === 'veil' ? 'Veil blue (default)' : option.toUpperCase();
+        return (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            className="accent-swatch"
+            style={{ background: option === 'veil' ? veilBlue : option }}
+            aria-checked={option === value}
+            aria-label={label}
+            title={label}
+            tabIndex={option === value || (selected < 0 && index === 0) ? 0 : -1}
+            onClick={() => onChange(option)}
+          />
+        );
+      })}
     </div>
   );
 }
-
 export type HostingForm = {
   server: string;
   credential: string;
@@ -116,6 +118,7 @@ export function SettingsDialog({
   appearance,
   onAppearanceChange,
   accent,
+  systemAccent,
   onAccentChange,
   hosting,
   notice,
@@ -142,6 +145,8 @@ export function SettingsDialog({
   appearance: Appearance;
   onAppearanceChange: (value: Appearance) => void;
   accent: Accent;
+  /** The Windows accent ramp, when the system provides one. */
+  systemAccent: string[] | null;
   onAccentChange: (value: Accent) => void;
   hosting: HostingForm;
   notice: string;
@@ -149,6 +154,7 @@ export function SettingsDialog({
   onOpenUrl: (url: string) => void;
 }) {
   const startup = useWindowsStartup(open);
+  const [colorsOpen, setColorsOpen] = useState(false);
   // Every page starts at its top; pages share one scrolling area.
   const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -225,12 +231,65 @@ export function SettingsDialog({
                     ]}
                   />
                 </SettingRow>
-                <SettingRow
-                  label="Accent color"
-                  description="Used for buttons, highlights and selections in both windows."
-                >
-                  <AccentPicker value={accent} onChange={onAccentChange} />
-                </SettingRow>
+                {systemAccent && (
+                  <SettingRow
+                    label="Match Windows accent color"
+                    htmlFor="accent-windows"
+                    description="Follows your Windows accent, including later changes."
+                  >
+                    <span className="accent-system">
+                      <span
+                        className="accent-system-swatch"
+                        style={{ background: systemAccent[3] }}
+                        aria-hidden="true"
+                      />
+                      <Switch
+                        id="accent-windows"
+                        checked={accent === 'windows'}
+                        onChange={(event) => {
+                          // Turning matching off keeps the current Windows color as a choice
+                          // and opens the colors to pick another.
+                          onAccentChange(
+                            event.target.checked ? 'windows' : (systemAccent[3] as Accent),
+                          );
+                          setColorsOpen(!event.target.checked);
+                        }}
+                      />
+                    </span>
+                  </SettingRow>
+                )}
+                {/* The color grid stays collapsed until asked for, and is hidden while
+                    matching Windows. Without a system palette it is the only choice. */}
+                {(accent !== 'windows' || !systemAccent) && (
+                  <div className="setting-row accent-row">
+                    <div className="accent-row-header">
+                      <div className="setting-row-text">
+                        <span className="setting-row-label">Accent color</span>
+                        <p>Used for buttons, highlights and selections in both windows.</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="accent-disclosure"
+                        aria-expanded={colorsOpen}
+                        aria-controls="accent-colors"
+                        onClick={() => setColorsOpen(!colorsOpen)}
+                      >
+                        <span
+                          className="accent-system-swatch"
+                          style={{ background: accent.startsWith('#') ? accent : veilBlue }}
+                          aria-hidden="true"
+                        />
+                        {colorsOpen ? 'Hide colors' : 'Choose color'}
+                        <ChevronDown size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                    {colorsOpen && (
+                      <div id="accent-colors">
+                        <AccentPicker value={accent} onChange={onAccentChange} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </SettingsGroup>
             {onRestoreTabsChange && (

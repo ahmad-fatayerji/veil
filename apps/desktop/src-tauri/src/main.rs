@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod accent;
 mod app_icon;
 #[cfg(windows)]
 mod browser_shortcuts;
@@ -78,6 +79,7 @@ fn main() {
             lifecycle::app_quit,
             lifecycle::app_complete_quit,
             app_icon::app_set_icon_theme,
+            accent::system_accent,
             startup::startup_status,
             startup::startup_configure,
             files::file_open,

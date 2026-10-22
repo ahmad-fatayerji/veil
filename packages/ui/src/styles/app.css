@@ -636,35 +636,81 @@
     border-radius: var(--radius-full);
     background: var(--accent);
   }
-  .accent-picker {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
+  /* Accent color: label above a grid laid out like Windows Personalization > Colors. */
+  .setting-row.accent-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
   }
-  /* Each swatch carries data-accent, so --accent here is that swatch's own color. */
+  .accent-picker {
+    display: grid;
+    grid-template-columns: repeat(9, 28px);
+    gap: 6px;
+  }
+  .accent-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-5);
+  }
+  .accent-disclosure {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-2);
+    height: var(--control-sm);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    font-size: var(--text-sm);
+  }
+  .accent-disclosure:hover {
+    background: var(--hover);
+  }
+  .accent-disclosure svg {
+    color: var(--fg-muted);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .accent-disclosure[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+  .accent-disclosure .accent-system-swatch {
+    width: 16px;
+    height: 16px;
+  }
   .accent-swatch {
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     border: 0;
-    border-radius: var(--radius-full);
-    background: var(--accent);
+    border-radius: var(--radius-sm);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent);
-    transition: box-shadow var(--dur-fast) var(--ease-out);
   }
-  .accent-swatch:hover {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent),
-      0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  .accent-swatch:hover:not(:disabled) {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--fg) 45%, transparent);
   }
   .accent-swatch[aria-checked='true'] {
     box-shadow:
-      0 0 0 2px var(--surface-raised),
-      0 0 0 4px var(--accent);
+      inset 0 0 0 2px var(--surface-raised),
+      0 0 0 2px var(--fg);
   }
   .accent-swatch:focus-visible {
-    outline: 2px solid var(--fg);
-    outline-offset: 4px;
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 3px;
+  }
+  .accent-system {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .accent-system-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-sm);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent);
   }
   .settings-content {
     min-width: 0;
