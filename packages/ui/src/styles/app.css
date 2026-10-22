@@ -672,6 +672,15 @@
   .setting-row + .setting-row {
     border-top: 1px solid var(--border);
   }
+  .keybind-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .keybind-actions > .btn:first-child {
+    min-width: 150px;
+  }
   .setting-row-text {
     display: grid;
     gap: 2px;
