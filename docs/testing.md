@@ -1,5 +1,29 @@
 # Verification record
 
+## Unresolved Discord black rectangle - 18 October 2026
+
+The user reports that a friend's overlay appears normally on the local desktop
+but immediately becomes a black rectangle in Discord entire-screen sharing on
+the latest beta and Windows 11. Hiding for two seconds and showing again does
+not clear it; switching capture exclusion off and back on also leaves the shared
+output black. Exact app/OS/Discord builds and graphics drivers have not yet been
+confirmed. The earlier 12 October acceptance below applies only to that reported
+machine and does not establish a fix for this case (issue #22).
+
+Source review found that capture acceptance starts each recorder after showing
+the overlay. The new regression keeps GDI/DXGI capture running through the first
+overlay show and recovery operations. This still starts Veil before the recorders
+and cannot prove Discord compatibility. The updated standalone diagnostic script
+adds Windows, graphics-driver, running WebView2/Discord versions and executable
+hashes, plus native alpha flags/errors. It omits executable paths and does not
+record pixels, document contents, command lines or browser profiles. Running
+WebView2 versions may include runtimes used by other apps, not only Veil.
+
+No production rendering change has been made on the basis of this report. Local
+test suites, builds and native capture acceptance were not run. The regression
+and affected-machine diagnostic trace remain to be executed; the black rectangle
+is unresolved. No release was published.
+
 ## Overlay capture layer hotfix - 12 October 2026
 
 The user tested PR #43 with Discord full-desktop sharing started before Veil.

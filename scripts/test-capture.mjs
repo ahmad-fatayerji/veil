@@ -20,6 +20,7 @@ await new Promise((done, reject) => {
 let app;
 let browser;
 let underlay;
+const persistentCaptures = new Set();
 const errors = [];
 const startupOnly = process.argv.includes('--startup-only');
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -129,6 +130,180 @@ function ffmpeg(args) {
     maxBuffer: 16 * 1024 * 1024,
   });
 }
+function desktopSource(mode, bounds) {
+  return mode === 'gdi'
+    ? [
+        '-f',
+        'gdigrab',
+        '-draw_mouse',
+        '1',
+        '-framerate',
+        '5',
+        '-offset_x',
+        String(bounds.x),
+        '-offset_y',
+        String(bounds.y),
+        '-video_size',
+        `${bounds.width}x${bounds.height}`,
+        '-i',
+        'desktop',
+      ]
+    : [
+        '-f',
+        'lavfi',
+        '-i',
+        `ddagrab=framerate=5:draw_mouse=1:video_size=${bounds.width}x${bounds.height}:offset_x=${bounds.x}:offset_y=${bounds.y}`,
+        '-vf',
+        'hwdownload,format=bgra',
+      ];
+}
+
+// Keep each capture source alive before the first overlay show and across repairs.
+// Fresh one-frame recorders can miss a capture source that became stale earlier (#22).
+function startPersistentCapture(mode, bounds) {
+  const capture = spawn(
+    'ffmpeg',
+    [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-y',
+      ...desktopSource(mode, bounds),
+      '-pix_fmt',
+      'rgb24',
+      '-f',
+      'rawvideo',
+      'pipe:1',
+    ],
+    { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  const frameBytes = bounds.width * bounds.height * 3;
+  let pending = Buffer.alloc(0);
+  let latest;
+  let sequence = 0;
+  let failure;
+  let stderr = '';
+  let closed = false;
+  let stopped = false;
+  capture.on('error', (error) => {
+    failure = error;
+  });
+  capture.on('close', (code, signal) => {
+    closed = true;
+    if (!stopped)
+      failure = new Error(`${mode} persistent capture exited (${code ?? signal}): ${stderr}`);
+  });
+  capture.stderr.on('data', (data) => {
+    stderr = (stderr + data.toString()).slice(-8192);
+  });
+  capture.stdout.on('data', (data) => {
+    pending = Buffer.concat([pending, data]);
+    while (pending.length >= frameBytes) {
+      latest = { sequence: ++sequence, pixels: pending.subarray(0, frameBytes) };
+      pending = pending.subarray(frameBytes);
+    }
+  });
+  const source = {
+    mode,
+    bounds,
+    processId: capture.pid,
+    async frames() {
+      let after = sequence;
+      const frames = [];
+      for (let index = 0; index < 3; index++) {
+        await waitFor(() => {
+          if (failure) throw failure;
+          return sequence > after;
+        }, `${mode} persistent capture frame`);
+        frames.push(latest);
+        after = latest.sequence;
+      }
+      return frames;
+    },
+    async stop() {
+      stopped = true;
+      if (!closed) capture.kill();
+      await waitFor(() => closed, `${mode} persistent capture stopped`, 5000);
+      persistentCaptures.delete(source);
+    },
+  };
+  persistentCaptures.add(source);
+  return source;
+}
+
+async function savePersistentFrame(pixels, bounds, imagePath) {
+  await new Promise((done, reject) => {
+    const encoder = spawn(
+      'ffmpeg',
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-y',
+        '-f',
+        'rawvideo',
+        '-pixel_format',
+        'rgb24',
+        '-video_size',
+        `${bounds.width}x${bounds.height}`,
+        '-i',
+        'pipe:0',
+        '-frames:v',
+        '1',
+        imagePath,
+      ],
+      { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'], timeout: 30000 },
+    );
+    let stderr = '';
+    encoder.stderr.on('data', (data) => {
+      stderr = (stderr + data.toString()).slice(-8192);
+    });
+    encoder.on('error', reject);
+    encoder.stdin.on('error', reject);
+    encoder.on('close', (code) =>
+      code === 0 ? done() : reject(new Error(`Frame encoder exited (${code}): ${stderr}`)),
+    );
+    encoder.stdin.end(pixels);
+  });
+}
+
+async function persistentCapturePhase(sources, phase, expected) {
+  const phaseWindow = native('Probe');
+  // Drain frames queued during native commands, without reopening either source.
+  await delay(300);
+  await Promise.all(sources.map((source) => source.frames()));
+  const captured = await Promise.all(
+    sources.map(async (source) => ({ source, frames: await source.frames() })),
+  );
+  return Promise.all(
+    captured.flatMap(({ source, frames }) =>
+      frames.map(async ({ sequence, pixels }, index) => {
+        const imagePath = resolve(directory, `${source.mode}-persistent-${phase}-${index + 1}.png`);
+        await savePersistentFrame(pixels, source.bounds, imagePath);
+        let yellow = 0;
+        let blue = 0;
+        for (let offset = 0; offset < pixels.length; offset += 3) {
+          const [r, g, b] = pixels.subarray(offset, offset + 3);
+          if (r > 220 && g > 200 && b < 140) yellow++;
+          if (Math.abs(r - 25) < 30 && Math.abs(g - 65) < 30 && Math.abs(b - 95) < 30) blue++;
+        }
+        return {
+          mode: source.mode,
+          phase,
+          expected,
+          sequence,
+          yellow,
+          blue,
+          imagePath,
+          recorderProcessId: source.processId,
+          bounds: source.bounds,
+          nativeWindow: phaseWindow,
+        };
+      }),
+    ),
+  );
+}
+
 async function capture(mode, phase, held = false) {
   // Keep the known background above unrelated windows without covering the overlay.
   if (!held) {
@@ -143,32 +318,7 @@ async function capture(mode, phase, held = false) {
   await delay(200);
   const bounds = native('Probe');
   const imagePath = resolve(directory, `${mode}-${phase}.png`);
-  let source =
-    mode === 'gdi'
-      ? [
-          '-f',
-          'gdigrab',
-          '-draw_mouse',
-          '1',
-          '-framerate',
-          '5',
-          '-offset_x',
-          String(bounds.x),
-          '-offset_y',
-          String(bounds.y),
-          '-video_size',
-          `${bounds.width}x${bounds.height}`,
-          '-i',
-          'desktop',
-        ]
-      : [
-          '-f',
-          'lavfi',
-          '-i',
-          `ddagrab=framerate=5:draw_mouse=1:video_size=${bounds.width}x${bounds.height}:offset_x=${bounds.x}:offset_y=${bounds.y}`,
-          '-vf',
-          'hwdownload,format=bgra',
-        ];
+  let source = desktopSource(mode, bounds);
   if (mode.startsWith('obs-')) {
     const recording = await recordObs(
       resolve(process.env.VEIL_TEST_OBS_PORTABLE),
@@ -619,8 +769,6 @@ try {
   assert.equal((await snapshot(main)).capabilities.captureExclusion, 'supported');
   const checkbox = main.getByLabel('Exclude overlay from compatible captures', { exact: true });
   await main.getByRole('button', { name: 'Capture compatibility test', exact: true }).click();
-  await main.getByRole('button', { name: 'Show test card', exact: true }).click();
-  await overlay.getByLabel('Capture test card').waitFor();
   const opacitySlider = main.getByRole('slider', { name: /Window opacity/ });
   assert.deepEqual(
     await opacitySlider.evaluate((node) => {
@@ -681,16 +829,100 @@ try {
       );
     }
   }
-  // Check the default-on path before any off/on transition can repair it (#22).
-  await captureExcluded('first-show-default-on');
+  assert.equal(
+    native('Probe').visible,
+    false,
+    'Overlay stays hidden before persistent sources start',
+  );
+  const persistentSources = ['gdi', 'dxgi'].map((mode) =>
+    startPersistentCapture(mode, native('Probe')),
+  );
+  const persistentResults = [];
+  async function recordPersistentPhase(phase, expected = 'excluded') {
+    persistentResults.push(...(await persistentCapturePhase(persistentSources, phase, expected)));
+    await writeFile(
+      resolve(directory, 'persistent-capture-results.json'),
+      JSON.stringify(
+        {
+          captureStartedBeforeFirstOverlayShow: true,
+          captureStartedBeforeVeilLaunch: false,
+          discordVerified: false,
+          discardedFramesPerPhase: 3,
+          sampledFramesPerPhase: 3,
+          results: persistentResults,
+        },
+        null,
+        2,
+      ),
+    );
+  }
+  try {
+    await recordPersistentPhase('hidden-underlay');
+    await main.getByRole('button', { name: 'Show test card', exact: true }).click();
+    await overlay.getByLabel('Capture test card').waitFor();
+    assert.equal(native('Probe').visible, true);
+    await recordPersistentPhase('first-show-default-on');
+    await main.getByRole('button', { name: 'Reapply setting', exact: true }).click();
+    await recordPersistentPhase('explicit-reapply');
+    await command(main, 'overlay_visibility', { visible: false });
+    await delay(2000);
+    await command(main, 'overlay_visibility', { visible: true });
+    await recordPersistentPhase('hide-two-seconds-show');
+    await checkbox.click();
+    await waitFor(
+      async () => (await snapshot(main)).capture.status === 'disabled',
+      'persistent exclusion off',
+    );
+    await recordPersistentPhase('exclusion-off-baseline', 'visible');
+    await checkbox.click();
+    await waitFor(
+      async () => (await snapshot(main)).capture.status === 'applied',
+      'persistent exclusion on',
+    );
+    await recordPersistentPhase('exclusion-reenabled');
+    // Assess after every phase so a failing first show still preserves repair evidence.
+    for (const result of persistentResults) {
+      const label = `${result.mode}: persistent ${result.phase} frame ${result.sequence}`;
+      assert.equal(
+        result.nativeWindow.visible,
+        result.phase !== 'hidden-underlay',
+        `${label}: visibility`,
+      );
+      assert.equal(result.nativeWindow.affinityRead, true, `${label}: affinity readback`);
+      assert.equal(
+        result.nativeWindow.affinity,
+        result.expected === 'visible' ? 0 : 0x11,
+        `${label}: affinity`,
+      );
+      for (const property of ['x', 'y', 'width', 'height'])
+        assert.equal(
+          result.nativeWindow[property],
+          result.bounds[property],
+          `${label}: fixed ${property}`,
+        );
+      if (result.expected === 'visible') {
+        assert.ok(result.yellow > 10000, `${label}: baseline card visible`);
+      } else {
+        assert.ok(result.yellow < 100, `${label}: card excluded`);
+        assert.ok(
+          result.blue / (result.bounds.width * result.bounds.height) > 0.97,
+          `${label}: underlying app visible without a black box`,
+        );
+      }
+    }
+  } finally {
+    await Promise.all(persistentSources.map((source) => source.stop()));
+  }
+  // Independent one-frame captures retain the existing tool/mode acceptance matrix.
+  await captureExcluded('after-persistent-capture-regression');
   await command(main, 'overlay_visibility', { visible: false });
   await command(main, 'overlay_visibility', { visible: true });
-  await captureExcluded('reshow-default-on');
+  await captureExcluded('reshow-after-persistent-regression');
   await command(main, 'overlay_update', { patch: { opacity: 1, alwaysOnTop: true } });
   await main.locator('label[for="overlay-opacity"]').screenshot({
     path: resolve(directory, 'opacity-100.png'),
   });
-  await captureExcluded('appearance-default-on');
+  await captureExcluded('appearance-after-persistent-regression');
   if (!startupOnly) await cursorAcceptance(main, overlay, recoveryAvailable);
   for (const mode of modes) {
     if (await checkbox.isChecked()) await checkbox.click();
@@ -835,6 +1067,8 @@ try {
           '\n',
         )[0],
         results,
+        persistentCaptureResults: persistentResults,
+        persistentCaptureStartedBeforeVeilLaunch: false,
         globalShortcutAndClickThroughVerified: recoveryAvailable && !startupOnly,
         startupOnly,
       },
@@ -846,6 +1080,7 @@ try {
     `PASS: capture output, affinity, authorization, style changes and preference restart.\nEvidence: ${directory}`,
   );
 } finally {
+  await Promise.allSettled([...persistentCaptures].map((source) => source.stop()));
   if (underlay?.exitCode === null) underlay.kill();
   if (app?.exitCode === null) app.kill();
   if (browser) await browser.close();

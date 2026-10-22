@@ -21,7 +21,7 @@ public class VeilCaptureDiagnostic {
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
   [DllImport("user32.dll", EntryPoint="GetWindowLongPtrW")] static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
   [DllImport("user32.dll", SetLastError=true)] static extern bool GetWindowDisplayAffinity(IntPtr window, out uint affinity);
-  [DllImport("user32.dll")] static extern bool GetLayeredWindowAttributes(IntPtr window, out uint color, out byte alpha, out uint flags);
+  [DllImport("user32.dll", SetLastError=true)] static extern bool GetLayeredWindowAttributes(IntPtr window, out uint color, out byte alpha, out uint flags);
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
   [DllImport("dwmapi.dll")] public static extern int DwmIsCompositionEnabled(out bool enabled);
   public class State {
@@ -40,6 +40,8 @@ public class VeilCaptureDiagnostic {
     public int affinityError;
     public bool alphaRead;
     public byte alpha;
+    public uint alphaFlags;
+    public int alphaError;
   }
   public static State[] Read(uint pid) {
     var states = new List<State>();
@@ -56,13 +58,14 @@ public class VeilCaptureDiagnostic {
       int error = affinityRead ? 0 : Marshal.GetLastWin32Error();
       uint color, flags; byte alpha;
       bool alphaRead = GetLayeredWindowAttributes(window, out color, out alpha, out flags);
+      int alphaError = alphaRead ? 0 : Marshal.GetLastWin32Error();
       states.Add(new State {
         hwnd=window.ToInt64(), processId=process, threadId=thread, windowClass=klass.ToString(),
         visible=IsWindowVisible(window), extendedStyle="0x"+style.ToString("X"),
         layeredStyle=(style & 0x80000)!=0, noRedirectionBitmap=(style & 0x200000)!=0,
         clickThrough=(style & 0x20)!=0, topmost=(style & 8)!=0,
         affinityRead=affinityRead, affinity=affinity, affinityError=error,
-        alphaRead=alphaRead, alpha=alpha
+        alphaRead=alphaRead, alpha=alpha, alphaFlags=flags, alphaError=alphaError
       });
       return true;
     }, IntPtr.Zero);
@@ -73,7 +76,13 @@ public class VeilCaptureDiagnostic {
 
 if (!$OutputPath) {
   $taskRoot = Split-Path $PSScriptRoot -Parent
-  $traceDirectory = Join-Path $taskRoot 'target/capture-diagnostics'
+  $traceDirectory = if ((Split-Path $PSScriptRoot -Leaf) -eq 'scripts' -and
+    (Test-Path -LiteralPath (Join-Path $taskRoot 'PROJECT_SPEC.md'))) {
+    Join-Path $taskRoot 'target/capture-diagnostics'
+  } else {
+    # A standalone copy can be run beside the installed app, without source/builds.
+    Join-Path $PSScriptRoot 'capture-diagnostics'
+  }
   New-Item -ItemType Directory -Force -Path $traceDirectory | Out-Null
   $OutputPath = Join-Path $traceDirectory ((Get-Date -Format 'yyyyMMdd-HHmmss') + '.jsonl')
 }
@@ -81,16 +90,49 @@ $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
 if (Test-Path -LiteralPath $OutputPath) { throw 'Refusing to overwrite an existing trace.' }
 $writer = [System.IO.StreamWriter]::new($OutputPath, $false, [System.Text.UTF8Encoding]::new($false))
 try {
-  $os = Get-CimInstance Win32_OperatingSystem
+  # Collect versions only. Do not include process paths, command lines, user names,
+  # browser profiles, Discord logs, screenshots or document contents.
+  $metadataWarnings = @()
+  $os = $null
+  $windowsVersion = [Environment]::OSVersion.Version.ToString()
+  $windowsBuild = [string][Environment]::OSVersion.Version.Build
+  $windowsVersionSource = 'Environment.OSVersion'
+  try {
+    $os = Get-CimInstance Win32_OperatingSystem
+    $windowsVersion = $os.Version
+    $windowsBuild = $os.BuildNumber
+    $windowsVersionSource = 'Win32_OperatingSystem'
+  } catch {
+    $metadataWarnings += 'Windows CIM metadata unavailable; fallback OS version may depend on the PowerShell host manifest.'
+  }
+  $graphics = @()
+  try {
+    $graphics = @(Get-CimInstance Win32_VideoController | ForEach-Object {
+      @{ name=$_.Name; driverVersion=$_.DriverVersion; driverDate=[string]$_.DriverDate }
+    })
+  } catch { $metadataWarnings += 'Graphics driver metadata unavailable.' }
+  $runningWebView2Versions = @(Get-Process -Name 'msedgewebview2' -ErrorAction SilentlyContinue |
+    ForEach-Object { try { $_.ProductVersion } catch { } } | Where-Object { $_ } | Sort-Object -Unique)
+  $discordVersions = @(Get-Process -Name 'Discord', 'DiscordPTB', 'DiscordCanary' -ErrorAction SilentlyContinue |
+    ForEach-Object {
+      $version = $null
+      try { $version = $_.ProductVersion } catch { }
+      @{ name=$_.ProcessName; productVersion=$version }
+    } |
+    Sort-Object -Property name, productVersion -Unique)
   [bool]$composition = $false
   $compositionResult = [VeilCaptureDiagnostic]::DwmIsCompositionEnabled([ref]$composition)
   $writer.WriteLine((@{
-    type='environment'; utc=[DateTime]::UtcNow.ToString('o'); windows=$os.Version;
+    type='environment'; schemaVersion=2; utc=[DateTime]::UtcNow.ToString('o');
+    windows=$windowsVersion; windowsName=$os.Caption; windowsBuild=$windowsBuild;
+    windowsVersionSource=$windowsVersionSource;
+    graphics=$graphics; runningWebView2Versions=$runningWebView2Versions;
+    discordVersions=$discordVersions; metadataWarnings=$metadataWarnings;
     composition=$composition; compositionResult=$compositionResult;
     requestedProcessId=$AppProcessId; intervalMs=$IntervalMs
-  } | ConvertTo-Json -Compress))
+  } | ConvertTo-Json -Depth 5 -Compress))
   Write-Output "Tracing for $Seconds seconds: $OutputPath"
-  Write-Output 'Reproduce the black rectangle, try Reapply, then manually hide/wait/show. Note their times and Discord output.'
+  Write-Output 'Keep the Discord share running. Show the overlay, try Reapply and hide/wait/show, then toggle exclusion off/on. Note the remote result and time for each action.'
   $watch = [System.Diagnostics.Stopwatch]::StartNew()
   $lastState = ''
   $seenProcesses = @{}
@@ -104,9 +146,21 @@ try {
     foreach ($process in $processes) {
       if (!$seenProcesses.ContainsKey($process.Id)) {
         $seenProcesses[$process.Id] = $true
+        $executableHash = $null
+        $fileVersion = $null
+        $productVersion = $null
+        try {
+          $fileVersion = $process.FileVersion
+          $productVersion = $process.ProductVersion
+          if ($process.Path) {
+            $executableHash = (Get-FileHash -LiteralPath $process.Path -Algorithm SHA256).Hash
+          }
+        } catch { } # A protected or exiting process must not stop window tracing.
         $writer.WriteLine((@{
-          type='process'; elapsedMs=$watch.ElapsedMilliseconds; processId=$process.Id;
-          executable=$process.Path; fileVersion=$process.FileVersion
+          type='process'; utc=[DateTime]::UtcNow.ToString('o');
+          elapsedMs=$watch.ElapsedMilliseconds; processId=$process.Id;
+          executableName=$process.ProcessName; fileVersion=$fileVersion;
+          productVersion=$productVersion; executableSha256=$executableHash
         } | ConvertTo-Json -Compress))
       }
       $states += [VeilCaptureDiagnostic]::Read($process.Id)

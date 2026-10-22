@@ -18,6 +18,31 @@ The adapter uses `DwmFlush` presentation waits, but these do not acknowledge Dis
 
 For an affected-machine investigation, run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/diagnose-capture.ps1 -Seconds 60` while reproducing the problem. The read-only script records overlay HWNDs, visibility, layered/redirected styles, alpha, affinity and process/build metadata under `target/capture-diagnostics/`. It does not capture pixels, read documents or change windows/preferences. Note when Discord shows black, when **Reapply setting** is used, and when manual hide/wait/show is used. Compare before/after states and the actual remote output; equal native states do not rule out a recorder-specific surface or timing problem. Sampling can miss very short transitions. Add `-AppProcessId <pid>` if multiple Veil instances are running.
 
+The latest beta has a further unresolved report from 18 October 2026: on a
+friend's Windows 11 machine, Discord entire-screen sharing shows black as soon
+as the overlay appears, while local rendering remains normal. Neither a
+two-second hide/show nor exclusion off/on clears it. The earlier acceptance does
+not cover this machine. Do not assume the same surface-recovery workaround
+addresses every black rectangle.
+
+The diagnostic script also works as a standalone copy on the affected machine;
+no checkout or app rebuild is required. With the script in the current folder,
+keep the Discord share running and run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\diagnose-capture.ps1 -Seconds 90
+```
+
+Show the overlay, use Reapply, hide/wait/show, then switch exclusion off/on while
+noting the time and remote result of each action. A standalone copy writes its
+trace to `capture-diagnostics` beside the script. The environment record includes
+exact Windows/graphics-driver versions, versions of running Discord and WebView2
+processes, and a hash of the Veil executable. WebView2 versions may include other
+apps' runtimes; they are not proof of which runtime Veil uses. No executable paths,
+command lines, screenshots, browser profiles or document contents are recorded.
+Missing optional metadata is not a successful capture result. If no Veil process
+is found, the trace contains no overlay states and is inconclusive.
+
 The displayed status is separate from the saved preference:
 
 | Status      | Meaning                                                                                                                         |
@@ -76,7 +101,7 @@ pnpm test:overlay
 
 The capture script uses real WebView2 controls, a separate colored WinForms underlay and actual capture output. It confirms a visible baseline card and its removal with underlying pixels retained, HWND affinity, control-panel scope, forbidden overlay administration, style/recovery/show changes, persisted opt-in/out, ephemeral test card and absence of JavaScript errors. Preferences/WebView2 profiles and evidence are isolated under `target/capture-acceptance/`. No networking session or operator server is needed. It does not run in hosted CI because it requires an interactive desktop/GPU and external capture tooling.
 
-Before any off/on toggle, the script also checks actual output with the default-on preference at first show, hide/show and appearance changes. It captures again after restarting with saved exclusion enabled. The script also simulates a native-only hide and checks that Show restores visible exclusion. The individual opacity, always-on-top and click-through updates also check captured pixels before any hide/show or explicit reapply can repair the surface. These checks require the underlying app across at least 97% of the overlay area, so a black rectangle cannot pass merely because the test card is absent. Discord remote-view verification on the originally affected machine remains separate.
+The script starts persistent GDI and DXGI sources after Veil launches but before the overlay first appears, then keeps those exact sources running through first show, Reapply, a two-second hide/show, and exclusion off/on. It saves settled frames and `persistent-capture-results.json` before asserting the results so failed first-show output can be compared with later recovery attempts. It does not assert every transient frame during a transition. Separate fresh-source checks cover appearance changes and restart with saved exclusion enabled. The script also simulates a native-only hide and checks that Show restores visible exclusion. Individual opacity, always-on-top and click-through updates check pixels before another hide/show or Reapply can mask a problem. Excluded checkpoints require the underlying app across at least 97% of the overlay area, so a black rectangle cannot pass merely because the test card is absent. The persistent regression has not yet been run. Capture started before Veil launches, Discord remote output, and other tools remain separate acceptance work.
 
 `pnpm test:capture --startup-only` runs the capture, appearance, authorization, document editing and preference-restart checks without the physical pointer/gesture/cursor checks or global recovery shortcut. Its results explicitly mark global shortcut/click-through verification false. Both modes still require a quiet desktop; unrelated windows obscuring the known underlay make pixel comparisons inconclusive.
 
