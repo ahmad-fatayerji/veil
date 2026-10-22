@@ -150,6 +150,9 @@ try {
   await shareSetup.getByRole('button', { name: 'Create invite link', exact: true }).click();
   let dialog = host.getByRole('dialog', { name: 'Settings', exact: true });
   await expect(dialog.getByRole('heading', { name: 'Hosting server' })).toBeVisible();
+  // Our public servers are the default and need no address; a test server is "another server".
+  await expect(dialog.getByLabel('Server address')).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Use another server', exact: true }).click();
   await dialog.getByLabel('Server address').fill(server);
   const testConnection = dialog.getByRole('button', { name: 'Test connection', exact: true });
   const testResult = dialog.locator('form').getByRole('status');

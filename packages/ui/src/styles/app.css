@@ -808,6 +808,9 @@
     display: block;
     padding: var(--space-4);
   }
+  .setting-form-plain .setting-row {
+    padding: 0;
+  }
   .setting-form .input {
     width: 100%;
   }

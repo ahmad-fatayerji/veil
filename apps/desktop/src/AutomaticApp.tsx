@@ -54,6 +54,7 @@ import { ShareDialog } from './dialogs/ShareDialog';
 import type { useDiscordPresence } from './discord';
 import { defaultKeybinds, matchesShortcut } from './keybinds';
 import { capacityProblem, sameServer, type CapacityProblem } from './capacity';
+import type { HostingMode } from './dialogs/SettingsDialog';
 
 export function AutomaticApp({
   tab,
@@ -91,6 +92,9 @@ export function AutomaticApp({
   const [server, setServer] = useState('');
   const [savedServer, setSavedServer] = useState('');
   const [official, setOfficial] = useState('');
+  // Chosen explicitly: an operator credential on the public server's own address is private hosting.
+  const [hostingMode, setHostingMode] = useState<HostingMode>('public');
+  const [savedPublic, setSavedPublic] = useState(false);
   const [capacity, setCapacity] = useState<CapacityProblem | null>(null);
   const [credential, setCredential] = useState('');
   const [serverTest, setServerTest] = useState('');
@@ -176,9 +180,14 @@ export function AutomaticApp({
   }, [tab.mode]);
   useEffect(() => {
     if (!active) return;
-    void invoke<{ server: string; official: string; development: boolean }>('network_preferences')
+    void invoke<{ server: string; official: string; credential: boolean; development: boolean }>(
+      'network_preferences',
+    )
       .then((p) => {
-        // Until another server is saved, sharing setup suggests Veil's public server.
+        // Until another server is saved, sharing setup suggests our own public servers.
+        const publicMode = !p.server || (sameServer(p.server, p.official) && !p.credential);
+        setHostingMode(publicMode ? 'public' : 'custom');
+        setSavedPublic(!!p.server && publicMode);
         setServer(p.server || p.official);
         setSavedServer(p.server);
         setOfficial(p.official);
@@ -347,6 +356,7 @@ export function AutomaticApp({
     else void run(() => share());
   }
   function switchToAnotherServer() {
+    setHostingMode('custom');
     setServer('');
     setCredential('');
     setServerTest('');
@@ -364,9 +374,9 @@ export function AutomaticApp({
     try {
       await invoke('network_test', { server, credential: credential || null });
       setServerTest(
-        credential || !sameServer(server, official)
-          ? 'Connection successful. Host credential accepted.'
-          : 'Connection successful. This server offers public hosting.',
+        hostingMode === 'public'
+          ? 'Connection successful. Public hosting is available.'
+          : 'Connection successful. Host credential accepted.',
       );
     } catch (e) {
       setServerTest(errorMessage(e));
@@ -379,9 +389,11 @@ export function AutomaticApp({
     setServerTest('Checking settings before saving...');
     let saved: { server: string };
     try {
+      // Public mode never uses a credential saved earlier for the same address.
+      if (hostingMode === 'public') await invoke('network_forget', { server: official });
       saved = await invoke<{ server: string }>('network_configure', {
-        server,
-        credential: credential || null,
+        server: hostingMode === 'public' ? official : server,
+        credential: hostingMode === 'public' ? null : credential || null,
       });
     } catch (e) {
       setServerTest(errorMessage(e));
@@ -392,6 +404,7 @@ export function AutomaticApp({
     setServerTest('');
     setServer(saved.server);
     setSavedServer(saved.server);
+    setSavedPublic(hostingMode === 'public');
     setCredential('');
     if (resumeShare) {
       setResumeShare(false);
@@ -756,7 +769,7 @@ export function AutomaticApp({
         title={
           capacity === 'limit'
             ? "You've reached the free limit"
-            : sameServer(savedServer, official)
+            : savedPublic
               ? 'Our public servers are full right now'
               : 'This server is full right now'
         }
@@ -836,9 +849,10 @@ export function AutomaticApp({
             server,
             credential,
             savedServer,
-            official,
+            mode: hostingMode,
             onUseAnother: switchToAnotherServer,
             onUseOfficial: () => {
+              setHostingMode('public');
               setServer(official);
               setCredential('');
               setServerTest('');
