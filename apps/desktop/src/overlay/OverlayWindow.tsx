@@ -1,3 +1,4 @@
+import { defaultKeybinds } from '../keybinds';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   Move,
@@ -121,14 +122,25 @@ export function OverlayWindow() {
             <OverlayHint handle={hint} />
           ) : (
             <span className="overlay-recovery-hint">
-              <kbd className="kbd">Ctrl+Alt+V</kbd> restores controls
+              {state?.recoveryAvailable ? (
+                <>
+                  <kbd className="kbd">{state.settings.keybinds.recoverControls}</kbd> restores
+                  controls
+                </>
+              ) : (
+                'Restore controls from the tray menu'
+              )}
             </span>
           )}
           <button
             type="button"
             className="overlay-close"
             aria-label="Hide overlay"
-            title="Hide overlay (Ctrl+Alt+Shift+V to show again)"
+            title={
+              state?.hideShortcutAvailable
+                ? `Hide overlay (${state.settings.keybinds.toggleOverlay} to show again)`
+                : 'Hide overlay (use the tray to show again)'
+            }
             disabled={!interactive}
             onPointerEnter={() => setHovered(null)}
             onPointerDown={(event) => event.stopPropagation()}
@@ -161,7 +173,11 @@ export function OverlayWindow() {
           ) : (
             <div className="overlay-empty">
               <p>Join the document to start writing.</p>
-              <p>Open the control panel with Ctrl+Alt+V to create a document or join a session.</p>
+              <p>
+                Open the control panel with{' '}
+                {state?.settings.keybinds.recoverControls ?? defaultKeybinds.recoverControls} to
+                create a document or join a session.
+              </p>
             </div>
           )}
         </div>

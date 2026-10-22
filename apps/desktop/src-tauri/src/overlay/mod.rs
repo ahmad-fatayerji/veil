@@ -2,7 +2,7 @@ mod platform;
 mod settings;
 
 use serde::{Deserialize, Serialize};
-use settings::Settings;
+use settings::{Keybinds, Settings};
 use std::{
     path::PathBuf,
     sync::{mpsc, Arc, Mutex},
@@ -12,7 +12,7 @@ use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 const OVERLAY: &str = "overlay";
 
@@ -128,6 +128,7 @@ pub struct OverlayState {
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Patch {
+    keybinds: Option<Keybinds>,
     opacity: Option<f64>,
     text_opacity: Option<f64>,
     always_on_top: Option<bool>,
@@ -252,11 +253,8 @@ pub fn setup(
         save_requests: sender,
         path: path.clone(),
     });
-    let recover = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
-    let hide = Shortcut::new(
-        Some(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT),
-        Code::KeyV,
-    );
+    let recover: Shortcut = preferences.keybinds.recover_controls.parse()?;
+    let hide: Shortcut = preferences.keybinds.toggle_overlay.parse()?;
     app.handle().plugin(
         tauri_plugin_global_shortcut::Builder::new()
             .with_handler(move |app, shortcut, event| {
@@ -265,9 +263,14 @@ pub fn setup(
                 {
                     return;
                 }
-                let result = if shortcut == &recover {
+                let bindings = snapshot(app).settings.keybinds;
+                let result = if bindings.recover_controls.parse::<Shortcut>().ok().as_ref()
+                    == Some(shortcut)
+                {
                     recover_controls(app)
-                } else if shortcut == &hide {
+                } else if bindings.toggle_overlay.parse::<Shortcut>().ok().as_ref()
+                    == Some(shortcut)
+                {
                     toggle_visible(app)
                 } else {
                     Ok(())
@@ -282,7 +285,13 @@ pub fn setup(
     let hide_shortcut_available = app.global_shortcut().register(hide).is_ok();
     if !recovery_available {
         preferences.click_through = false;
-        warning = Some("Ctrl+Alt+V is already in use. Click-through is disabled; the control panel can still show or hide the overlay.".to_owned());
+    }
+    if let Some(message) = shortcut_warning(
+        &preferences.keybinds,
+        recovery_available,
+        hide_shortcut_available,
+    ) {
+        warning = Some(message);
     }
     let overlay =
         WebviewWindowBuilder::new(app, OVERLAY, WebviewUrl::App("index.html?overlay".into()))
@@ -455,6 +464,92 @@ pub fn overlay_snapshot(app: AppHandle, caller: WebviewWindow) -> Result<Snapsho
     Ok(snapshot(&app))
 }
 
+fn shortcut_warning(bindings: &Keybinds, recovery: bool, hide: bool) -> Option<String> {
+    let mut unavailable = Vec::new();
+    if !recovery {
+        unavailable.push(bindings.recover_controls.as_str());
+    }
+    if !hide {
+        unavailable.push(bindings.toggle_overlay.as_str());
+    }
+    if unavailable.is_empty() {
+        return None;
+    }
+    Some(format!("Global shortcut unavailable: {}. Change it in Settings > Keybinds or use the tray to restore controls.{}",
+        unavailable.join(", "), if recovery { "" } else { " Click-through is disabled." }))
+}
+
+fn rebind_shortcuts(
+    app: &AppHandle,
+    current: &Snapshot,
+    next: &Keybinds,
+) -> Result<(), OverlayError> {
+    let parse = |value: &str| {
+        value
+            .parse::<Shortcut>()
+            .map_err(|_| OverlayError::new("INVALID_KEYBIND", "Unsupported shortcut."))
+    };
+    let old: Vec<_> = [
+        (
+            &current.settings.keybinds.recover_controls,
+            current.recovery_available,
+        ),
+        (
+            &current.settings.keybinds.toggle_overlay,
+            current.hide_shortcut_available,
+        ),
+    ]
+    .into_iter()
+    .filter(|(_, available)| *available)
+    .map(|(value, _)| parse(value))
+    .collect::<Result<_, _>>()?;
+    let desired = [parse(&next.recover_controls)?, parse(&next.toggle_overlay)?];
+    let retry_all = next == &current.settings.keybinds;
+    let recovery_available = current.recovery_available
+        || retry_all
+        || next.recover_controls != current.settings.keybinds.recover_controls;
+    let hide_available = current.hide_shortcut_available
+        || retry_all
+        || next.toggle_overlay != current.settings.keybinds.toggle_overlay;
+    let mut acquired = Vec::new();
+    for (shortcut, enabled) in desired.iter().zip([recovery_available, hide_available]) {
+        if !enabled {
+            continue;
+        }
+        if old.contains(shortcut) {
+            continue;
+        }
+        if app.global_shortcut().register(*shortcut).is_err() {
+            for registered in acquired {
+                let _ = app.global_shortcut().unregister(registered);
+            }
+            return Err(OverlayError::new("KEYBIND_UNAVAILABLE", "That global shortcut is unavailable. Choose another combination; your previous keybinds are unchanged."));
+        }
+        acquired.push(*shortcut);
+    }
+    // Switch dispatch before retiring old registrations. Failed removals cannot trigger an old action.
+    modify(app, |model| {
+        model.settings.keybinds = next.clone();
+        model.recovery_available = recovery_available;
+        model.hide_shortcut_available = hide_available;
+        if current.warning
+            == shortcut_warning(
+                &current.settings.keybinds,
+                current.recovery_available,
+                current.hide_shortcut_available,
+            )
+        {
+            model.warning = shortcut_warning(next, recovery_available, hide_available);
+        }
+    });
+    for shortcut in old {
+        if !desired.contains(&shortcut) {
+            let _ = app.global_shortcut().unregister(shortcut);
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn overlay_update(
     app: AppHandle,
@@ -496,6 +591,10 @@ pub fn overlay_update(
     if let Some(value) = patch.close_behavior {
         next.close_behavior = value;
     }
+    let keybind_update = patch.keybinds.is_some();
+    if let Some(value) = patch.keybinds {
+        next.keybinds = value;
+    }
     next.validate()?;
     // Reapply the appearance after toolkit style changes replace the extended styles.
     let overlay = window(&app)?;
@@ -517,6 +616,9 @@ pub fn overlay_update(
             });
         }
         return Err(error);
+    }
+    if keybind_update {
+        rebind_shortcuts(&app, &current, &next.keybinds)?;
     }
     modify(&app, |model| model.settings = next);
     // Toolkit style changes can replace the protected layered surface even when

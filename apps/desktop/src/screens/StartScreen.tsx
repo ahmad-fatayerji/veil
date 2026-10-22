@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, FilePlus2, Link2 } from 'lucide-react';
+import { type Keybinds } from '../keybinds';
 import { parseShareLink, decodeServerInvitation } from '@veil/protocol';
 import { Button, Field, Input, Kbd, Textarea } from '@veil/ui';
 
@@ -24,6 +25,8 @@ function isEditable(element: Element | null) {
 }
 
 export function StartScreen({
+  keybinds,
+  shortcutsDisabled,
   name,
   onNameChange,
   invitation,
@@ -35,6 +38,8 @@ export function StartScreen({
   onCreate,
   onJoin,
 }: {
+  keybinds: Keybinds;
+  shortcutsDisabled: boolean;
   name: string;
   onNameChange: (value: string) => void;
   invitation: string;
@@ -70,20 +75,15 @@ export function StartScreen({
   }, [joinOpen]);
 
   useEffect(() => {
-    const keydown = (event: KeyboardEvent) => {
-      if (busy || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
-      const key = event.key.toLowerCase();
-      if (key === 'n') {
-        event.preventDefault();
-        onCreate();
-      } else if (key === 'j') {
-        event.preventDefault();
-        onJoinOpenChange(true);
-      }
-    };
     // Pasting an invitation anywhere on the start screen opens the join form with it.
     const paste = (event: ClipboardEvent) => {
-      if (busy || isEditable(document.activeElement)) return;
+      if (
+        busy ||
+        shortcutsDisabled ||
+        document.querySelector('dialog[open]') ||
+        isEditable(document.activeElement)
+      )
+        return;
       const text = event.clipboardData?.getData('text').trim() ?? '';
       if (!text.startsWith('veil://')) return;
       event.preventDefault();
@@ -92,13 +92,11 @@ export function StartScreen({
       if (joinOpen) (name.trim() ? joinButton : nameInput).current?.focus();
       else onJoinOpenChange(true);
     };
-    window.addEventListener('keydown', keydown);
     window.addEventListener('paste', paste);
     return () => {
-      window.removeEventListener('keydown', keydown);
       window.removeEventListener('paste', paste);
     };
-  }, [busy, joinOpen, name, onCreate, onInvitationChange, onJoinOpenChange]);
+  }, [busy, shortcutsDisabled, joinOpen, name, onInvitationChange, onJoinOpenChange]);
 
   const card = (
     props: {
@@ -138,7 +136,7 @@ export function StartScreen({
             {card({
               title: 'New document',
               description: 'Start writing now and share when ready',
-              shortcut: 'Ctrl+N',
+              shortcut: keybinds.newDocument,
               icon: <FilePlus2 size={20} />,
               onClick: onCreate,
             })}
@@ -146,7 +144,7 @@ export function StartScreen({
               ref: joinRow,
               title: 'Join with a link',
               description: 'Paste an invitation from the host',
-              shortcut: 'Ctrl+J',
+              shortcut: keybinds.joinDocument,
               icon: <Link2 size={20} />,
               onClick: () => onJoinOpenChange(true),
               'aria-expanded': false,

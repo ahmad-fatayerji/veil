@@ -82,7 +82,7 @@ document.
 Support opacity, font size, always on top, movement, resizing, hide/show, and
 click-through. Click-through requires a registered recovery shortcut. Ctrl+Alt+V
 restores interaction and the control panel; Ctrl+Alt+Shift+V toggles overlay visibility.
-Tray controls offer recovery as well. Closing the main window moves to the tray by
+Settings > Keybinds allows device-local rebinding of these global shortcuts and the new, join, copy-invite, and close-document actions, with duplicate detection and reset controls. Tray controls offer recovery as well. Closing the main window moves to the tray by
 default; the configurable quit behavior must remain explicit because documents
 are temporary.
 

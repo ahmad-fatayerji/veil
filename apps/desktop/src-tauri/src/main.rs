@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(windows)]
+mod browser_shortcuts;
 mod discord;
 mod hosting;
 mod lifecycle;
@@ -33,6 +35,7 @@ fn main() {
     }
     #[cfg(windows)]
     {
+        builder = builder.plugin(browser_shortcuts::init());
         builder = builder.plugin(
             tauri_plugin_autostart::Builder::new()
                 .app_name("Veil")

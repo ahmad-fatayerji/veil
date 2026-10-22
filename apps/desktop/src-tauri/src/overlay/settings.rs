@@ -3,9 +3,81 @@ use serde::{Deserialize, Serialize};
 use std::{io::Write, path::Path};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+pub struct Keybinds {
+    pub new_document: String,
+    pub join_document: String,
+    pub copy_invite: String,
+    pub close_document: String,
+    pub recover_controls: String,
+    pub toggle_overlay: String,
+}
+
+impl Default for Keybinds {
+    fn default() -> Self {
+        Self {
+            new_document: "Ctrl+N".into(),
+            join_document: "Ctrl+J".into(),
+            copy_invite: "Ctrl+Shift+C".into(),
+            close_document: "Ctrl+W".into(),
+            recover_controls: "Ctrl+Alt+V".into(),
+            toggle_overlay: "Ctrl+Alt+Shift+V".into(),
+        }
+    }
+}
+
+impl Keybinds {
+    pub fn validate(&self) -> Result<(), OverlayError> {
+        let bindings = [
+            &self.new_document,
+            &self.join_document,
+            &self.copy_invite,
+            &self.close_document,
+            &self.recover_controls,
+            &self.toggle_overlay,
+        ];
+        let mut used = std::collections::HashSet::new();
+        for binding in bindings {
+            let parts: Vec<_> = binding.split('+').collect();
+            let key = *parts.last().unwrap_or(&"");
+            let modifiers = &parts[..parts.len().saturating_sub(1)];
+            let canonical: Vec<_> = ["Ctrl", "Alt", "Shift"]
+                .into_iter()
+                .filter(|modifier| modifiers.contains(modifier))
+                .collect();
+            let valid_key = (key.len() == 1
+                && key
+                    .bytes()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()))
+                || (1..=12).any(|n| key == format!("F{n}"));
+            if !valid_key
+                || modifiers != canonical.as_slice()
+                || !(modifiers.contains(&"Ctrl") || modifiers.contains(&"Alt"))
+            {
+                return Err(OverlayError::new(
+                    "INVALID_KEYBIND",
+                    "Use Ctrl or Alt with a letter, number, or F1-F12 key.",
+                ));
+            }
+            let shortcut = binding
+                .parse::<tauri_plugin_global_shortcut::Shortcut>()
+                .map_err(|_| OverlayError::new("INVALID_KEYBIND", "Unsupported shortcut."))?;
+            if !used.insert(shortcut.id()) {
+                return Err(OverlayError::new(
+                    "KEYBIND_CONFLICT",
+                    "Each action must have a different shortcut.",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub version: u32,
+    pub keybinds: Keybinds,
     pub x: i32,
     pub y: i32,
     pub width: u32,
@@ -24,6 +96,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             version: 1,
+            keybinds: Keybinds::default(),
             x: 80,
             y: 80,
             width: 520,
@@ -42,6 +115,7 @@ impl Default for Settings {
 
 impl Settings {
     pub fn validate(&self) -> Result<(), OverlayError> {
+        self.keybinds.validate()?;
         if self.version != 1
             || !self.opacity.is_finite()
             || !(0.0..=1.0).contains(&self.opacity)
@@ -112,6 +186,45 @@ pub fn save(path: &Path, settings: &Settings) -> Result<(), OverlayError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn keybinds_migrate_and_persist_independently_of_documents() {
+        let old: Settings =
+            serde_json::from_value(serde_json::json!({"version": 1, "opacity": 0.65})).unwrap();
+        assert_eq!(old.keybinds, Keybinds::default());
+        let folder = tempfile::tempdir().unwrap();
+        let path = folder.path().join("overlay.json");
+        let mut next = old;
+        next.keybinds.recover_controls = "Ctrl+Alt+R".into();
+        next.keybinds.new_document = "Alt+Shift+F12".into();
+        save(&path, &next).unwrap();
+        assert_eq!(load(&path).unwrap(), next);
+    }
+
+    #[test]
+    fn keybinds_reject_duplicates_and_unsupported_combinations() {
+        let mut bindings = Keybinds::default();
+        bindings.validate().unwrap();
+        bindings.new_document = bindings.recover_controls.clone();
+        assert!(bindings.validate().is_err());
+        for value in [
+            "N",
+            "Shift+N",
+            "Ctrl+Ctrl+N",
+            "Alt+Ctrl+N",
+            "Ctrl+F13",
+            "Ctrl+Escape",
+            "Ctrl+",
+            "",
+        ] {
+            bindings.new_document = value.into();
+            assert!(bindings.validate().is_err(), "{value}");
+        }
+        for value in ["Ctrl+Alt+Shift+1", "Alt+F12", "Ctrl+0"] {
+            bindings.new_document = value.into();
+            bindings.validate().unwrap();
+        }
+    }
 
     #[test]
     fn capture_preference_defaults_on_and_preserves_saved_choices() {
