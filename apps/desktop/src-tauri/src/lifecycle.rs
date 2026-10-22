@@ -32,7 +32,7 @@ pub fn request_quit(app: &AppHandle) {
     let _ = app.emit_to("main", "app-quit-requested", ());
 }
 
-fn show_main(app: &AppHandle) -> tauri::Result<()> {
+pub(crate) fn show_main(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window("main") {
         window.show()?;
         window.unminimize()?;

@@ -87,8 +87,14 @@ document.
 Support opacity, font size, always on top, movement, resizing, hide/show, and
 click-through. Click-through requires a registered recovery shortcut. Ctrl+Alt+V
 restores interaction and the control panel; Ctrl+Alt+Shift+V toggles overlay visibility.
-Tray controls offer recovery as well. Closing the main window moves to the tray by
+Settings > Keybinds supports device-local rebinding of document, file, invitation, and global overlay actions, with duplicate detection and reset controls. Tray controls offer recovery as well. Closing the main window moves to the tray by
 default; the configurable quit behavior must remain explicit so unsaved changes can be resolved before quitting.
+
+**Settings → General → Start Veil with Windows** is off by default. Enabling it
+registers Veil for the current user's Windows sign-in and launches quietly in the
+system tray with both windows hidden. Opening Veil manually or through an
+invitation shows the control panel. The setting reads Windows startup registration
+and does not enable itself on launch or upgrade.
 
 Capture exclusion is enabled by default for supported Windows versions. Native
 status and actual capture results are different: verify saved recordings or remote

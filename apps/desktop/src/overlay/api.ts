@@ -1,3 +1,4 @@
+import type { Keybinds } from '../keybinds';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useState } from 'react';
@@ -11,6 +12,7 @@ export interface OverlayCapabilities {
 
 export interface OverlaySettings {
   version: number;
+  keybinds: Keybinds;
   x: number;
   y: number;
   width: number;
@@ -41,6 +43,7 @@ export interface OverlaySnapshot {
 export type OverlayPatch = Partial<
   Pick<
     OverlaySettings,
+    | 'keybinds'
     | 'opacity'
     | 'textOpacity'
     | 'alwaysOnTop'

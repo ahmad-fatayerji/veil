@@ -16,7 +16,8 @@ import { Banner, Button, Dialog, useAppearance, useParticipants } from '@veil/ui
 import { useDiscordPresence } from './discord';
 import { AutomaticApp } from './AutomaticApp';
 import { SessionBridge, flushOverlay } from './overlay/session';
-import { errorMessage, invoke } from './overlay/api';
+import { errorMessage, invoke, useOverlay } from './overlay/api';
+import { defaultKeybinds, matchesShortcut } from './keybinds';
 import './workspace.css';
 
 export interface DocumentFile {
@@ -525,6 +526,8 @@ export class Workspace {
 export function DocumentWorkspace() {
   const [workspace] = useState(() => new Workspace());
   useSyncExternalStore(workspace.subscribe, workspace.snapshot);
+  const overlay = useOverlay();
+  const keybinds = overlay.state?.settings.keybinds ?? defaultKeybinds;
   const activeId = workspace.activeId;
   const selectedDocument = workspace.active()?.document ?? null;
   const selectedTitle = useDocumentTitle(selectedDocument?.doc);
@@ -575,35 +578,41 @@ export function DocumentWorkspace() {
   }, [workspace]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-      const command = event.key.toLowerCase();
-      if (['o', 'n', 'j', 's', 'w', 'tab'].includes(command)) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-      if (!workspace.ready || workspace.working || workspace.prompt) return;
-      if (command === 'o') {
-        event.preventDefault();
-        void workspace.open();
-      } else if (command === 'n' && !event.shiftKey) {
-        event.preventDefault();
-        workspace.newTab();
-      } else if (command === 'j' && !event.shiftKey) {
-        event.preventDefault();
-        workspace.joinTab();
-      } else if (command === 's') {
-        event.preventDefault();
-        const tab = workspace.active();
-        if (tab?.document)
-          void workspace.run(async () => {
-            await workspace.save(tab, event.shiftKey);
-          });
-      } else if (command === 'w' && !event.shiftKey) {
-        event.preventDefault();
-        const tab = workspace.active();
-        if (tab) void workspace.close(tab);
-      } else if (command === 'tab') {
-        event.preventDefault();
+      if (
+        !workspace.ready ||
+        workspace.working ||
+        workspace.prompt ||
+        document.querySelector('dialog[open]') ||
+        event.repeat ||
+        event.isComposing
+      )
+        return;
+      const action = (Object.keys(keybinds) as (keyof typeof keybinds)[]).find((action) =>
+        matchesShortcut(event, keybinds[action]),
+      );
+      const commands = [
+        'newDocument',
+        'joinDocument',
+        'closeDocument',
+        'openDocument',
+        'saveDocument',
+        'saveDocumentAs',
+      ];
+      const cycle =
+        (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'tab';
+      if (!cycle && (!action || !commands.includes(action))) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const tab = workspace.active();
+      if (action === 'newDocument') workspace.newTab();
+      else if (action === 'joinDocument') workspace.joinTab();
+      else if (action === 'openDocument') void workspace.open();
+      else if (action === 'closeDocument' && tab) void workspace.close(tab);
+      else if ((action === 'saveDocument' || action === 'saveDocumentAs') && tab?.document)
+        void workspace.run(async () => {
+          await workspace.save(tab, action === 'saveDocumentAs');
+        });
+      else if (cycle) {
         const index = workspace.tabs.findIndex((tab) => tab.id === workspace.activeId);
         workspace.select(
           workspace.tabs[
@@ -614,7 +623,7 @@ export function DocumentWorkspace() {
     };
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
-  }, [workspace]);
+  }, [workspace, keybinds]);
   if (!workspace.ready) return <p role="status">Opening workspace…</p>;
   return (
     <div className="document-workspace" aria-busy={workspace.working}>
@@ -675,7 +684,7 @@ export function DocumentWorkspace() {
         <button
           className="workspace-tab-action"
           type="button"
-          title="New document (Ctrl+N)"
+          title={`New document (${keybinds.newDocument})`}
           aria-label="New document"
           disabled={workspace.working}
           onClick={workspace.newTab}
@@ -685,7 +694,7 @@ export function DocumentWorkspace() {
         <button
           className="workspace-tab-action"
           type="button"
-          title="Open (Ctrl+O)"
+          title={`Open (${keybinds.openDocument})`}
           aria-label="Open document"
           disabled={workspace.working}
           onClick={() => void workspace.open()}

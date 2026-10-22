@@ -18,7 +18,10 @@ Tabs show unsaved changes and connection status. **New** (`Ctrl+N`) and **Join**
 create tabs. Use `Ctrl+Tab` / `Ctrl+Shift+Tab` to navigate and `Ctrl+W` to close.
 Each tab has its own editor history and optional host or guest session.
 Background sessions stay connected. Share, People, Discord activity, and the
-overlay follow the selected tab. Strikethrough uses `Ctrl+Shift+X`.
+overlay follow the selected tab. Strikethrough uses `Ctrl+Shift+X`. File and document
+shortcuts can be changed in **Settings ? Keybinds**. Existing custom assignments
+are preserved; if a new file shortcut would conflict, Veil assigns that new action
+a free shortcut shown in Settings and the document menu.
 
 Each participant can save a local copy of the shared title and notes. File paths,
 save status, and recovery settings are private to their device. Remote and overlay
