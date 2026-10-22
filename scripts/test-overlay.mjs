@@ -206,7 +206,11 @@ try {
   await waitFor(async () => (await snapshot(main)).settings.visible, 'overlay shown');
   assert.equal(native('Probe').visible, true);
   assert.equal(native('Probe').topmost, true);
-  assert.equal(await overlay.getByRole('toolbar').count(), 0, 'Overlay has no editor toolbar.');
+  assert.equal(
+    await overlay.getByRole('toolbar').count(),
+    0,
+    'Overlay shows no formatting toolbar until text is selected.',
+  );
   const forbidden = await overlay.evaluate(() =>
     window.__TAURI_INTERNALS__
       .invoke('overlay_update', { patch: { opacity: 0.3 } })
@@ -233,7 +237,7 @@ try {
   );
   assert.equal(
     await overlay
-      .locator('.overlay-document > div[style]')
+      .locator('.overlay-document .document-editor')
       .evaluate((node) => getComputedStyle(node).opacity),
     '1',
     'Document stays fully opaque over a transparent window background.',
@@ -253,7 +257,7 @@ try {
     async () =>
       (await snapshot(main)).settings.textOpacity === 0 &&
       (await overlay
-        .locator('.overlay-document > div[style]')
+        .locator('.overlay-document .document-editor')
         .evaluate((node) => getComputedStyle(node).opacity)) === '0',
     'text opacity reaches zero without changing window opacity',
   );

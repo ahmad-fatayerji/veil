@@ -78,6 +78,11 @@
     grid-column: 1 / -1;
     border-top: 1px solid var(--border);
   }
+  .overlay-formatting-row {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+  }
   /* Sits on the divider between the two sliders; the solid fill masks the line behind it. */
   .overlay-link-toggle {
     --link-fill: color-mix(in srgb, var(--fg) 2%, var(--surface-raised));
@@ -237,14 +242,15 @@
     opacity: var(--overlay-window-opacity, 0.85);
     pointer-events: none;
   }
+  /* One slim header row: status, title or document switcher, people, view, hide. */
   .overlay-drag-handle {
     display: flex;
     flex-shrink: 0;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
-    height: 40px;
-    padding: 0 var(--space-2) 0 var(--space-4);
+    gap: var(--space-2);
+    height: 34px;
+    padding: 0 var(--space-1) 0 var(--space-3);
     border-bottom: 1px solid var(--border);
     font-size: var(--text-sm);
     cursor: move;
@@ -262,20 +268,59 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .overlay-chip {
+  .overlay-status-dot {
     flex-shrink: 0;
-    padding: 1px 6px;
-    border-radius: var(--radius-sm);
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: 11px;
-    font-weight: var(--weight-medium);
+    width: 7px;
+    height: 7px;
+    border-radius: var(--radius-full);
+    background: var(--fg-muted);
+  }
+  .overlay-status-dot[data-tone='success'] {
+    background: var(--success);
+  }
+  .overlay-status-dot[data-tone='warning'] {
+    background: var(--warning);
+  }
+  .overlay-status-dot[data-tone='danger'] {
+    background: var(--danger);
+  }
+  .overlay-header-control {
+    display: flex;
+    min-width: 0;
+  }
+  .overlay-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: 26px;
+    margin-left: -6px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
+  .overlay-switcher:hover,
+  .overlay-switcher[data-state='open'] {
+    background: var(--hover);
+  }
+  .overlay-switcher svg {
+    flex-shrink: 0;
+    color: var(--fg-muted);
+  }
+  .overlay-menu-spacer {
+    width: 16px;
+  }
+  .overlay-menu-unsaved {
+    color: var(--fg-muted);
   }
   .overlay-header-actions {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
-    gap: var(--space-2);
-    min-width: 0;
+    gap: 2px;
   }
   .overlay-recovery-hint {
     overflow: hidden;
@@ -288,6 +333,40 @@
     height: 18px;
     margin-right: 4px;
     background: transparent;
+  }
+  .overlay-people {
+    display: flex;
+    align-items: center;
+    margin: 0 var(--space-1) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .overlay-people li + li {
+    margin-left: -6px;
+  }
+  .overlay-person {
+    display: inline-grid;
+    border-radius: var(--radius-full);
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+  /* A typing collaborator pulses, so activity reads at a glance without a list. */
+  .overlay-people li[data-activity='typing'] .overlay-person {
+    animation: overlay-typing 1.4s ease-in-out infinite;
+  }
+  .overlay-people li[data-activity='away'] .avatar {
+    opacity: 0.55;
+  }
+  @keyframes overlay-typing {
+    50% {
+      box-shadow:
+        0 0 0 2px var(--surface),
+        0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+  }
+  .overlay-people-more {
+    padding-left: 8px;
+    color: var(--fg-muted);
+    font-size: var(--text-xs);
   }
   .overlay-gesture-hint {
     display: inline-flex;
@@ -303,7 +382,7 @@
     white-space: nowrap;
     pointer-events: none;
   }
-  .overlay-close {
+  .overlay-icon-button {
     display: grid;
     flex-shrink: 0;
     place-items: center;
@@ -315,20 +394,82 @@
     background: transparent;
     color: var(--fg-muted);
   }
-  .overlay-close:hover:not(:disabled) {
+  .overlay-icon-button:hover:not(:disabled) {
     background: var(--hover);
     color: var(--fg);
   }
+  .overlay-icon-button[aria-pressed='true'] {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
   .overlay-document {
+    display: flex;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
     overflow: auto;
+  }
+  .overlay-editor {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .overlay-editor .editor-compact {
+    flex: 1;
+  }
+  /* Text opacity fades only the document, never its formatting controls. */
+  .overlay-document :is(.document-editor, .markdown-source) {
+    opacity: var(--overlay-text-opacity, 1);
   }
   .overlay-document .document-editor {
     min-height: 100%;
     padding: var(--space-3) var(--space-5) var(--space-6);
     font-size: inherit;
     line-height: 1.55;
+  }
+  .overlay-document .markdown-scroll .editor-column {
+    padding: var(--space-3) var(--space-5) var(--space-6);
+  }
+  .overlay-document .markdown-source {
+    min-height: 0;
+    font-size: 0.85em;
+  }
+  /* The compact toolbar stays fixed under the header while the document scrolls. */
+  .overlay-document .editor-toolbar.is-compact {
+    position: sticky;
+    top: 0;
+    flex-shrink: 0;
+    min-height: 36px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .editor-toolbar.is-compact .toolbar-inner {
+    justify-content: flex-start;
+    padding-inline: var(--space-2);
+  }
+  .editor-toolbar.is-compact :is(.toolbar-button, .toolbar-style) {
+    height: 28px;
+  }
+  .editor-toolbar.is-compact .toolbar-style {
+    width: 104px;
+  }
+  .selection-toolbar > [role='toolbar'] {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-flyout);
+  }
+  .selection-toolbar .toolbar-button {
+    width: 28px;
+    height: 28px;
+  }
+  .selection-toolbar .toolbar-separator {
+    height: 18px;
   }
   .overlay-empty {
     display: grid;
@@ -342,43 +483,6 @@
   }
   .overlay-surface.is-click-through .overlay-drag-handle {
     cursor: default;
-  }
-  .overlay-participants {
-    display: flex;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-    gap: 4px var(--space-4);
-    max-height: 25%;
-    margin: 0;
-    padding: var(--space-2) var(--space-4);
-    border-top: 1px solid var(--border);
-    overflow: auto;
-    font-size: var(--text-xs);
-    list-style: none;
-  }
-  .overlay-participants li {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    max-width: 100%;
-  }
-  .overlay-person-dot {
-    flex-shrink: 0;
-    width: 8px;
-    height: 8px;
-    border-radius: var(--radius-full);
-  }
-  .overlay-person-name {
-    overflow: hidden;
-    font-weight: var(--weight-medium);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .overlay-participants .participant-activity {
-    flex-shrink: 0;
-    color: var(--fg-muted);
-    font-size: inherit;
   }
   .overlay-surface > .overlay-error {
     padding: var(--space-2) var(--space-4);
@@ -467,10 +571,12 @@
     max-width: calc(100vw - 8px);
   }
 
+  /* With capture exclusion, controls keep the arrow cursor instead of pointer or move. */
   .overlay-surface.is-capture-excluded .overlay-drag-handle,
   .overlay-surface.is-capture-excluded .overlay-resize,
-  .overlay-surface.is-capture-excluded .overlay-close,
-  .overlay-visibility-menu.is-capture-excluded button {
+  .overlay-surface.is-capture-excluded :is(button, hr, .menu-item),
+  .overlay-visibility-menu.is-capture-excluded button,
+  html.overlay-mode .menu-item {
     cursor: default;
   }
   .overlay-surface.is-capture-excluded.is-gesturing,

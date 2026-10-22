@@ -24,9 +24,13 @@ export interface OverlaySettings {
   clickThrough: boolean;
   captureExclusion: boolean;
   fontSize: number;
+  formatting: OverlayFormatting;
   visible: boolean;
   closeBehavior: 'tray' | 'quit';
 }
+
+/** How the overlay offers formatting; shortcuts and Markdown typing always work. */
+export type OverlayFormatting = 'bubble' | 'toolbar' | 'none';
 
 export interface OverlaySnapshot {
   settings: OverlaySettings;
@@ -51,6 +55,7 @@ export type OverlayPatch = Partial<
     | 'alwaysOnTop'
     | 'clickThrough'
     | 'fontSize'
+    | 'formatting'
     | 'captureExclusion'
     | 'closeBehavior'
   >

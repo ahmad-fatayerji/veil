@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import type * as Y from 'yjs';
 import { documentExtensions } from './schema';
 import { applyMarkdown, markdownOrigin, saveMarkdown } from './markdown';
@@ -47,11 +48,17 @@ export type EditorConnection = Pick<DemoConnection, 'doc'> & {
   provider: Pick<DemoConnection['provider'], 'awareness'>;
 };
 
+/** How a compact editor offers formatting; shortcuts and Markdown typing always work. */
+export type EditorFormatting = 'bubble' | 'toolbar' | 'none';
+
 export function SharedEditor({
   connection,
   compact = false,
   header,
   aside,
+  mode: controlledMode,
+  onModeChange,
+  formatting = 'bubble',
 }: {
   connection: EditorConnection;
   compact?: boolean;
@@ -59,10 +66,16 @@ export function SharedEditor({
   header?: ReactNode;
   /** Rendered between the toolbar and the scrolling document, e.g. join requests. */
   aside?: ReactNode;
+  /** Controls the view from outside, e.g. the overlay header; otherwise the editor owns it. */
+  mode?: EditorMode;
+  onModeChange?: (mode: EditorMode) => void;
+  /** Formatting controls for the compact editor. */
+  formatting?: EditorFormatting;
 }) {
   const { doc, provider } = connection;
   // Each person chooses their own view; both edit the same shared document.
-  const [mode, setMode] = useState<EditorMode>('rich');
+  const [ownMode, setOwnMode] = useState<EditorMode>('rich');
+  const mode = controlledMode ?? ownMode;
   const source = useRef<SourceCommand | null>(null);
   const editor = useEditor(
     {
@@ -156,24 +169,42 @@ export function SharedEditor({
     };
   }, [editor, provider]);
 
-  if (compact) return <EditorContent editor={editor} />;
+  const changeMode = (next: EditorMode) => {
+    if (controlledMode === undefined) setOwnMode(next);
+    onModeChange?.(next);
+    if (next === 'rich') requestAnimationFrame(() => editor?.commands.focus());
+  };
+  // In the Markdown view, formatting buttons insert Markdown syntax instead.
+  const toolbar = (compactToolbar: boolean) => (
+    <EditorToolbar
+      editor={mode === 'rich' ? editor : null}
+      onSource={
+        mode === 'markdown' ? (command, level) => source.current?.(command, level) : undefined
+      }
+      mode={mode}
+      onModeChange={changeMode}
+      compact={compactToolbar}
+    />
+  );
+  // The rich editor stays mounted while hidden, keeping its undo history and binding.
+  if (compact)
+    return (
+      <>
+        {formatting === 'toolbar' && toolbar(true)}
+        {formatting === 'bubble' && editor && mode === 'rich' && (
+          <SelectionToolbar editor={editor} />
+        )}
+        {mode === 'markdown' && <MarkdownSource doc={doc} commandRef={source} />}
+        <div className="editor-compact" hidden={mode === 'markdown'}>
+          <EditorContent editor={editor} />
+        </div>
+      </>
+    );
   return (
     <>
-      {/* In the Markdown view, formatting buttons insert Markdown syntax instead. */}
-      <EditorToolbar
-        editor={mode === 'rich' ? editor : null}
-        onSource={
-          mode === 'markdown' ? (command, level) => source.current?.(command, level) : undefined
-        }
-        mode={mode}
-        onModeChange={(next) => {
-          setMode(next);
-          if (next === 'rich') requestAnimationFrame(() => editor?.commands.focus());
-        }}
-      />
+      {toolbar(false)}
       {aside}
       {mode === 'markdown' && <MarkdownSource doc={doc} commandRef={source} />}
-      {/* The rich editor stays mounted while hidden, keeping its undo history and binding. */}
       <div
         className="editor-scroll"
         hidden={mode === 'markdown'}
@@ -444,17 +475,71 @@ function ToolbarButton({
   );
 }
 
+const selectionCommands = [
+  ...inlineCommands,
+  ...blockCommands.filter((command) =>
+    ['bulletList', 'orderedList', 'taskList', 'blockquote'].includes(command.id),
+  ),
+];
+
+/** A small toolbar floating above a text selection, for compact editors such as the overlay. */
+function SelectionToolbar({ editor }: { editor: Editor }) {
+  const active = useEditorState({
+    editor,
+    selector: ({ editor }) =>
+      Object.fromEntries(
+        selectionCommands.map((command) => [command.id, editor?.isActive(command.id) ?? false]),
+      ),
+  });
+  return (
+    <BubbleMenu
+      editor={editor}
+      className="selection-toolbar"
+      options={{ placement: 'top', offset: 8 }}
+      shouldShow={({ editor, state }) =>
+        editor.isEditable && !state.selection.empty && !editor.isActive('codeBlock')
+      }
+    >
+      <div
+        role="toolbar"
+        aria-label="Formatting"
+        onMouseDown={(event) => {
+          // Keep the text selection while using the toolbar.
+          if ((event.target as HTMLElement).closest('button')) event.preventDefault();
+        }}
+      >
+        {selectionCommands.map((command, index) => (
+          <span key={command.id} style={{ display: 'contents' }}>
+            {index === inlineCommands.length && (
+              <span className="toolbar-separator" aria-hidden="true" />
+            )}
+            <ToolbarButton
+              command={command}
+              active={!!active?.[command.id]}
+              disabled={false}
+              onRun={(item) => item.run(editor)}
+            />
+          </span>
+        ))}
+      </div>
+    </BubbleMenu>
+  );
+}
+
 function EditorToolbar({
   editor,
   onSource,
   mode,
   onModeChange,
+  compact = false,
 }: {
   editor: Editor | null;
   /** Receives commands as Markdown edits while the source view is shown. */
   onSource?: SourceCommand;
   mode: EditorMode;
   onModeChange: (mode: EditorMode) => void;
+  /** A slimmer toolbar without the view switch, whose host provides one. */
+  compact?: boolean;
 }) {
   const disabled = !editor && !onSource;
   const run = (command: Command) => {
@@ -481,7 +566,7 @@ function EditorToolbar({
   const level = state?.level ?? 0;
   return (
     <div
-      className="editor-toolbar"
+      className={`editor-toolbar${compact ? ' is-compact' : ''}`}
       role="toolbar"
       aria-label="Document formatting"
       onMouseDown={(event) => {
@@ -588,7 +673,7 @@ function EditorToolbar({
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
-        <div className="editor-mode" role="group" aria-label="Editor view">
+        <div className="editor-mode" role="group" aria-label="Editor view" hidden={compact}>
           {(
             [
               ['rich', 'Rich text'],

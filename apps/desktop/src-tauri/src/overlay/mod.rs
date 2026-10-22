@@ -135,6 +135,7 @@ pub struct Patch {
     always_on_top: Option<bool>,
     click_through: Option<bool>,
     font_size: Option<u32>,
+    formatting: Option<settings::Formatting>,
     capture_exclusion: Option<bool>,
     close_behavior: Option<crate::lifecycle::CloseBehavior>,
 }
@@ -588,6 +589,9 @@ pub fn overlay_update(
     }
     if let Some(value) = patch.font_size {
         next.font_size = value;
+    }
+    if let Some(value) = patch.formatting {
+        next.formatting = value;
     }
     if let Some(value) = patch.capture_exclusion {
         next.capture_exclusion = value;

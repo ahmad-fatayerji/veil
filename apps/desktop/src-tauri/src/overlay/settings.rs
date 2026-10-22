@@ -82,6 +82,19 @@ impl Keybinds {
     }
 }
 
+/// How the overlay offers text formatting; shortcuts and Markdown typing always work.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Formatting {
+    /// A floating toolbar above a text selection.
+    #[default]
+    Bubble,
+    /// A compact toolbar row below the overlay header.
+    Toolbar,
+    /// Keyboard shortcuts only.
+    None,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -98,6 +111,7 @@ pub struct Settings {
     pub click_through: bool,
     pub capture_exclusion: bool,
     pub font_size: u32,
+    pub formatting: Formatting,
     pub visible: bool,
     pub close_behavior: crate::lifecycle::CloseBehavior,
 }
@@ -118,6 +132,7 @@ impl Default for Settings {
             click_through: false,
             capture_exclusion: true,
             font_size: 20,
+            formatting: Formatting::Bubble,
             visible: false,
             close_behavior: crate::lifecycle::CloseBehavior::Tray,
         }
@@ -310,6 +325,7 @@ mod tests {
         assert!(settings.capture_exclusion);
         assert_eq!(settings.text_opacity, 1.0);
         assert!(!settings.opacity_linked);
+        assert_eq!(settings.formatting, Formatting::Bubble);
         assert_eq!(
             settings.close_behavior,
             crate::lifecycle::CloseBehavior::Tray
@@ -322,9 +338,15 @@ mod tests {
         settings.capture_exclusion = true;
         settings.close_behavior = crate::lifecycle::CloseBehavior::Quit;
         settings.opacity_linked = true;
+        settings.formatting = Formatting::Toolbar;
         save(&path, &settings).unwrap();
         assert!(load(&path).unwrap().capture_exclusion);
         assert!(load(&path).unwrap().opacity_linked);
+        assert_eq!(load(&path).unwrap().formatting, Formatting::Toolbar);
+        assert_eq!(
+            serde_json::to_value(Formatting::None).unwrap(),
+            serde_json::json!("none")
+        );
         assert_eq!(
             load(&path).unwrap().close_behavior,
             crate::lifecycle::CloseBehavior::Quit

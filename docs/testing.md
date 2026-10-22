@@ -31,6 +31,10 @@ encoding and size failures, and update gating; execution remains with the user.
    paragraph in rich text. Both edits must survive, your caret must stay put, the
    title must follow the leading `# Heading`, and switching back must keep undo.
    Italic text must render slanted in rich text.
+   In the overlay, check each Formatting controls setting, the Markdown toggle,
+   the document switcher with several tabs, avatar activity tooltips, the
+   recovery hint appearing only in click-through mode, text opacity sparing the
+   formatting controls, and arrow cursors on controls with capture exclusion.
 5. Exercise tab close, tray Quit, Alt+F4, and window close configured as Quit.
    Check Save / Discard / Cancel across several tabs, failed/cancelled saves,
    remote edits during prompts, and the hosted-session warning. Cancel must keep

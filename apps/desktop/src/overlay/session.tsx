@@ -16,7 +16,17 @@ type Message =
   | { kind: 'update'; id: string; update: number[] }
   | { kind: 'participants'; id: string; participants: Participant[] }
   | { kind: 'awareness'; id: string; update: number[] }
-  | { kind: 'presence'; id: string; cursor: unknown; activity: unknown };
+  | { kind: 'presence'; id: string; cursor: unknown; activity: unknown }
+  | { kind: 'tabs'; activeId: string; tabs: OverlayTab[] }
+  | { kind: 'select'; tabId: string };
+
+/** An open document as the overlay's switcher shows it. */
+export interface OverlayTab {
+  id: string;
+  title: string;
+  status: string;
+  dirty: boolean;
+}
 const relayOrigin = Symbol('desktop document relay');
 const send = (message: Message) => invoke('document_relay', { message });
 
@@ -118,24 +128,48 @@ export async function flushOverlay() {
 export function SessionBridge({
   connection,
   resolveDocument,
+  tabs = [],
+  activeId = '',
+  onSelectTab,
 }: {
   connection: DemoConnection | null;
   resolveDocument?: (id: string) => DemoConnection | null;
+  /** Open documents offered by the overlay's switcher. */
+  tabs?: OverlayTab[];
+  activeId?: string;
+  onSelectTab?: (id: string) => void;
 }) {
   const current = useRef(connection);
   const resolver = useRef(resolveDocument);
+  const selectTab = useRef(onSelectTab);
   const initial = useRef<() => void>(() => {});
+  const publishTabs = useRef<() => void>(() => {});
   const outgoing = useRef<Promise<unknown>>(Promise.resolve());
   const [error, setError] = useState('');
   useEffect(() => {
     current.current = connection;
     resolver.current = resolveDocument;
+    selectTab.current = onSelectTab;
   });
+  // Republish only when the switcher's content changes, not on every render.
+  const tabList = JSON.stringify({ activeId, tabs });
+  useEffect(() => {
+    const message = { kind: 'tabs', ...JSON.parse(tabList) } as Message;
+    publishTabs.current = () => {
+      outgoing.current = outgoing.current
+        .then(() => send(message))
+        .catch((cause: unknown) => setError(errorMessage(cause)));
+    };
+    publishTabs.current();
+  }, [tabList]);
   useEffect(() => {
     let active = true;
     const subscription = listen<Message>('desktop-document', ({ payload }) => {
       if (!active) return;
-      if (payload.kind === 'request') initial.current();
+      if (payload.kind === 'request') {
+        initial.current();
+        publishTabs.current();
+      } else if (payload.kind === 'select') selectTab.current?.(payload.tabId);
       else if (payload.kind === 'update') {
         const target =
           resolver.current?.(payload.id) ??
@@ -249,7 +283,12 @@ export function SessionBridge({
 export function useOverlayDocument() {
   const [connection, setConnection] = useState<EditorConnection | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [tabs, setTabs] = useState<{ activeId: string; tabs: OverlayTab[] }>({
+    activeId: '',
+    tabs: [],
+  });
   const [error, setError] = useState('');
+  const select = useRef<(id: string) => void>(() => {});
   useEffect(() => {
     let active = true;
     let outgoing: Promise<unknown> = Promise.resolve();
@@ -265,9 +304,12 @@ export function useOverlayDocument() {
       session?.destroy();
       session = null;
     };
+    select.current = (tabId) => dispatch({ kind: 'select', tabId });
     const subscription = listen<Message>('desktop-document', ({ payload }) => {
       if (!active) return;
-      if (payload.kind === 'flush') {
+      if (payload.kind === 'tabs') {
+        setTabs({ activeId: payload.activeId, tabs: payload.tabs });
+      } else if (payload.kind === 'flush') {
         dispatch({ kind: 'flushed', requestId: payload.requestId });
       } else if (payload.kind === 'closed') {
         clear();
@@ -339,5 +381,12 @@ export function useOverlayDocument() {
       void subscription.then((unlisten) => unlisten()).catch(() => {});
     };
   }, []);
-  return { connection, participants, error };
+  return {
+    connection,
+    participants,
+    error,
+    tabs: tabs.tabs,
+    activeId: tabs.activeId,
+    selectTab: (id: string) => select.current(id),
+  };
 }

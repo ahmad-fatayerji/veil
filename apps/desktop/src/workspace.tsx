@@ -725,6 +725,19 @@ export function DocumentWorkspace() {
           workspace.tabs.find((tab) => String(tab.document?.doc.clientID) === sessionId)
             ?.document ?? null
         }
+        tabs={workspace.tabs
+          .filter((tab) => tab.document)
+          .map((tab) => ({
+            id: tab.id,
+            title: tabLabel(tab),
+            status: tab.status,
+            dirty: tab.dirty,
+          }))}
+        activeId={workspace.activeId}
+        onSelectTab={(id) => {
+          const tab = workspace.tabs.find((item) => item.id === id);
+          if (tab && !workspace.working) workspace.select(tab);
+        }}
       />
       <Dialog
         open={!!workspace.prompt}

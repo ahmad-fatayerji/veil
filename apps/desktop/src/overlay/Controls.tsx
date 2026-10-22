@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Eye, EyeOff, Link2, RotateCcw, Unlink2 } from 'lucide-react';
-import { Button, IconButton, Slider, Switch } from '@veil/ui';
-import { errorMessage, invoke, useOverlay, type OverlayPatch, type OverlaySnapshot } from './api';
+import { Button, IconButton, SegmentedControl, Slider, Switch } from '@veil/ui';
+import {
+  errorMessage,
+  invoke,
+  useOverlay,
+  type OverlayFormatting,
+  type OverlayPatch,
+  type OverlaySnapshot,
+} from './api';
 
 function ToggleRow({
   label,
@@ -225,6 +232,25 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
                   onChange={(event) => range({ fontSize: Number(event.target.value) })}
                 />
               </RangeRow>
+              <div className="setting-row overlay-formatting-row">
+                <span className="setting-row-text">
+                  <span className="setting-row-label">Formatting controls</span>
+                  <span className="setting-row-hint">
+                    Shortcuts and Markdown typing always work.
+                  </span>
+                </span>
+                <SegmentedControl<OverlayFormatting>
+                  label="Formatting controls"
+                  value={state.settings.formatting}
+                  disabled={busy}
+                  options={[
+                    { value: 'bubble', label: 'On selection' },
+                    { value: 'toolbar', label: 'Toolbar' },
+                    { value: 'none', label: 'Shortcuts only' },
+                  ]}
+                  onChange={(formatting) => void update({ formatting })}
+                />
+              </div>
             </div>
           </section>
           <section className="overlay-setting-group" aria-labelledby="overlay-behavior-heading">
