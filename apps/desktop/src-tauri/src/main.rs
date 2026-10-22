@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod discord;
 mod hosting;
 mod lifecycle;
 mod networking;
@@ -36,10 +37,14 @@ fn main() {
             overlay::setup(app)?;
             updates::setup(app.handle())?;
             lifecycle::setup(app)?;
+            discord::setup(app.handle())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             lifecycle::app_quit,
+            discord::discord_preferences,
+            discord::discord_configure,
+            discord::discord_update,
             overlay::overlay_snapshot,
             overlay::overlay_update,
             overlay::overlay_capture_check,
@@ -91,6 +96,7 @@ fn main() {
         .expect("failed to build Veil desktop")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
+                discord::shutdown(app);
                 overlay::flush(app);
             }
         });

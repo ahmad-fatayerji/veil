@@ -39,6 +39,7 @@ import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
 import { ShareDialog } from './dialogs/ShareDialog';
+import { useDiscordPresence } from './discord';
 
 export function AutomaticApp() {
   const [document, setDocument] = useState<PeerSession | null>(null);
@@ -84,6 +85,10 @@ export function AutomaticApp() {
   const overlay = useOverlay();
   const participants = useParticipants(document);
   const title = useDocumentTitle(document?.doc);
+  const discord = useDiscordPresence(
+    document ? title : null,
+    participants.filter((person) => !person.local).length,
+  );
   const onUpdateBusy = useCallback((value: boolean) => setUpdating(value), []);
   function signaling() {
     return nativeSignaling({
@@ -688,6 +693,7 @@ export function AutomaticApp() {
         onUpdateBusy={onUpdateBusy}
         name={name}
         onNameChange={updateName}
+        discord={discord}
         closeBehavior={overlay.state?.settings.closeBehavior ?? 'tray'}
         closeBehaviorDisabled={!overlay.state || busy || updating}
         onCloseBehaviorChange={(closeBehavior) =>

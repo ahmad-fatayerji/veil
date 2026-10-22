@@ -562,7 +562,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a347dcabdae9c31b0825fd6a8bed285ec9c2acb89c47827126d52fa4f59cece3"
 dependencies = [
  "fnv",
- "uuid",
+ "uuid 1.27.0",
  "web-time",
 ]
 
@@ -1004,6 +1004,21 @@ dependencies = [
  "option-ext",
  "redox_users",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "discord-rich-presence"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90c55d69cab17c19677ce3a5f8face993a9e6eaf847fecac3547f3a3ff4a2494"
+dependencies = [
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_repr",
+ "thiserror 2.0.21",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -3566,7 +3581,7 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
- "uuid",
+ "uuid 1.27.0",
 ]
 
 [[package]]
@@ -4322,7 +4337,7 @@ dependencies = [
  "thiserror 2.0.21",
  "time",
  "url",
- "uuid",
+ "uuid 1.27.0",
  "walkdir",
 ]
 
@@ -4550,7 +4565,7 @@ dependencies = [
  "toml 1.1.8+spec-1.1.0",
  "url",
  "urlpattern",
- "uuid",
+ "uuid 1.27.0",
  "walkdir",
 ]
 
@@ -5077,6 +5092,15 @@ checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
 
 [[package]]
 name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom 0.2.17",
+]
+
+[[package]]
+name = "uuid"
 version = "1.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97277d36b9c3ace13e58fa6e753f8b0bbbf302a18dd193240d70f9e29681059a"
@@ -5092,6 +5116,7 @@ name = "veil-desktop"
 version = "0.7.2"
 dependencies = [
  "base64 0.22.1",
+ "discord-rich-presence",
  "futures-util",
  "httpdate",
  "keyring",
@@ -5126,7 +5151,7 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http",
- "uuid",
+ "uuid 1.27.0",
  "yrs",
 ]
 
@@ -6053,7 +6078,7 @@ dependencies = [
  "serde_repr",
  "tracing",
  "uds_windows",
- "uuid",
+ "uuid 1.27.0",
  "windows-sys 0.61.2",
  "winnow 1.0.4",
  "zbus_macros",
