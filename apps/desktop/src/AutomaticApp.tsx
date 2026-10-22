@@ -72,7 +72,14 @@ export function AutomaticApp({
 }) {
   const [document, setDocument] = useState<PeerSession | null>(null);
   const mounted = useRef(false);
-  const createInitial = useRef(() => void run(create));
+  // New-document tabs show a blank page, not the start screen, until creation settles.
+  const [opening, setOpening] = useState(tab.mode === 'new');
+  const createInitial = useRef(
+    () =>
+      void run(create).finally(() => {
+        if (mounted.current) setOpening(false);
+      }),
+  );
   const documentRef = useRef<PeerSession | null>(null);
   const network = useRef<AutomaticSession | null>(null);
   const [session, setSession] = useState<AutomaticSession | null>(null);
@@ -592,7 +599,9 @@ export function AutomaticApp({
             </Banner>
           )}
         </div>
-        {!document ? (
+        {!document && opening ? (
+          <div className="document-opening" aria-busy="true" />
+        ) : !document ? (
           <StartScreen
             name={name}
             onNameChange={updateName}
@@ -651,7 +660,7 @@ export function AutomaticApp({
                       : 'Not saved to a file'}
                 </span>
               </>
-            ) : (
+            ) : opening ? null : (
               <span className="statusbar-note">Overlay hidden from compatible screen capture</span>
             )
           }

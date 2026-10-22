@@ -87,6 +87,18 @@
     transition:
       background var(--dur) var(--ease-out),
       color var(--dur) var(--ease-out);
+    animation: workspace-tab-in var(--dur) var(--ease-out);
+  }
+  @keyframes workspace-tab-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .workspace-tab {
+      animation: none;
+    }
   }
   .workspace-tab:hover {
     background: var(--hover);
@@ -262,6 +274,11 @@
   /* The workspace owns the title bar, so each tab's content has no title bar row. */
   .workspace-panel .desktop-content {
     grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  /* Holds the editor's place while a new document is created, avoiding a start-screen flash. */
+  .document-opening {
+    min-height: 0;
+    background: var(--bg);
   }
 
   @media (max-width: 700px) {
