@@ -15,3 +15,12 @@ export function capacityProblem(message: string): CapacityProblem | null {
 export function sameServer(a: string, b: string) {
   return !!a && a.trim().replace(/\/+$/, '').toLowerCase() === b.toLowerCase();
 }
+
+/** A server address as people recognize it, e.g. "signal.example.com". */
+export function serverHost(server: string) {
+  try {
+    return new URL(server).host || server;
+  } catch {
+    return server;
+  }
+}
