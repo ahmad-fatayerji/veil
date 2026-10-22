@@ -272,6 +272,25 @@
     min-height: 0;
     padding: var(--space-6) var(--space-5) var(--space-4);
     overflow-y: auto;
+    position: relative;
+    isolation: isolate;
+  }
+  .launcher-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .launcher-watermark {
+    position: absolute;
+    /* Full height, anchored to the centred content (not the window edge) so the
+       left arm stays behind the Join card at every window size. */
+    top: 0;
+    left: calc(50% - 50px);
+    height: 100%;
+    width: auto;
+    fill: var(--brand-watermark);
   }
   .launcher-inner {
     align-self: center;
