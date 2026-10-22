@@ -27,11 +27,7 @@ export function Menu({
   );
   return (
     <DropdownMenu.Root modal={false}>
-      {tooltip ? (
-        <Tooltip content={label}>{button}</Tooltip>
-      ) : (
-        button
-      )}
+      {tooltip ? <Tooltip content={label}>{button}</Tooltip> : button}
       <DropdownMenu.Portal>
         <DropdownMenu.Content className="menu" align={align} sideOffset={6} collisionPadding={8}>
           {children}
