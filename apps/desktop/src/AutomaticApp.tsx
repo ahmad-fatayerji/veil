@@ -110,7 +110,7 @@ export function AutomaticApp({
   const [development, setDevelopment] = useState(false);
   const [people, setPeople] = useState(false);
   const peopleButton = useRef<HTMLButtonElement>(null);
-  const updateAttention = useUpdateAttention();
+  const updateAttention = useUpdateAttention(active);
   const [settings, setSettings] = useState(false);
   const [section, setSection] = useState<Section>('General');
   const [shareOpen, setShareOpen] = useState(false);
@@ -192,7 +192,14 @@ export function AutomaticApp({
     changed();
     const timer = setInterval(() => {
       setServiceOnline(network.current?.serviceOnline ?? false);
-      setPendingGuests(network.current?.pendingGuests ?? []);
+      // Keep the previous array when nothing changed, so idle ticks don't re-render the tab.
+      setPendingGuests((previous) => {
+        const next = network.current?.pendingGuests ?? [];
+        return next.length === previous.length &&
+          next.every((guest, index) => guest === previous[index])
+          ? previous
+          : next;
+      });
     }, 1000);
     return () => {
       clearInterval(timer);
@@ -723,69 +730,72 @@ export function AutomaticApp({
           </Button>
         </div>
       </Dialog>
-      <SettingsDialog
-        open={active && settings}
-        section={section}
-        onSectionChange={setSection}
-        onClose={() => {
-          if (!updating) {
-            setSettings(false);
-            setResumeShare(false);
-          }
-        }}
-        updating={updating}
-        busy={busy}
-        updateAttention={updateAttention}
-        onUpdateBusy={onUpdateBusy}
-        name={name}
-        onNameChange={updateName}
-        discord={discord}
-        restoreTabs={workspace.restore}
-        onRestoreTabsChange={(enabled) => void workspace.configureRestore(enabled)}
-        restoreTabsDisabled={workspace.working}
-        closeBehavior={overlay.state?.settings.closeBehavior ?? 'tray'}
-        closeBehaviorDisabled={!overlay.state || busy || updating}
-        onCloseBehaviorChange={(closeBehavior) =>
-          void run(async () => {
-            overlay.setState(
-              await invoke<OverlaySnapshot>('overlay_update', { patch: { closeBehavior } }),
-            );
-          })
-        }
-        appearance={appearance}
-        onAppearanceChange={setAppearance}
-        hosting={{
-          server,
-          credential,
-          savedServer,
-          status: serverTest,
-          testing: testingServer,
-          saving: savingServer,
-          resumeShare,
-          onServerChange: (value) => {
-            setServer(value);
-            setServerTest('');
-          },
-          onCredentialChange: (value) => {
-            setCredential(value);
-            setServerTest('');
-          },
-          onSave: () => void run(saveServer),
-          onTest: () => void run(testServer),
-          onForget: () =>
+      {/* Only the selected tab mounts Settings, so background tabs don't poll native state. */}
+      {active && (
+        <SettingsDialog
+          open={settings}
+          section={section}
+          onSectionChange={setSection}
+          onClose={() => {
+            if (!updating) {
+              setSettings(false);
+              setResumeShare(false);
+            }
+          }}
+          updating={updating}
+          busy={busy}
+          updateAttention={updateAttention}
+          onUpdateBusy={onUpdateBusy}
+          name={name}
+          onNameChange={updateName}
+          discord={discord}
+          restoreTabs={workspace.restore}
+          onRestoreTabsChange={(enabled) => void workspace.configureRestore(enabled)}
+          restoreTabsDisabled={workspace.working}
+          closeBehavior={overlay.state?.settings.closeBehavior ?? 'tray'}
+          closeBehaviorDisabled={!overlay.state || busy || updating}
+          onCloseBehaviorChange={(closeBehavior) =>
             void run(async () => {
-              await invoke('network_forget', { server: savedServer });
-              setCredential('');
+              overlay.setState(
+                await invoke<OverlaySnapshot>('overlay_update', { patch: { closeBehavior } }),
+              );
+            })
+          }
+          appearance={appearance}
+          onAppearanceChange={setAppearance}
+          hosting={{
+            server,
+            credential,
+            savedServer,
+            status: serverTest,
+            testing: testingServer,
+            saving: savingServer,
+            resumeShare,
+            onServerChange: (value) => {
+              setServer(value);
               setServerTest('');
-              setNotice('Saved host credential removed.');
-            }),
-        }}
-        notice={notice}
-        error={error}
-        onOpenUrl={(url) => {
-          void openUrl(url).catch((cause) => setError(errorMessage(cause)));
-        }}
-      />
+            },
+            onCredentialChange: (value) => {
+              setCredential(value);
+              setServerTest('');
+            },
+            onSave: () => void run(saveServer),
+            onTest: () => void run(testServer),
+            onForget: () =>
+              void run(async () => {
+                await invoke('network_forget', { server: savedServer });
+                setCredential('');
+                setServerTest('');
+                setNotice('Saved host credential removed.');
+              }),
+          }}
+          notice={notice}
+          error={error}
+          onOpenUrl={(url) => {
+            void openUrl(url).catch((cause) => setError(errorMessage(cause)));
+          }}
+        />
+      )}
       {active && joinInProgress && (
         <Dialog
           open

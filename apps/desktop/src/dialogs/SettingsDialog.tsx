@@ -359,7 +359,10 @@ export function SettingsDialog({
 
           <section hidden={section !== 'Updates'}>
             <h3>Updates</h3>
-            <Updates onBusy={onUpdateBusy} settingsView />
+            {/* Updates polls native state frequently, so it runs only while shown or installing. */}
+            {((open && section === 'Updates') || updating) && (
+              <Updates onBusy={onUpdateBusy} settingsView />
+            )}
           </section>
 
           <section hidden={section !== 'About'}>
