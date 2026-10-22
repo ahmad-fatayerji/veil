@@ -735,8 +735,16 @@
     gap: var(--space-4);
     padding: var(--space-4);
   }
-  .about-card .brand-mark {
-    border-radius: 8px;
+  .brand-mark {
+    display: block;
+    flex-shrink: 0;
+  }
+  .brand-mark rect {
+    fill: var(--brand-tile);
+    stroke: var(--brand-tile-border);
+  }
+  .brand-mark path {
+    fill: var(--brand-glyph);
   }
   .about-card strong {
     display: block;
@@ -746,6 +754,11 @@
     display: grid;
     gap: 2px;
     font-size: var(--text-sm);
+  }
+  .about-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
   .desktop-updates {
