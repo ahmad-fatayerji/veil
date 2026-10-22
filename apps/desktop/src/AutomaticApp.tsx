@@ -467,13 +467,16 @@ export function AutomaticApp({
   const fileName = tab.file?.path.split(/[\\/]/).pop();
   const titlebarActions = document && (
     <>
-      <PeopleButton
-        ref={peopleButton}
-        participants={participants}
-        waiting={guest ? 0 : pendingGuests.length}
-        expanded={people}
-        onToggle={() => togglePeople()}
-      />
+      {/* A local document has only its author, so People appears once a session exists. */}
+      {session && (
+        <PeopleButton
+          ref={peopleButton}
+          participants={participants}
+          waiting={guest ? 0 : pendingGuests.length}
+          expanded={people}
+          onToggle={() => togglePeople()}
+        />
+      )}
       <IconButton
         label={overlayVisible ? 'Hide overlay' : 'Show overlay'}
         shortcut={overlay.state?.hideShortcutAvailable ? keybinds.toggleOverlay : undefined}
