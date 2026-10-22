@@ -87,9 +87,9 @@ impl Keybinds {
 #[serde(rename_all = "lowercase")]
 pub enum Formatting {
     /// A floating toolbar above a text selection.
-    #[default]
     Bubble,
     /// A compact toolbar row below the overlay header.
+    #[default]
     Toolbar,
     /// Keyboard shortcuts only.
     None,
@@ -132,7 +132,7 @@ impl Default for Settings {
             click_through: false,
             capture_exclusion: true,
             font_size: 20,
-            formatting: Formatting::Bubble,
+            formatting: Formatting::Toolbar,
             visible: false,
             close_behavior: crate::lifecycle::CloseBehavior::Tray,
         }
@@ -325,7 +325,7 @@ mod tests {
         assert!(settings.capture_exclusion);
         assert_eq!(settings.text_opacity, 1.0);
         assert!(!settings.opacity_linked);
-        assert_eq!(settings.formatting, Formatting::Bubble);
+        assert_eq!(settings.formatting, Formatting::Toolbar);
         assert_eq!(
             settings.close_behavior,
             crate::lifecycle::CloseBehavior::Tray
@@ -338,11 +338,11 @@ mod tests {
         settings.capture_exclusion = true;
         settings.close_behavior = crate::lifecycle::CloseBehavior::Quit;
         settings.opacity_linked = true;
-        settings.formatting = Formatting::Toolbar;
+        settings.formatting = Formatting::Bubble;
         save(&path, &settings).unwrap();
         assert!(load(&path).unwrap().capture_exclusion);
         assert!(load(&path).unwrap().opacity_linked);
-        assert_eq!(load(&path).unwrap().formatting, Formatting::Toolbar);
+        assert_eq!(load(&path).unwrap().formatting, Formatting::Bubble);
         assert_eq!(
             serde_json::to_value(Formatting::None).unwrap(),
             serde_json::json!("none")

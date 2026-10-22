@@ -246,7 +246,7 @@ export function OverlayWindow() {
               compact
               mode={mode}
               onModeChange={setMode}
-              formatting={interactive ? (state?.settings.formatting ?? 'bubble') : 'none'}
+              formatting={interactive ? (state?.settings.formatting ?? 'toolbar') : 'none'}
             />
           ) : (
             <div className="overlay-empty">
