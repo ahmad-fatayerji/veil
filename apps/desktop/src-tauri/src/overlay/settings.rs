@@ -84,6 +84,7 @@ pub struct Settings {
     pub height: u32,
     pub opacity: f64,
     pub text_opacity: f64,
+    pub opacity_linked: bool,
     pub always_on_top: bool,
     pub click_through: bool,
     pub capture_exclusion: bool,
@@ -103,6 +104,7 @@ impl Default for Settings {
             height: 320,
             opacity: 0.85,
             text_opacity: 1.0,
+            opacity_linked: false,
             always_on_top: true,
             click_through: false,
             capture_exclusion: true,
@@ -234,6 +236,7 @@ mod tests {
         assert!(Settings::default().capture_exclusion);
         assert!(settings.capture_exclusion);
         assert_eq!(settings.text_opacity, 1.0);
+        assert!(!settings.opacity_linked);
         assert_eq!(
             settings.close_behavior,
             crate::lifecycle::CloseBehavior::Tray
@@ -245,8 +248,10 @@ mod tests {
         assert!(!load(&path).unwrap().capture_exclusion);
         settings.capture_exclusion = true;
         settings.close_behavior = crate::lifecycle::CloseBehavior::Quit;
+        settings.opacity_linked = true;
         save(&path, &settings).unwrap();
         assert!(load(&path).unwrap().capture_exclusion);
+        assert!(load(&path).unwrap().opacity_linked);
         assert_eq!(
             load(&path).unwrap().close_behavior,
             crate::lifecycle::CloseBehavior::Quit

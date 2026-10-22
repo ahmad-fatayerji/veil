@@ -263,6 +263,22 @@ try {
     async () => (await snapshot(main)).settings.textOpacity === 0.65,
     'text opacity saved',
   );
+  // Linked sliders keep their 25-point gap; the Home key in setRange clamps window opacity at 0
+  // and stepping back up restores it.
+  await main.getByRole('button', { name: 'Link opacities' }).click();
+  await waitFor(async () => (await snapshot(main)).settings.opacityLinked, 'opacities linked');
+  await setRange(main, 'Window opacity', 30);
+  await waitFor(async () => {
+    const { opacity, textOpacity } = (await snapshot(main)).settings;
+    return opacity === 0.3 && textOpacity === 0.55;
+  }, 'text opacity follows window opacity');
+  await setRange(main, 'Text opacity', 65);
+  await waitFor(async () => {
+    const { opacity, textOpacity } = (await snapshot(main)).settings;
+    return opacity === 0.4 && textOpacity === 0.65;
+  }, 'window opacity follows text opacity and recovers from clamping');
+  await main.getByRole('button', { name: 'Unlink opacities' }).click();
+  await waitFor(async () => !(await snapshot(main)).settings.opacityLinked, 'opacities unlinked');
   await main.getByLabel('Always on top', { exact: true }).click();
   await waitFor(async () => !(await snapshot(main)).settings.alwaysOnTop, 'always-on-top disabled');
   assert.equal(native('Probe').topmost, false);
@@ -706,6 +722,7 @@ try {
     'height',
     'opacity',
     'textOpacity',
+    'opacityLinked',
     'fontSize',
     'alwaysOnTop',
     'clickThrough',
