@@ -53,8 +53,14 @@ import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
 import { ShareDialog } from './dialogs/ShareDialog';
 import type { useDiscordPresence } from './discord';
 import { defaultKeybinds, matchesShortcut } from './keybinds';
-import { capacityProblem, sameServer, type CapacityProblem } from './capacity';
-import type { HostingMode } from './dialogs/SettingsDialog';
+import {
+  capacityProblem,
+  sameServer,
+  serverHost,
+  SELF_HOSTING_URL,
+  type CapacityProblem,
+} from './capacity';
+import type { HostingForm, HostingMode } from './dialogs/HostingChoice';
 
 export function AutomaticApp({
   tab,
@@ -124,7 +130,8 @@ export function AutomaticApp({
   const [settings, setSettings] = useState(false);
   const [section, setSection] = useState<Section>('General');
   const [shareOpen, setShareOpen] = useState(false);
-  const [resumeShare, setResumeShare] = useState(false);
+  // The Share dialog asks where to host on the first share, or after a server was full.
+  const [hostingStep, setHostingStep] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [connected, setConnected] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
@@ -318,10 +325,9 @@ export function AutomaticApp({
   }
   async function share(configuredServer = savedServer) {
     if (!documentRef.current) return;
+    // Without a saved server, the Share dialog asks where to host first.
     if (!configuredServer) {
-      setShareOpen(false);
-      setResumeShare(true);
-      openSettings('Sharing');
+      setShareOpen(true);
       return;
     }
     if (network.current?.sessionEnded)
@@ -358,22 +364,47 @@ export function AutomaticApp({
     setServiceOnline(network.current.serviceOnline);
   }
   function requestShare() {
-    // Ask for a name before the first invitation so guests know who is hosting.
-    if (!network.current && !name.trim()) setShareOpen(true);
+    // Ask for a name and a server before the first invitation so guests know who is hosting.
+    if (!network.current && (!name.trim() || !savedServer)) setShareOpen(true);
     else void run(() => share());
   }
-  function switchToAnotherServer() {
-    setHostingMode('custom');
-    setServer('');
+  /** Saves the server chosen in the Share dialog, when it asked for one, then shares. */
+  async function startSharing() {
+    let configured = savedServer;
+    if (!configured || hostingStep) {
+      const saved = await saveServer();
+      if (!saved) return;
+      configured = saved;
+      setHostingStep(false);
+    }
+    await share(configured);
+  }
+  function changeHostingMode(mode: HostingMode) {
+    setHostingMode(mode);
+    // Returning to another server restores the one saved, if any.
+    setServer(mode === 'public' ? official : savedPublic ? '' : savedServer);
     setCredential('');
     setServerTest('');
-    requestAnimationFrame(() => window.document.getElementById('automatic-server')?.focus());
+  }
+  /** Unsaved hosting choices are dropped so Settings keeps showing the saved server. */
+  function discardHostingChanges() {
+    if (!savedServer) return;
+    setHostingMode(savedPublic ? 'public' : 'custom');
+    setServer(savedServer);
+    setCredential('');
+    setServerTest('');
   }
   function configureOwnServer() {
     setCapacity(null);
-    setResumeShare(true);
-    openSettings('Sharing');
-    switchToAnotherServer();
+    setHostingStep(true);
+    changeHostingMode('custom');
+    setShareOpen(true);
+  }
+  function closeShare() {
+    setShareOpen(false);
+    if (!hostingStep) return;
+    setHostingStep(false);
+    discardHostingChanges();
   }
   async function testServer() {
     setTestingServer(true);
@@ -391,6 +422,7 @@ export function AutomaticApp({
       setTestingServer(false);
     }
   }
+  /** Returns the saved server, or null when the settings were rejected. */
   async function saveServer() {
     setSavingServer(true);
     setServerTest('Checking settings before saving...');
@@ -404,7 +436,7 @@ export function AutomaticApp({
       });
     } catch (e) {
       setServerTest(errorMessage(e));
-      return;
+      return null;
     } finally {
       setSavingServer(false);
     }
@@ -413,11 +445,7 @@ export function AutomaticApp({
     setSavedServer(saved.server);
     setSavedPublic(hostingMode === 'public');
     setCredential('');
-    if (resumeShare) {
-      setResumeShare(false);
-      setSettings(false);
-      await share(saved.server);
-    } else setNotice('Hosting settings saved on this device.');
+    return saved.server;
   }
   const leave = useCallback(async () => {
     const current = network.current;
@@ -500,6 +528,38 @@ export function AutomaticApp({
           : 'local';
   const overlayVisible = !!overlay.state?.settings.visible;
   const leaveLabel = guest ? 'Leave session' : 'Close document';
+  // Settings and the Share dialog edit the same hosting choice.
+  const hostingForm: HostingForm = {
+    server,
+    credential,
+    savedServer,
+    mode: hostingMode,
+    status: serverTest,
+    testing: testingServer,
+    saving: savingServer,
+    onModeChange: changeHostingMode,
+    onServerChange: (value) => {
+      setServer(value);
+      setServerTest('');
+    },
+    onCredentialChange: (value) => {
+      setCredential(value);
+      setServerTest('');
+    },
+    onSave: () =>
+      void run(async () => {
+        if (await saveServer()) setNotice('Hosting settings saved on this device.');
+      }),
+    onTest: () => void run(testServer),
+    onForget: () =>
+      void run(async () => {
+        await invoke('network_forget', { server: savedServer });
+        setCredential('');
+        setServerTest('');
+        setNotice('Saved host credential removed.');
+      }),
+  };
+  const hostingSummary = savedPublic ? 'Veil public servers' : serverHost(savedServer);
   useEffect(() => {
     workspace.attach(tab, document);
     return () => {
@@ -823,10 +883,7 @@ export function AutomaticApp({
           section={section}
           onSectionChange={setSection}
           onClose={() => {
-            if (!updating) {
-              setSettings(false);
-              setResumeShare(false);
-            }
+            if (!updating) setSettings(false);
           }}
           updating={updating}
           busy={busy}
@@ -852,40 +909,7 @@ export function AutomaticApp({
           accent={accent}
           systemAccent={systemAccent}
           onAccentChange={setAccent}
-          hosting={{
-            server,
-            credential,
-            savedServer,
-            mode: hostingMode,
-            onUseAnother: switchToAnotherServer,
-            onUseOfficial: () => {
-              setHostingMode('public');
-              setServer(official);
-              setCredential('');
-              setServerTest('');
-            },
-            status: serverTest,
-            testing: testingServer,
-            saving: savingServer,
-            resumeShare,
-            onServerChange: (value) => {
-              setServer(value);
-              setServerTest('');
-            },
-            onCredentialChange: (value) => {
-              setCredential(value);
-              setServerTest('');
-            },
-            onSave: () => void run(saveServer),
-            onTest: () => void run(testServer),
-            onForget: () =>
-              void run(async () => {
-                await invoke('network_forget', { server: savedServer });
-                setCredential('');
-                setServerTest('');
-                setNotice('Saved host credential removed.');
-              }),
-          }}
+          hosting={hostingForm}
           notice={notice}
           error={error}
           onOpenUrl={(url) => {
@@ -918,7 +942,7 @@ export function AutomaticApp({
       )}
       <ShareDialog
         open={active && shareOpen}
-        onClose={() => setShareOpen(false)}
+        onClose={closeShare}
         started={!!session}
         link={link}
         joinMode={joinMode}
@@ -929,7 +953,15 @@ export function AutomaticApp({
         name={name}
         onNameChange={saveDisplayName}
         busy={busy}
-        onStart={() => void run(() => share())}
+        hosting={hostingForm}
+        chooseHosting={!savedServer || hostingStep}
+        hostingSummary={hostingSummary}
+        onChangeHosting={() => {
+          setShareOpen(false);
+          openSettings('Sharing');
+        }}
+        onSelfHosting={() => void openUrl(SELF_HOSTING_URL).catch((e) => setError(errorMessage(e)))}
+        onStart={() => void run(startSharing)}
         onCopy={() =>
           void run(async () => {
             await navigator.clipboard.writeText(link);
