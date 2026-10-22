@@ -280,7 +280,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: ahmad-fatayerji/veil-server
-          ref: 7c64f4efe6d2d1f358d028119c78767cce0a3e7d
+          ref: 837d7e89c3c808418e02409323ff708a5647b447
           path: target/server-source
       - uses: dtolnay/rust-toolchain@1.99.0
       - uses: Swatinem/rust-cache@v2
