@@ -3,6 +3,9 @@ import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/r
 import type * as Y from 'yjs';
 import { documentExtensions } from './schema';
 import { applyMarkdown, markdownOrigin, saveMarkdown } from './markdown';
+import { formatMarkdown, markdownShortcut, type MarkdownCommand } from './markdown-format';
+
+type SourceCommand = (command: MarkdownCommand, level?: number) => void;
 import Collaboration, { isChangeOrigin } from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -60,6 +63,7 @@ export function SharedEditor({
   const { doc, provider } = connection;
   // Each person chooses their own view; both edit the same shared document.
   const [mode, setMode] = useState<EditorMode>('rich');
+  const source = useRef<SourceCommand | null>(null);
   const editor = useEditor(
     {
       shouldRerenderOnTransaction: false,
@@ -155,9 +159,12 @@ export function SharedEditor({
   if (compact) return <EditorContent editor={editor} />;
   return (
     <>
-      {/* Formatting buttons stay in place, disabled, while the Markdown view is shown. */}
+      {/* In the Markdown view, formatting buttons insert Markdown syntax instead. */}
       <EditorToolbar
         editor={mode === 'rich' ? editor : null}
+        onSource={
+          mode === 'markdown' ? (command, level) => source.current?.(command, level) : undefined
+        }
         mode={mode}
         onModeChange={(next) => {
           setMode(next);
@@ -165,7 +172,7 @@ export function SharedEditor({
         }}
       />
       {aside}
-      {mode === 'markdown' && <MarkdownSource doc={doc} />}
+      {mode === 'markdown' && <MarkdownSource doc={doc} commandRef={source} />}
       {/* The rich editor stays mounted while hidden, keeping its undo history and binding. */}
       <div
         className="editor-scroll"
@@ -212,12 +219,46 @@ function mapCaret(previous: string, next: string, index: number) {
  * Editable Markdown for the shared document. Every change is applied to the document at
  * once, so collaborators' edits arriving later are merged into the source, not overwritten.
  */
-function MarkdownSource({ doc }: { doc: Y.Doc }) {
+function MarkdownSource({
+  doc,
+  commandRef,
+}: {
+  doc: Y.Doc;
+  commandRef: { current: SourceCommand | null };
+}) {
   const area = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(() => saveMarkdown(doc));
   const current = useRef(text);
   const caret = useRef<[number, number] | null>(null);
   const [error, setError] = useState('');
+  // Formatting goes through the browser's text editing, so Ctrl+Z undoes it like typing.
+  const format: SourceCommand = (command, level) => {
+    const element = area.current;
+    if (!element) return;
+    const edit = formatMarkdown(
+      element.value,
+      element.selectionStart,
+      element.selectionEnd,
+      command,
+      level,
+    );
+    element.focus();
+    element.setSelectionRange(edit.from, edit.to);
+    const inserted = edit.insert
+      ? document.execCommand('insertText', false, edit.insert)
+      : edit.from === edit.to || document.execCommand('delete');
+    if (!inserted) {
+      element.setRangeText(edit.insert, edit.from, edit.to);
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    element.setSelectionRange(...edit.selection);
+  };
+  useEffect(() => {
+    commandRef.current = format;
+    return () => {
+      commandRef.current = null;
+    };
+  });
   useEffect(() => {
     const refresh = (_update: Uint8Array, origin: unknown) => {
       // Own edits keep the text exactly as typed instead of re-serializing it.
@@ -252,6 +293,12 @@ function MarkdownSource({ doc }: { doc: Y.Doc }) {
           spellCheck={false}
           autoFocus
           value={text}
+          onKeyDown={(event) => {
+            const shortcut = markdownShortcut(event);
+            if (!shortcut || event.repeat || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            format(...shortcut);
+          }}
           onChange={(event) => {
             const value = event.target.value;
             current.current = value;
@@ -372,11 +419,13 @@ function setTextStyle(editor: Editor, level: 0 | 1 | 2 | 3) {
 function ToolbarButton({
   command,
   active,
-  editor,
+  disabled,
+  onRun,
 }: {
   command: Command;
   active: boolean;
-  editor: Editor | null;
+  disabled: boolean;
+  onRun: (command: Command) => void;
 }) {
   const Icon = command.icon;
   const isToggle = command.id !== 'horizontalRule';
@@ -387,8 +436,8 @@ function ToolbarButton({
       aria-label={command.label}
       title={command.shortcut ? `${command.label} (${command.shortcut})` : command.label}
       aria-pressed={isToggle ? active : undefined}
-      disabled={!editor}
-      onClick={() => editor && command.run(editor)}
+      disabled={disabled}
+      onClick={() => onRun(command)}
     >
       <Icon size={16} strokeWidth={1.9} aria-hidden="true" />
     </button>
@@ -397,13 +446,25 @@ function ToolbarButton({
 
 function EditorToolbar({
   editor,
+  onSource,
   mode,
   onModeChange,
 }: {
   editor: Editor | null;
+  /** Receives commands as Markdown edits while the source view is shown. */
+  onSource?: SourceCommand;
   mode: EditorMode;
   onModeChange: (mode: EditorMode) => void;
 }) {
+  const disabled = !editor && !onSource;
+  const run = (command: Command) => {
+    if (editor) command.run(editor);
+    else onSource?.(command.id as MarkdownCommand);
+  };
+  const applyStyle = (value: 0 | 1 | 2 | 3) => {
+    if (editor) setTextStyle(editor, value);
+    else onSource?.('heading', value);
+  };
   const state = useEditorState({
     editor,
     selector: ({ editor }) => {
@@ -433,7 +494,7 @@ function EditorToolbar({
           <DropdownMenu.Trigger
             className="toolbar-style"
             aria-label={`Text style: ${textStyles[level].label}`}
-            disabled={!editor}
+            disabled={disabled}
           >
             <span>{textStyles[level].label}</span>
             <ChevronDown size={14} aria-hidden="true" />
@@ -452,7 +513,7 @@ function EditorToolbar({
                 <DropdownMenu.Item
                   key={style.level}
                   className="menu-item"
-                  onSelect={() => editor && setTextStyle(editor, style.level)}
+                  onSelect={() => applyStyle(style.level)}
                 >
                   <span className={`menu-style-${style.level}`}>{style.label}</span>
                   {style.level === level ? (
@@ -471,7 +532,8 @@ function EditorToolbar({
             <ToolbarButton
               key={command.id}
               command={command}
-              editor={editor}
+              disabled={disabled}
+              onRun={run}
               active={!!active[command.id]}
             />
           ))}
@@ -482,7 +544,8 @@ function EditorToolbar({
             <ToolbarButton
               key={command.id}
               command={command}
-              editor={editor}
+              disabled={disabled}
+              onRun={run}
               active={!!active[command.id]}
             />
           ))}
@@ -492,7 +555,7 @@ function EditorToolbar({
             className="toolbar-button toolbar-overflow"
             aria-label="More formatting"
             title="More formatting"
-            disabled={!editor}
+            disabled={disabled}
           >
             <Ellipsis size={16} aria-hidden="true" />
           </DropdownMenu.Trigger>
@@ -512,7 +575,7 @@ function EditorToolbar({
                   <DropdownMenu.Item
                     key={command.id}
                     className="menu-item"
-                    onSelect={() => editor && command.run(editor)}
+                    onSelect={() => run(command)}
                   >
                     <Icon size={16} aria-hidden="true" />
                     {command.label}

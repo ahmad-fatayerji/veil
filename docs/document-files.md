@@ -17,6 +17,8 @@ The **Rich text / Markdown** switch at the end of the formatting toolbar changes
 only your own view of a tab. Edit in either view: Markdown edits apply to the
 shared document as you type and appear immediately for collaborators, and their
 edits flow into your Markdown view. A leading `# Heading` is the document title.
+In the Markdown view, the toolbar and its shortcuts insert or remove Markdown
+syntax around the selection, and `Ctrl+Z` undoes them like typing.
 Your Markdown keeps its exact spelling until someone else edits; Veil then shows
 the saved form, for example `*italic*` instead of `_italic_`.
 Files must be UTF-8 and at most 16 MiB; recovery data is also limited to 16 MiB.
