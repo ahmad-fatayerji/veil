@@ -11,6 +11,7 @@ import {
   Pencil,
   Save,
   Settings,
+  Users,
   X,
 } from 'lucide-react';
 import {
@@ -42,7 +43,7 @@ import type { Workspace, WorkspaceTab } from './workspace';
 import { useUpdateAttention } from './Updates';
 import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
-import { DocumentStatus, PeopleButton, type ConnectionState } from './shell/TitleBar';
+import { PeopleButton, type ConnectionState } from './shell/TitleBar';
 import { StatusBar } from './shell/StatusBar';
 import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
@@ -654,7 +655,24 @@ export function AutomaticApp({
           start={
             document ? (
               <>
-                <DocumentStatus state={connection} count={participants.length} />
+                {connection !== 'local' && (
+                  <span className="statusbar-connection" data-state={connection} role="status">
+                    {connection === 'sharing' || connection === 'connected' ? (
+                      <Users size={14} aria-hidden="true" />
+                    ) : (
+                      <span className="statusbar-connection-dot" aria-hidden="true" />
+                    )}
+                    {connection === 'sharing'
+                      ? 'Sharing'
+                      : connection === 'connected'
+                        ? guest
+                          ? 'Connected'
+                          : `Shared with ${participants.length - 1}`
+                        : connection === 'connecting'
+                          ? 'Connecting…'
+                          : 'Disconnected'}
+                  </span>
+                )}
                 <span className="statusbar-note" title={tab.file?.path}>
                   {tab.dirty
                     ? 'Unsaved changes'

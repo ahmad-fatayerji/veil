@@ -275,6 +275,39 @@
   .workspace-panel .desktop-content {
     grid-template-rows: auto minmax(0, 1fr) auto;
   }
+  /* Connection status reads as plain status-bar text; colour appears only for problems. */
+  .statusbar-connection {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 6px;
+    padding-left: var(--space-2);
+    color: var(--fg-muted);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+  .statusbar-connection::after {
+    content: '·';
+    margin-left: var(--space-1);
+  }
+  .statusbar-connection + .statusbar-note {
+    margin-left: calc(var(--space-3) * -1 + var(--space-1));
+  }
+  .statusbar-connection-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: var(--radius-full);
+    background: var(--warning);
+  }
+  .statusbar-connection[data-state='connecting'] .statusbar-connection-dot {
+    animation: workspace-tab-pulse 1.2s ease-in-out infinite;
+  }
+  .statusbar-connection[data-state='disconnected'] {
+    color: var(--danger);
+  }
+  .statusbar-connection[data-state='disconnected'] .statusbar-connection-dot {
+    background: var(--danger);
+  }
   /* Holds the editor's place while a new document is created, avoiding a start-screen flash. */
   .document-opening {
     min-height: 0;

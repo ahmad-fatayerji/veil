@@ -89,28 +89,6 @@ export const connectionStates = {
   disconnected: { label: 'Disconnected', tone: 'danger' },
 } as const;
 
-export function DocumentStatus({ state, count }: { state: ConnectionState; count?: number }) {
-  const { label, tone } = connectionStates[state];
-  return (
-    <span
-      className="status-pill"
-      data-tone={tone}
-      data-state={state}
-      title="Document connection status"
-    >
-      <span className="status-dot" aria-hidden="true" />
-      <span className="status-label" role="status">
-        {label}
-      </span>
-      {state === 'connected' && count && count > 1 ? (
-        <span className="status-count" aria-hidden="true">
-          · {count}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
 export function PeopleButton({
   participants,
   waiting,
