@@ -8,29 +8,40 @@ mod lifecycle;
 mod networking;
 mod overlay;
 mod session;
+mod startup;
 mod updates;
 use tauri::Manager;
 
 fn main() {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let mut builder = tauri::Builder::default();
-    #[cfg(windows)]
-    {
-        builder = builder.plugin(browser_shortcuts::init());
-    }
+    let background_launch = startup::is_background_launch(&std::env::args().collect::<Vec<_>>());
     // Acceptance runs intentionally use independent app profiles. Production is
     // one instance, so invitations cannot silently create a second document.
     if !(cfg!(debug_assertions)
         && std::env::var_os("VEIL_TEST_SETTINGS_DIR").is_some()
         && std::env::var_os("VEIL_TEST_SINGLE_INSTANCE").is_none())
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if startup::is_background_launch(&args) {
+                return;
+            }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
         }));
+    }
+    #[cfg(windows)]
+    {
+        builder = builder.plugin(browser_shortcuts::init());
+        builder = builder.plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name("Veil")
+                .args(["--autostart"])
+                .build(),
+        );
     }
     builder
         .plugin(tauri_plugin_deep_link::init())
@@ -39,15 +50,20 @@ fn main() {
         .manage(networking::Networking::default())
         .manage(updates::Updates::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|app| {
-            overlay::setup(app)?;
+        .setup(move |app| {
+            overlay::setup(app, background_launch)?;
             updates::setup(app.handle())?;
             lifecycle::setup(app)?;
             discord::setup(app.handle())?;
+            if !background_launch {
+                lifecycle::show_main(app.handle())?;
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             lifecycle::app_quit,
+            startup::startup_status,
+            startup::startup_configure,
             discord::discord_preferences,
             discord::discord_configure,
             discord::discord_update,
