@@ -42,6 +42,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             lifecycle::app_quit,
+            lifecycle::app_set_icon_theme,
             discord::discord_preferences,
             discord::discord_configure,
             discord::discord_update,

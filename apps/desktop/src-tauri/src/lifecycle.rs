@@ -1,9 +1,35 @@
 use serde::{Deserialize, Serialize};
 use tauri::{
+    image::Image,
+    include_image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, WebviewWindow,
 };
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum IconTheme {
+    Light,
+    #[default]
+    Dark,
+}
+
+impl IconTheme {
+    fn window_icon(self) -> Image<'static> {
+        match self {
+            Self::Light => include_image!("icons/theme/window-light.png"),
+            Self::Dark => include_image!("icons/theme/window-dark.png"),
+        }
+    }
+
+    fn tray_icon(self) -> Image<'static> {
+        match self {
+            Self::Light => include_image!("icons/theme/tray-light.png"),
+            Self::Dark => include_image!("icons/theme/tray-dark.png"),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -79,10 +105,32 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
                 let _ = show_main(tray.app_handle());
             }
         });
-    if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(icon.clone());
-    }
+    // The bundle icon is the dark tile; the control panel switches it once the
+    // app appearance resolves.
+    tray = tray.icon(IconTheme::default().tray_icon());
     tray.build(app)?;
+    Ok(())
+}
+
+/// Matches the taskbar and tray icons to the app's resolved light/dark appearance.
+/// Installer, executable and Start menu icons come from the bundle and stay dark.
+#[tauri::command]
+pub fn app_set_icon_theme(
+    app: AppHandle,
+    caller: WebviewWindow,
+    theme: IconTheme,
+) -> Result<(), String> {
+    if caller.label() != "main" {
+        return Err("Only the control panel can change the app icon.".into());
+    }
+    let window_icon = theme.window_icon();
+    for window in app.webview_windows().values() {
+        // Icons are cosmetic; a window that is closing must not fail the switch.
+        let _ = window.set_icon(window_icon.clone());
+    }
+    if let Some(tray) = app.tray_by_id("veil") {
+        let _ = tray.set_icon(Some(theme.tray_icon()));
+    }
     Ok(())
 }
 
