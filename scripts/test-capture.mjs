@@ -118,6 +118,10 @@ async function close() {
     .flatMap((context) => context.pages())
     .find((page) => !page.url().includes('?overlay'));
   await main.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
+  const unsaved = main.getByRole('dialog', { name: /^Save changes to / });
+  await waitFor(async () => app.exitCode !== null || (await unsaved.isVisible()), 'quit decision');
+  if (app.exitCode === null)
+    await unsaved.getByRole('button', { name: 'Discard', exact: true }).click();
   await waitFor(() => app.exitCode !== null, 'clean exit');
   await browser.close();
   browser = undefined;
@@ -130,8 +134,16 @@ function ffmpeg(args) {
   });
 }
 async function capture(mode, phase, held = false) {
-  // Keep the known background above unrelated normal windows, below the topmost overlay.
-  if (!held) native('Raise', {}, 'main', underlay.pid);
+  // Keep the known background above unrelated windows without covering the overlay.
+  if (!held) {
+    native('Raise', {}, 'main', underlay.pid);
+    const current = native('Probe');
+    assert.equal(current.visible, true, 'Overlay visible before capture');
+    if (!current.topmost) {
+      native('Focus');
+      assert.equal(native('Probe').foreground, true, 'Non-topmost overlay above the underlay');
+    }
+  }
   await delay(200);
   const bounds = native('Probe');
   const imagePath = resolve(directory, `${mode}-${phase}.png`);
@@ -225,14 +237,14 @@ async function capture(mode, phase, held = false) {
 
 const handles = {
   move: ['Move', 'move'],
-  north: ['Resize ↕', 'vertical'],
-  south: ['Resize ↕', 'vertical'],
-  east: ['Resize ↔', 'horizontal'],
-  west: ['Resize ↔', 'horizontal'],
-  northEast: ['Resize ↗', 'nesw'],
-  southWest: ['Resize ↗', 'nesw'],
-  northWest: ['Resize ↘', 'nwse'],
-  southEast: ['Resize ↘', 'nwse'],
+  north: ['Resize vertically', 'vertical'],
+  south: ['Resize vertically', 'vertical'],
+  east: ['Resize horizontally', 'horizontal'],
+  west: ['Resize horizontally', 'horizontal'],
+  northEast: ['Resize diagonally', 'nesw'],
+  southWest: ['Resize diagonally', 'nesw'],
+  northWest: ['Resize diagonally', 'nwse'],
+  southEast: ['Resize diagonally', 'nwse'],
 };
 const handleLocator = (overlay, handle) =>
   overlay.locator(handle === 'move' ? '.overlay-drag-handle' : `.overlay-resize-${handle}`);
@@ -613,7 +625,7 @@ try {
   await main.getByRole('button', { name: 'Capture compatibility test', exact: true }).click();
   await main.getByRole('button', { name: 'Show test card', exact: true }).click();
   await overlay.getByLabel('Capture test card').waitFor();
-  const opacitySlider = main.getByRole('slider', { name: /Opacity/ });
+  const opacitySlider = main.getByRole('slider', { name: /Window opacity/ });
   assert.deepEqual(
     await opacitySlider.evaluate((node) => {
       const style = getComputedStyle(node);
@@ -721,6 +733,8 @@ try {
     await command(main, 'overlay_update', { patch });
     assert.equal(native('Probe').affinity, 0x11);
     assert.equal((await snapshot(main)).capture.status, 'applied');
+    // Check pixels before hide/show or Reapply can repair a stale capture surface.
+    await captureExcluded(`appearance-${Object.keys(patch)[0]}-${Object.values(patch)[0]}`);
   }
   await command(main, 'overlay_visibility', { visible: false });
   await command(main, 'overlay_visibility', { visible: true });
@@ -753,10 +767,18 @@ try {
   for (const property of ['x', 'y', 'width', 'height', 'alpha', 'topmost', 'clickThrough'])
     assert.equal(afterReapply[property], beforeReapply[property], `Reapply preserves ${property}`);
   await captureExcluded('explicit-reapply');
+  // Simulate a refresh failure hiding the HWND without updating Tao's visible flag.
+  native('Hide');
+  assert.equal(native('Probe').visible, false, 'Native-only hide fixture');
+  await command(main, 'overlay_visibility', { visible: true });
+  assert.equal(native('Probe').visible, true, 'Show recovers a natively hidden overlay');
+  assert.equal((await snapshot(main)).settings.visible, true);
+  assert.equal((await snapshot(main)).capture.status, 'applied');
+  await captureExcluded('native-hide-recovery');
   await main.screenshot({ path: resolve(directory, 'control-panel.png'), fullPage: true });
   await command(main, 'overlay_capture_test', { enabled: false });
   await main.getByRole('button', { name: 'Close Settings', exact: true }).click();
-  await main.getByRole('button', { name: 'Create document', exact: true }).click();
+  await main.getByRole('button', { name: 'New document', exact: true }).click();
   await overlay.locator('.tiptap').waitFor();
   for (const excluded of [true, false]) {
     await command(main, 'overlay_update', { patch: { captureExclusion: excluded, opacity: 1 } });
@@ -777,10 +799,11 @@ try {
     }
   }
   await command(main, 'overlay_update', { patch: { captureExclusion: true } });
-  await main.getByRole('button', { name: 'Close document', exact: true }).click();
+  await main.getByRole('button', { name: /^Document menu/ }).click();
+  await main.getByRole('menuitem', { name: 'Close document', exact: true }).click();
   await main
-    .getByRole('dialog', { name: 'Close document?', exact: true })
-    .getByRole('button', { name: 'Close document', exact: true })
+    .getByRole('dialog', { name: /^Save changes to / })
+    .getByRole('button', { name: 'Discard', exact: true })
     .click();
   await close();
   ({ main, overlay } = await launch());

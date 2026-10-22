@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Veil",
-  "version": "0.7.2",
-  "identifier": "dev.veil.desktop",
+  "version": "1.0.0",
+  "identifier": "veil",
   "build": {
     "beforeDevCommand": "pnpm --filter @veil/web build && pnpm dev",
     "devUrl": "http://127.0.0.1:1420",
@@ -13,11 +13,13 @@
     "windows": [
       {
         "label": "main",
+        "visible": false,
         "title": "Veil",
         "width": 1180,
         "height": 860,
         "minWidth": 480,
-        "minHeight": 600
+        "minHeight": 600,
+        "decorations": false
       }
     ],
     "security": {
@@ -36,6 +38,7 @@
       },
       "nsis": {
         "installMode": "currentUser",
+        "installerHooks": "nsis/markdown.nsh",
         "displayLanguageSelector": false
       }
     },

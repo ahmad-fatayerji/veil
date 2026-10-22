@@ -1,0 +1,11 @@
+{
+  "identifier": "discord-community",
+  "description": "The control panel can open Veil's Discord community invite in the default browser.",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://discord.gg/PHQQfyYNRE" }]
+    }
+  ]
+}

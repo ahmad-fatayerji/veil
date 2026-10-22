@@ -26,6 +26,25 @@ export function proposeVersion(current, messages, hotfix = false) {
   return semver.inc(current, bump);
 }
 
+// An operator may choose the version (e.g. a 1.0.0 milestone) instead of the proposal.
+export function requestedVersion(requested, current, hotfix = false) {
+  const version = semver.valid(requested);
+  if (!version || semver.prerelease(version) || version !== requested)
+    throw new Error('Requested version must be a stable version such as 1.0.0.');
+  if (!semver.gt(version, current))
+    throw new Error(`Requested version must be newer than ${current}.`);
+  if (hotfix && version !== semver.inc(current, 'patch'))
+    throw new Error('Hotfixes must use the next patch version.');
+  return version;
+}
+
+// Published betas advance update feeds on main. Those commits never change the
+// release baseline, so they do not require a back-merge before preparing.
+export function feedOnlyDrift(paths) {
+  const changed = paths.filter(Boolean);
+  return changed.length > 0 && changed.every((path) => /^updates\/[a-z]+\.json$/.test(path));
+}
+
 export function releaseNotes(version, messages) {
   const groups = new Map();
   for (const message of messages) {

@@ -156,7 +156,7 @@ try {
   assert.equal(
     await invoke(page, 'update_install').then(
       () => false,
-      (error) => String(error).includes('End or leave'),
+      (error) => /End or leave|close all tabs/.test(String(error)),
     ),
     true,
   );
@@ -183,7 +183,15 @@ try {
   assert.equal(settings.opacity, 0.63);
   assert.equal(settings.fontSize, 26);
   if (updateTo) {
-    await page.locator('.desktop-updates summary').click();
+    if (await page.locator('.desktop-updates summary').isVisible())
+      await page.locator('.desktop-updates summary').click();
+    else {
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page
+        .getByRole('navigation', { name: 'Settings sections' })
+        .getByRole('button', { name: 'About & updates', exact: true })
+        .click();
+    }
     await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
     await waitFor(
       async () => (await invoke(page, 'update_status')).availableVersion === updateTo,

@@ -7,13 +7,18 @@
     ".": "./src/index.tsx"
   },
   "dependencies": {
-    "@veil/collaboration": "workspace:*",
+    "@radix-ui/react-dropdown-menu": "^2.2.1",
     "@tiptap/extension-collaboration": "^3.31.4",
     "@tiptap/extension-collaboration-caret": "3.31.4",
+    "@tiptap/extension-list": "^3.31.4",
+    "@tiptap/extension-strike": "3.31.4",
+    "@tiptap/markdown": "3.31.4",
     "@tiptap/react": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
     "@tiptap/y-tiptap": "^3.0.0",
+    "@veil/collaboration": "workspace:*",
     "@veil/protocol": "workspace:*",
+    "lucide-react": "^1.61.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "yjs": "^13.6.27"

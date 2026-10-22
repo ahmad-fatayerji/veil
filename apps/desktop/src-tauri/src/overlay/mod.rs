@@ -2,7 +2,7 @@ mod platform;
 mod settings;
 
 use serde::{Deserialize, Serialize};
-use settings::Settings;
+use settings::{Keybinds, Settings};
 use std::{
     path::PathBuf,
     sync::{mpsc, Arc, Mutex},
@@ -12,7 +12,7 @@ use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 const OVERLAY: &str = "overlay";
 
@@ -97,7 +97,7 @@ fn refresh_capture(
     let enabled = preferences.capture_exclusion;
     let result = platform::capture_exclusion(&overlay, enabled, apply).and_then(|()| {
         if enabled && apply && refresh_surface {
-            platform::refresh_capture_surface(&overlay, preferences.opacity)?;
+            platform::refresh_capture_surface(&overlay, 1.0)?;
             // Showing the HWND must not invalidate its confirmed affinity.
             platform::capture_exclusion(&overlay, enabled, false)?;
         }
@@ -128,10 +128,14 @@ pub struct OverlayState {
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Patch {
+    keybinds: Option<Keybinds>,
     opacity: Option<f64>,
+    text_opacity: Option<f64>,
+    opacity_linked: Option<bool>,
     always_on_top: Option<bool>,
     click_through: Option<bool>,
     font_size: Option<u32>,
+    formatting: Option<settings::Formatting>,
     capture_exclusion: Option<bool>,
     close_behavior: Option<crate::lifecycle::CloseBehavior>,
 }
@@ -201,14 +205,18 @@ fn apply(
     if capabilities.always_on_top {
         platform::always_on_top(window, settings.always_on_top)?;
     }
-    // Toolkit style changes can replace extended styles; apply layered opacity last.
+    // Keep native alpha fully opaque: background and document opacity are separate
+    // WebView layers. Toolkit style changes can replace extended styles.
     if capabilities.transparency {
-        platform::opacity(window, settings.opacity)?;
+        platform::opacity(window, 1.0)?;
     }
     Ok(())
 }
 
-pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+pub fn setup(
+    app: &mut tauri::App,
+    background_launch: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let directory = app.path().app_config_dir()?;
     // Native acceptance tests isolate preferences from the user's device settings.
     #[cfg(debug_assertions)]
@@ -223,6 +231,10 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             Some("Saved overlay settings could not be read. Defaults were restored.".to_owned()),
         ),
     };
+    // Sign-in launches stay quiet even if the previous run saved a visible overlay.
+    if background_launch {
+        preferences.visible = false;
+    }
     let capabilities = platform::capabilities();
     let model = Arc::new(Mutex::new(Snapshot {
         settings: preferences.clone(),
@@ -243,11 +255,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         save_requests: sender,
         path: path.clone(),
     });
-    let recover = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
-    let hide = Shortcut::new(
-        Some(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT),
-        Code::KeyV,
-    );
+    let recover: Shortcut = preferences.keybinds.recover_controls.parse()?;
+    let hide: Shortcut = preferences.keybinds.toggle_overlay.parse()?;
     app.handle().plugin(
         tauri_plugin_global_shortcut::Builder::new()
             .with_handler(move |app, shortcut, event| {
@@ -256,9 +265,14 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 {
                     return;
                 }
-                let result = if shortcut == &recover {
+                let bindings = snapshot(app).settings.keybinds;
+                let result = if bindings.recover_controls.parse::<Shortcut>().ok().as_ref()
+                    == Some(shortcut)
+                {
                     recover_controls(app)
-                } else if shortcut == &hide {
+                } else if bindings.toggle_overlay.parse::<Shortcut>().ok().as_ref()
+                    == Some(shortcut)
+                {
                     toggle_visible(app)
                 } else {
                     Ok(())
@@ -273,7 +287,13 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let hide_shortcut_available = app.global_shortcut().register(hide).is_ok();
     if !recovery_available {
         preferences.click_through = false;
-        warning = Some("Ctrl+Alt+V is already in use. Click-through is disabled; the control panel can still show or hide the overlay.".to_owned());
+    }
+    if let Some(message) = shortcut_warning(
+        &preferences.keybinds,
+        recovery_available,
+        hide_shortcut_available,
+    ) {
+        warning = Some(message);
     }
     let overlay =
         WebviewWindowBuilder::new(app, OVERLAY, WebviewUrl::App("index.html?overlay".into()))
@@ -378,6 +398,11 @@ pub fn flush_checked(app: &AppHandle) -> Result<(), OverlayError> {
 fn set_visible(app: &AppHandle, visible: bool) -> Result<(), OverlayError> {
     let overlay = window(app)?;
     if visible {
+        // A failed native capture refresh can hide the HWND without updating Tao's
+        // visibility flag. Synchronize it so show cannot become an unchanged no-op.
+        if !overlay.is_visible().map_err(OverlayError::native)? {
+            overlay.hide().map_err(OverlayError::native)?;
+        }
         let mut preferences = snapshot(app).settings;
         preferences.fit(&areas(&overlay)?);
         overlay
@@ -441,6 +466,92 @@ pub fn overlay_snapshot(app: AppHandle, caller: WebviewWindow) -> Result<Snapsho
     Ok(snapshot(&app))
 }
 
+fn shortcut_warning(bindings: &Keybinds, recovery: bool, hide: bool) -> Option<String> {
+    let mut unavailable = Vec::new();
+    if !recovery {
+        unavailable.push(bindings.recover_controls.as_str());
+    }
+    if !hide {
+        unavailable.push(bindings.toggle_overlay.as_str());
+    }
+    if unavailable.is_empty() {
+        return None;
+    }
+    Some(format!("Global shortcut unavailable: {}. Change it in Settings > Keybinds or use the tray to restore controls.{}",
+        unavailable.join(", "), if recovery { "" } else { " Click-through is disabled." }))
+}
+
+fn rebind_shortcuts(
+    app: &AppHandle,
+    current: &Snapshot,
+    next: &Keybinds,
+) -> Result<(), OverlayError> {
+    let parse = |value: &str| {
+        value
+            .parse::<Shortcut>()
+            .map_err(|_| OverlayError::new("INVALID_KEYBIND", "Unsupported shortcut."))
+    };
+    let old: Vec<_> = [
+        (
+            &current.settings.keybinds.recover_controls,
+            current.recovery_available,
+        ),
+        (
+            &current.settings.keybinds.toggle_overlay,
+            current.hide_shortcut_available,
+        ),
+    ]
+    .into_iter()
+    .filter(|(_, available)| *available)
+    .map(|(value, _)| parse(value))
+    .collect::<Result<_, _>>()?;
+    let desired = [parse(&next.recover_controls)?, parse(&next.toggle_overlay)?];
+    let retry_all = next == &current.settings.keybinds;
+    let recovery_available = current.recovery_available
+        || retry_all
+        || next.recover_controls != current.settings.keybinds.recover_controls;
+    let hide_available = current.hide_shortcut_available
+        || retry_all
+        || next.toggle_overlay != current.settings.keybinds.toggle_overlay;
+    let mut acquired = Vec::new();
+    for (shortcut, enabled) in desired.iter().zip([recovery_available, hide_available]) {
+        if !enabled {
+            continue;
+        }
+        if old.contains(shortcut) {
+            continue;
+        }
+        if app.global_shortcut().register(*shortcut).is_err() {
+            for registered in acquired {
+                let _ = app.global_shortcut().unregister(registered);
+            }
+            return Err(OverlayError::new("KEYBIND_UNAVAILABLE", "That global shortcut is unavailable. Choose another combination; your previous keybinds are unchanged."));
+        }
+        acquired.push(*shortcut);
+    }
+    // Switch dispatch before retiring old registrations. Failed removals cannot trigger an old action.
+    modify(app, |model| {
+        model.settings.keybinds = next.clone();
+        model.recovery_available = recovery_available;
+        model.hide_shortcut_available = hide_available;
+        if current.warning
+            == shortcut_warning(
+                &current.settings.keybinds,
+                current.recovery_available,
+                current.hide_shortcut_available,
+            )
+        {
+            model.warning = shortcut_warning(next, recovery_available, hide_available);
+        }
+    });
+    for shortcut in old {
+        if !desired.contains(&shortcut) {
+            let _ = app.global_shortcut().unregister(shortcut);
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn overlay_update(
     app: AppHandle,
@@ -470,8 +581,17 @@ pub fn overlay_update(
         }
         next.click_through = value;
     }
+    if let Some(value) = patch.text_opacity {
+        next.text_opacity = value;
+    }
+    if let Some(value) = patch.opacity_linked {
+        next.opacity_linked = value;
+    }
     if let Some(value) = patch.font_size {
         next.font_size = value;
+    }
+    if let Some(value) = patch.formatting {
+        next.formatting = value;
     }
     if let Some(value) = patch.capture_exclusion {
         next.capture_exclusion = value;
@@ -479,13 +599,16 @@ pub fn overlay_update(
     if let Some(value) = patch.close_behavior {
         next.close_behavior = value;
     }
+    let keybind_update = patch.keybinds.is_some();
+    if let Some(value) = patch.keybinds {
+        next.keybinds = value;
+    }
     next.validate()?;
     // Reapply the appearance after toolkit style changes replace the extended styles.
     let overlay = window(&app)?;
-    let result = if patch.always_on_top.is_some() || patch.click_through.is_some() {
+    let style_update = patch.always_on_top.is_some() || patch.click_through.is_some();
+    let result = if style_update {
         apply(&overlay, &next, &current.capabilities)
-    } else if patch.opacity.is_some() {
-        platform::opacity(&overlay, next.opacity)
     } else {
         Ok(())
     };
@@ -502,15 +625,19 @@ pub fn overlay_update(
         }
         return Err(error);
     }
+    if keybind_update {
+        rebind_shortcuts(&app, &current, &next.keybinds)?;
+    }
     modify(&app, |model| model.settings = next);
-    // Toolkit style and alpha changes must preserve/reapply display affinity. Capture
-    // failure has its own status and must not disable unrelated overlay controls.
-    if patch.capture_exclusion.is_some()
-        || patch.always_on_top.is_some()
-        || patch.click_through.is_some()
-        || patch.opacity.is_some()
-    {
-        refresh_capture(&app, true, patch.capture_exclusion == Some(true))?;
+    // Toolkit style changes can replace the protected layered surface even when
+    // affinity readback matches. Rebuild it as on explicit enable/reapply.
+    // Capture failure has its own status and does not disable unrelated controls.
+    if patch.capture_exclusion.is_some() || style_update {
+        refresh_capture(
+            &app,
+            true,
+            patch.capture_exclusion == Some(true) || style_update,
+        )?;
     }
     Ok(snapshot(&app))
 }

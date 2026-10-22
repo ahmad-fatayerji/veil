@@ -112,7 +112,8 @@ try {
   // Actual scoped command verifies updater's native session guard.
   const active = await host.evaluate(() => window.__TAURI_INTERNALS__.invoke('update_status'));
   assert.equal(active.sessionActive, true);
-  await guest.getByRole('button', { name: 'Leave session', exact: true }).first().click();
+  await guest.getByRole('button', { name: /^Document menu/ }).click();
+  await guest.getByRole('menuitem', { name: 'Leave session', exact: true }).click();
   await waitFor(
     async () =>
       (await host.getByRole('list', { name: 'Participants' }).getByRole('listitem').count()) === 1,

@@ -8,12 +8,24 @@ connectivity on every network.
 
 ## Documents and participants
 
-Documents and session secrets are held in memory, rather than saved as durable
-documents by the desktop app or sharing server. Closing a document, ending a
-session, or quitting discards that in-memory work. This is not a secure-erasure
-guarantee: operating-system paging, crash dumps, endpoint malware, or a participant
-copying content can retain information. Preferences and server configuration are
-stored separately from documents.
+Document editing and session secrets stay in memory. Participants can manually
+save the shared title and body to UTF-8 Markdown files on their own devices;
+file paths, save state, credentials, and invitation links are not shared or written
+into these files. Optional workspace recovery is off by default. Enabling it
+stores document snapshots, local file paths, tab order, and the selected tab in
+`workspace.json` under Veil's local app data. This is a content snapshot, without
+collaboration credentials, participant awareness, or reconnectable session state.
+
+Saved Markdown and recovery drafts are not encrypted by Veil. Closing to the tray
+keeps documents and sessions running. Closing an unsaved tab or quitting asks to
+save or discard; discard removes its recovery snapshot. After a normal quit,
+restoration reopens saved files from disk; after an unexpected exit, recovery can
+also restore unsaved content. Disabling recovery removes stored snapshots without
+closing current documents. Damaged recovery files are backed up before replacement
+so manual recovery remains possible. Deleting or discarding is not a secure-erasure
+guarantee: operating-system paging, crash dumps, backups, endpoint malware, or a
+participant copying content can retain information. Preferences and host credentials
+are stored separately.
 
 Anyone holding a reusable `veil://join/...` link can join and edit while sharing
 is active. There are no viewer roles, per-user permission controls, or verified
@@ -24,7 +36,31 @@ through a trusted channel and treat them as secrets.
 admissions. Neither removes guests already admitted: their authenticated tickets,
 recovery, and relay renewal remain valid until the session ends. End the session
 to disconnect everyone. The host must stay available; there is no host migration
-or durable recovery after quitting.
+or automatic reconnection after quitting. Restored documents start locally.
+
+## Discord Rich Presence
+
+Discord Rich Presence is enabled by default in the Windows desktop app. When
+Discord is running and activity sharing is allowed in Discord, Veil shares the
+current document title (labeled "Document: ...") and how many other participants are connected. Solo
+documents show a solo editing message; without a document it shows "No document
+open". Pending join requests are excluded from the count.
+
+In **Settings > Sharing > Discord**, turn off **Show document title** to use "Editing a
+document" instead, or turn off **Show participant count** to omit that information.
+Turn off **Discord Rich Presence** to clear Veil's activity and stop connecting
+to Discord. All three settings default to on and are remembered on this device;
+the individual privacy choices are retained when Rich Presence is disabled.
+If saved preferences cannot be read, presence stays paused until a setting is
+saved. If saving fails, changes still apply for the current run and Settings
+shows a warning that they may not survive a restart.
+
+Only the title and aggregate count are shared through local Discord IPC. Veil
+does not include document contents, participant names, credentials, or invitation
+links. Activity data stays in Veil's memory, but sharing it with Discord is subject
+to Discord's own visibility and data handling. Presence continues while Veil is
+in the tray and is cleared when Veil quits. Discord absence or restart does not
+interrupt editing. Browser and legacy development tools do not publish presence.
 
 ## Encrypted peer connections and signaling
 
@@ -61,6 +97,12 @@ perform bounded HTTPS/WSS operations and validate certificates. Host credentials
 are stored in Windows Credential Manager, scoped to that origin; saved credentials
 are not returned to frontend JavaScript. Native administration belongs to the
 control panel, and frontend CSP does not allow arbitrary remote WebSockets.
+
+Servers may also offer bounded public hosting (`publicHosting: 1`): sessions are
+created without a host credential and limited per client network by the server.
+Veil's public server is suggested until another server is saved; public sessions
+use the same end-to-end invitation and signaling protections, but the operator of a
+shared public server can still observe metadata and deny service.
 
 Operators issue and revoke host authorization. Forgetting a saved credential only
 removes the local copy; server revocation is a separate operator action. The server

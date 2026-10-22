@@ -1,5 +1,137 @@
 # Verification record
 
+## Save, Open, tabs, and recovery acceptance
+
+The following cases require user testing on Windows 10/11 with WebView2. They are
+acceptance instructions, not verification records. Regression tests were added
+for Markdown conversion, workspace decisions, connection isolation, atomic writes,
+encoding and size failures, and update gating; execution remains with the user.
+
+1. Save and reopen Unicode titles, all formatting commands, nested tasks/lists,
+   quotes, code, and dividers. Repeat with BOM/CRLF, empty notes, unsupported
+   links/images/HTML/tables, and invalid UTF-8 or oversized files.
+2. Cancel Open and Save As; try read-only and unavailable locations. Confirm notes
+   and unsaved state survive. Edit a saved file externally and exercise Overwrite,
+   Save As, and Cancel. Make edits during a save; newer changes must stay unsaved.
+   Reopen the same path without duplicating its tab; Save As must not overwrite a
+   file open in another tab.
+3. Host one tab, join another, and edit a third locally. Check each tab's People,
+   Share, and Discord activity. Reconnect or close one session without interrupting
+   the others. Verify editor undo and selection survive tab switches.
+4. Edit in the overlay while switching tabs, then immediately save or close.
+   Verify edits reach their originating document and the overlay follows selection.
+   Check Ctrl+N/O/S/Shift+S/Tab/Shift+Tab/W, Ctrl+1–9, strikethrough on
+   Ctrl+Shift+X, and arrow/Home/End navigation in the tab strip.
+   With tabs in the title bar, drag and double-click the empty title bar space,
+   middle-click a tab to close it, and scroll an overflowing tab strip with the
+   mouse wheel. New, Open, or Join from a blank Home tab must replace it. The
+   People, overlay, Share, and ⋯ document menu controls must follow the selected
+   tab; saving must not flicker or disable the tabs.
+   Switch a shared tab to Markdown and edit while a collaborator edits another
+   paragraph in rich text. Both edits must survive, your caret must stay put, the
+   title must follow the leading `# Heading`, and switching back must keep undo.
+   Italic text must render slanted in rich text.
+   In the overlay, check each Formatting controls setting, the Markdown toggle,
+   the document switcher with several tabs, avatar activity tooltips, the
+   recovery hint appearing only in click-through mode, text opacity sparing the
+   formatting controls, and arrow cursors on controls with capture exclusion.
+5. Exercise tab close, tray Quit, Alt+F4, and window close configured as Quit.
+   Check Save / Discard / Cancel across several tabs, failed/cancelled saves,
+   remote edits during prompts, and the hosted-session warning. Cancel must keep
+   all sessions alive; closing to the tray must preserve the workspace.
+6. Enable restoration, leave saved and unsaved tabs open, force an unexpected
+   exit, and reopen. Restore content/order locally without reconnecting sessions.
+   Repeat normal quit with Save and Discard: discarded unnamed drafts must not
+   return. Disable restoration and verify snapshots disappear while current notes
+   remain. Check missing files, damaged recovery, and recovery write failures.
+7. Install a local test build and use Explorer's Open with on paths containing
+   spaces and Unicode, with Veil closed and running. The default editor must stay
+   unchanged; uninstall must remove only Veil's association. No publication is
+   required for this acceptance test.
+8. Updates must remain blocked with any document or background connection open,
+   including after closing the selected tab or selecting Home.
+
+## Windows startup - 22 October 2026
+
+Added **Start Veil with Windows** in Settings > General, off by default. Sign-in
+launches use `--autostart` and keep the control panel and overlay hidden while the
+tray initializes. Manual launches and invitations show the control panel; duplicate
+autostart launches do not reveal it. The toggle refreshes from Windows registration
+whenever Settings opens and reports read/write failures without optimistic changes.
+
+The autostart plugin is pinned to 2.5.1 for current-user registration. Native code
+quotes its registered executable path for installation paths containing spaces and
+removes the registration if enabling or quoting fails. Direct plugin commands are
+not granted to WebViews; the app's startup commands require the main window.
+
+TypeScript, changed-source ESLint, Prettier, rustfmt and `git diff --check` passed.
+Windows `cargo check -p veil-desktop --tests` passed, compiling the added launch
+argument regression cases. Test suites and native acceptance were not run.
+This feature does not change any server or peer protocol contract.
+
+Manual acceptance on an installed Windows build:
+
+1. With no startup registration, confirm the switch is off. Restart Veil and confirm
+   it stays off; signing in to Windows must not launch Veil.
+2. Enable the switch, quit, and sign in again. Confirm one tray icon, no control
+   panel or overlay flash, and no taskbar window, including after saving a visible
+   overlay in the previous run. Repeat with an installation path containing spaces.
+3. Open Veil from the tray, a normal app launch, and an invitation link while it is
+   running in the tray. Confirm the control panel opens and invitations still work.
+   Invoke the executable with `--autostart` again and confirm it stays hidden.
+4. Confirm tray overlay controls and Quit Veil still work. Disable startup, quit,
+   and sign in again; Veil must remain closed. Confirm the disabled choice survives
+   an app upgrade, and an enabled choice remains enabled without re-registering.
+5. Disable Veil through Windows Startup Apps, then reopen Settings and confirm the
+   switch reflects that change. Re-enable in Veil and confirm startup works again.
+6. With registration writes denied in a disposable Windows test account, confirm
+   an accessible error and the last confirmed switch value. Reopen Settings to
+   refresh the actual state. Confirm the overlay cannot invoke startup commands.
+
+## Discord Rich Presence - 22 October 2026
+
+Added default-on Windows Discord activity and independent title/count privacy
+switches in Settings > General. The native manager applies privacy before sending
+activity, keeps only the latest state, prioritizes privacy changes, and uses
+bounded IPC transactions and reconnect backoff. Preferences are stored separately
+from temporary documents. Browser/legacy flows do not activate presence.
+
+Verified source compilation with TypeScript and Windows `cargo check` (including
+compilation of the Rust regression tests); desktop Clippy with warnings denied,
+changed-source ESLint, Prettier, rustfmt, and `git diff --check` passed. Local test
+suites, `pnpm check`, live Discord, and native UI acceptance were not run. The added Rust cases cover title
+and count privacy, solo/singular/plural wording, blank/Unicode titles, preference
+defaults/migration/round trips, corrupt preferences, and failed writes. They have
+not been executed.
+
+Manual acceptance on Windows with Discord activity sharing enabled:
+
+1. Start with fresh preferences and confirm all three switches default on. With
+   no document open, confirm "No document open". Create a document, rename it,
+   and confirm "Document: <title>" and "Editing solo" appear. With guests, the
+   second line should say "Editing with 1 other" / "Editing with X others".
+2. Connect one guest and then another. Confirm "1 other" and "2 others", excluding
+   yourself. Pending approval requests must not change the count; departures
+   must update it. Rename the document from the other client.
+3. Exercise all title/count switch combinations. Hidden titles become "Editing a
+   document" with a compact "Solo" / "With X others" count line rather than
+   repeating the editing message; hidden counts disappear. Try blank, long Unicode, and single-letter
+   titles. Confirm privacy changes promptly remove previously visible fields.
+4. Disable Rich Presence and confirm activity clears. Both subordinate controls
+   must be disabled with their values preserved. Restart Veil while disabled,
+   then re-enable it and confirm the saved privacy choices remain effective.
+5. Start Discord after Veil, restart Discord, and check recovery with current
+   privacy choices. Minimize Veil to the tray and keep editing through the
+   overlay; confirm activity remains current. Close the document and quit Veil;
+   confirm idle and then cleared activity.
+6. Navigate the switches by keyboard and verify labels, focus visibility, and
+   disabled states. In an isolated debug preferences directory, corrupt
+   `discord.json` and confirm presence pauses with a Settings warning. Simulate a
+   failed preference write and confirm the new privacy choices apply during that
+   run while Settings explains they were not saved.
+
+No server contract or protocol-generation changes, merge, or release publication.
+
 ## Overlay capture layer hotfix - 12 October 2026
 
 The user tested PR #43 with Discord full-desktop sharing started before Veil.

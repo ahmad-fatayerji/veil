@@ -103,7 +103,7 @@ try {
   const main = pages().find((page) => !page.url().includes('?overlay'));
   const overlay = pages().find((page) => page.url().includes('?overlay'));
   for (const page of pages()) page.on('pageerror', (error) => errors.push(error.message));
-  await main.getByRole('button', { name: 'Create document', exact: true }).click();
+  await main.getByRole('button', { name: 'New document', exact: true }).click();
   await main.locator('.tiptap').fill('Tray keeps my temporary document');
   await invoke(main, 'overlay_visibility', { visible: true });
   await expect(overlay.locator('.tiptap')).toContainText('Tray keeps my temporary document');
@@ -236,6 +236,11 @@ try {
   // Exercise the native shutdown shared by tray Quit Veil and app_quit.
   // This does not simulate a physical tray-menu click.
   await invoke(main, 'app_quit').catch(() => {});
+  const unsaved = main.getByRole('dialog', { name: /^Save changes to / });
+  await unsaved.getByRole('button', { name: 'Cancel', exact: true }).click();
+  assert.equal(app.exitCode, null, 'Cancel preserves the workspace');
+  await invoke(main, 'app_quit');
+  await unsaved.getByRole('button', { name: 'Discard', exact: true }).click();
   await waitFor(() => app.exitCode !== null);
   assert.equal(app.exitCode, 0);
   assert.equal(
@@ -257,16 +262,20 @@ try {
     async () => (await invoke(restarted, 'overlay_snapshot')).settings.closeBehavior === 'quit',
   );
   await restarted.getByRole('button', { name: 'Close Settings', exact: true }).click();
-  await restarted.getByRole('button', { name: 'Create document', exact: true }).click();
+  await restarted.getByRole('button', { name: 'New document', exact: true }).click();
   await restarted.locator('.tiptap').fill('Window close quits even with a temporary document');
   await invoke(restarted, 'overlay_visibility', { visible: true });
   assert.equal(native('Probe', 'overlay').visible, true);
   native('Close', 'main');
+  await restarted
+    .getByRole('dialog', { name: /^Save changes to / })
+    .getByRole('button', { name: 'Discard', exact: true })
+    .click();
   await waitFor(() => app.exitCode !== null);
   assert.equal(app.exitCode, 0);
   assert.deepEqual(errors, []);
   console.log(
-    `PASS: default tray behavior, immediate native close in Quit mode, immediate native quit, overlay preservation and preference restart. Evidence: ${directory}`,
+    `PASS: default tray behavior, save/discard/cancel on native close and quit, overlay preservation and preference restart. Evidence: ${directory}`,
   );
 } finally {
   if (browser) await browser.close().catch(() => {});

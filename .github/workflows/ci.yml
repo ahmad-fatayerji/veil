@@ -267,12 +267,18 @@ jobs:
   networking:
     needs: plan
     if: needs.plan.outputs.networking == 'true'
-    name: Signaling and selective relay regression
+    name: Signaling and selective relay regression (${{ matrix.transport }})
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Each TURN transport is an independent pass; parallel runners halve the wall time.
+    strategy:
+      fail-fast: false
+      matrix:
+        transport: [udp, tcp]
     env:
       VEIL_NETWORK_MODE: ${{ needs.plan.outputs.extended == 'true' && 'full' || 'smoke' }}
       VEIL_SERVER_SOURCE: ${{ github.workspace }}/target/server-source
+      VEIL_TURN_TRANSPORT: ${{ matrix.transport }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -280,7 +286,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: ahmad-fatayerji/veil-server
-          ref: 7009e06f2d457e96d108a83de7f953a51faba215
+          ref: 837d7e89c3c808418e02409323ff708a5647b447
           path: target/server-source
       - uses: dtolnay/rust-toolchain@1.99.0
       - uses: Swatinem/rust-cache@v2
@@ -301,13 +307,10 @@ jobs:
       - run: cargo build --manifest-path target/server-source/Cargo.toml --locked
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:network
-      - run: pnpm test:network
-        env:
-          VEIL_TURN_TRANSPORT: tcp
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: network-measurements-${{ github.run_id }}-${{ github.run_attempt }}
+          name: network-measurements-${{ matrix.transport }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             target/network-acceptance/**/failure.json
             target/network-acceptance/**/measurements.json

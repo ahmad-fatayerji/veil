@@ -1,3 +1,4 @@
+import type { Keybinds } from '../keybinds';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useState } from 'react';
@@ -11,18 +12,25 @@ export interface OverlayCapabilities {
 
 export interface OverlaySettings {
   version: number;
+  keybinds: Keybinds;
   x: number;
   y: number;
   width: number;
   height: number;
   opacity: number;
+  textOpacity: number;
+  opacityLinked: boolean;
   alwaysOnTop: boolean;
   clickThrough: boolean;
   captureExclusion: boolean;
   fontSize: number;
+  formatting: OverlayFormatting;
   visible: boolean;
   closeBehavior: 'tray' | 'quit';
 }
+
+/** How the overlay offers formatting; shortcuts and Markdown typing always work. */
+export type OverlayFormatting = 'bubble' | 'toolbar' | 'none';
 
 export interface OverlaySnapshot {
   settings: OverlaySettings;
@@ -40,7 +48,16 @@ export interface OverlaySnapshot {
 export type OverlayPatch = Partial<
   Pick<
     OverlaySettings,
-    'opacity' | 'alwaysOnTop' | 'clickThrough' | 'fontSize' | 'captureExclusion' | 'closeBehavior'
+    | 'keybinds'
+    | 'opacity'
+    | 'textOpacity'
+    | 'opacityLinked'
+    | 'alwaysOnTop'
+    | 'clickThrough'
+    | 'fontSize'
+    | 'formatting'
+    | 'captureExclusion'
+    | 'closeBehavior'
   >
 >;
 

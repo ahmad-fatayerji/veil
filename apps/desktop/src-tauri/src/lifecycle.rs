@@ -27,17 +27,12 @@ pub fn refresh_overlay_label(app: &AppHandle, visible: bool) {
     }
 }
 
-pub fn quit_immediately(app: &AppHandle) {
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        if let Err(error) = quit(&app).await {
-            let _ = show_main(&app);
-            let _ = app.emit_to("main", "app-quit-failed", error);
-        }
-    });
+pub fn request_quit(app: &AppHandle) {
+    let _ = show_main(app);
+    let _ = app.emit_to("main", "app-quit-requested", ());
 }
 
-fn show_main(app: &AppHandle) -> tauri::Result<()> {
+pub(crate) fn show_main(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window("main") {
         window.show()?;
         window.unminimize()?;
@@ -62,7 +57,7 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
                 let _ = show_main(app);
             }
             "quit" => {
-                quit_immediately(app);
+                request_quit(app);
             }
             "overlay" => crate::overlay::tray_toggle(app),
             _ => {}
@@ -79,8 +74,10 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
                 let _ = show_main(tray.app_handle());
             }
         });
-    if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(icon.clone());
+    // The bundle icon is the dark tile; the control panel switches it once the
+    // app appearance resolves.
+    if let Some(icon) = crate::app_icon::tray_icon(Default::default()) {
+        tray = tray.icon(icon);
     }
     tray.build(app)?;
     Ok(())
@@ -88,6 +85,15 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
 
 #[tauri::command]
 pub async fn app_quit(app: AppHandle, caller: WebviewWindow) -> Result<(), String> {
+    if caller.label() != "main" {
+        return Err("Only the control panel can quit Veil.".into());
+    }
+    request_quit(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn app_complete_quit(app: AppHandle, caller: WebviewWindow) -> Result<(), String> {
     if caller.label() != "main" {
         return Err("Only the control panel can quit Veil.".into());
     }

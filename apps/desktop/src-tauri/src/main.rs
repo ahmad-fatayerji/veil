@@ -1,23 +1,39 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod accent;
+mod app_icon;
+#[cfg(windows)]
+mod browser_shortcuts;
+mod discord;
+mod files;
 mod hosting;
 mod lifecycle;
 mod networking;
 mod overlay;
 mod session;
+mod startup;
 mod updates;
 use tauri::Manager;
 
 fn main() {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let mut builder = tauri::Builder::default();
+    #[cfg(windows)]
+    {
+        builder = builder.plugin(browser_shortcuts::init());
+    }
+    let background_launch = startup::is_background_launch(&std::env::args().collect::<Vec<_>>());
     // Acceptance runs intentionally use independent app profiles. Production is
     // one instance, so invitations cannot silently create a second document.
     if !(cfg!(debug_assertions)
         && std::env::var_os("VEIL_TEST_SETTINGS_DIR").is_some()
         && std::env::var_os("VEIL_TEST_SINGLE_INSTANCE").is_none())
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            if startup::is_background_launch(&args) {
+                return;
+            }
+            files::receive_paths(app, args.into_iter().skip(1), std::path::Path::new(&cwd));
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
@@ -25,21 +41,56 @@ fn main() {
             }
         }));
     }
+    #[cfg(windows)]
+    {
+        builder = builder.plugin(browser_shortcuts::init());
+        builder = builder.plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name("Veil")
+                .args(["--autostart"])
+                .build(),
+        );
+    }
     builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .manage(files::Files::default())
         .manage(hosting::Hosting::default())
         .manage(networking::Networking::default())
         .manage(updates::Updates::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|app| {
-            overlay::setup(app)?;
+        .setup(move |app| {
+            files::receive_paths(
+                app.handle(),
+                std::env::args().skip(1),
+                &std::env::current_dir().unwrap_or_default(),
+            );
+            overlay::setup(app, background_launch)?;
             updates::setup(app.handle())?;
             lifecycle::setup(app)?;
+            discord::setup(app.handle())?;
+            if !background_launch {
+                lifecycle::show_main(app.handle())?;
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             lifecycle::app_quit,
+            lifecycle::app_complete_quit,
+            app_icon::app_set_icon_theme,
+            accent::system_accent,
+            startup::startup_status,
+            startup::startup_configure,
+            files::file_open,
+            files::file_save,
+            files::file_release,
+            files::file_pending,
+            files::workspace_load,
+            files::workspace_store,
+            discord::discord_preferences,
+            discord::discord_configure,
+            discord::discord_update,
             overlay::overlay_snapshot,
             overlay::overlay_update,
             overlay::overlay_capture_check,
@@ -70,13 +121,16 @@ fn main() {
             updates::update_dismiss_result,
         ])
         .on_window_event(|window, event| {
+            if let tauri::WindowEvent::ScaleFactorChanged { .. } = event {
+                app_icon::scale_changed(window);
+            }
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     if overlay::close_behavior(window.app_handle())
                         == lifecycle::CloseBehavior::Quit
                     {
-                        lifecycle::quit_immediately(window.app_handle());
+                        lifecycle::request_quit(window.app_handle());
                         return;
                     }
                     // A pending WebView focus restoration (for example after a dialog)
@@ -91,6 +145,7 @@ fn main() {
         .expect("failed to build Veil desktop")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
+                discord::shutdown(app);
                 overlay::flush(app);
             }
         });

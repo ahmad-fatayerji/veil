@@ -95,11 +95,8 @@ try {
   await waitFor(() => pages().some((page) => !page.url().includes('?overlay')), 'main window');
   const page = pages().find((page) => !page.url().includes('?overlay'));
   page.on('pageerror', (error) => errors.push(error.message));
-  await expect(page.getByLabel('Session link')).toHaveValue(link);
-  await expect(page.getByRole('tab', { name: 'Join session' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await expect(page.getByLabel('Invite link')).toHaveValue(link);
+  await expect(page.getByRole('form', { name: 'Join a session' })).toBeVisible();
   assert.equal(
     await page.getByRole('textbox', { name: 'Shared document' }).count(),
     0,
@@ -107,29 +104,32 @@ try {
   );
   open('veil://join/invalid');
   await expect(page.getByRole('alert')).toContainText('invalid');
-  await page.getByRole('tab', { name: 'Create document' }).click();
-  await page.getByRole('button', { name: 'Create document', exact: true }).click();
+  await page.getByRole('button', { name: 'New document', exact: true }).click();
   const editor = page.getByRole('textbox', { name: 'Shared document' });
   await editor.fill('Keep this temporary document.');
   open(link);
-  const confirmation = page.getByRole('dialog', { name: 'Open another session?' });
-  await expect(confirmation).toBeVisible();
-  await expect(confirmation).toContainText('contains temporary content');
+  await expect(
+    page.locator('.workspace-panel:not([hidden])').getByLabel('Invite link'),
+  ).toHaveValue(link);
   assert.equal(processes(), '1', 'Warm activation delivers to one existing instance');
-  await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(editor).toHaveText('Keep this temporary document.');
-  open(link);
-  await confirmation.getByRole('button', { name: 'Leave and open invitation' }).click();
-  await expect(page.getByLabel('Session link')).toHaveValue(link);
   assert.equal(
     await page
       .evaluate(() => window.__TAURI_INTERNALS__.invoke('update_status'))
       .then((value) => value.sessionActive),
-    false,
+    true,
+    'The background document remains open',
   );
+  await page.getByRole('tab', { name: /^Untitled/ }).click();
+  await expect(editor).toHaveText('Keep this temporary document.');
+  open(link);
+  await expect(
+    page.locator('.workspace-panel:not([hidden])').getByLabel('Invite link'),
+  ).toHaveValue(link);
+  await page.getByRole('tab', { name: /^Untitled/ }).click();
+  await expect(editor).toHaveText('Keep this temporary document.');
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: isolated installed Windows URL registration, cold/warm activation, single instance, explicit Join, invalid link rejection, and active-document Cancel/Leave protection.',
+    'PASS: isolated installed Windows URL registration, cold/warm activation, single instance, explicit Join, invalid link rejection, and independent invitation tabs preserving the background document.',
   );
 } finally {
   if (browser) await browser.close().catch(() => {});

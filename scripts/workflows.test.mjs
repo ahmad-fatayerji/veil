@@ -203,3 +203,37 @@ test('unified publication is opt-in, feed merges use trusted main and PR CI has 
   assert.match(coordinator, /pull.base.ref === 'main' && isReleaseBranch\(pull.head.ref\)/);
   assert.doesNotMatch(JSON.stringify(feed), /release\.yml|secrets\./);
 });
+
+test('stable publication skips validation only when identical full validation is proven', () => {
+  const stable = workflow('release');
+  assert.equal(stable.jobs.validate.if, "needs.source.outputs.reuse != 'true'");
+  assert.equal(stable.jobs.source.outputs.reuse, '${{ steps.reuse.outputs.reuse }}');
+  const reuse = stable.jobs.source.steps.find((step) => step.id === 'reuse');
+  assert.equal(reuse.run, 'node scripts/ci-plan.mjs reuse');
+  const condition = stable.jobs.publish.if.replace(/\s+/g, ' ');
+  assert.match(condition, /needs.build.result == 'success'/);
+  assert.match(condition, /needs.validate.result == 'success'/);
+  assert.match(
+    condition,
+    /needs.validate.result == 'skipped' && needs.source.outputs.reuse == 'true'/,
+  );
+  // Betas always validate their exact candidate; only stable may reuse the release PR.
+  assert.equal(workflow('beta').jobs.validate.if, undefined);
+});
+
+test('relay transports run as parallel network regression jobs', () => {
+  const job = workflow('ci').jobs.networking;
+  assert.deepEqual(job.strategy.matrix.transport, ['udp', 'tcp']);
+  assert.equal(job.strategy['fail-fast'], false);
+  assert.equal(job.env.VEIL_TURN_TRANSPORT, '${{ matrix.transport }}');
+  assert.equal(job.steps.filter((step) => step.run === 'pnpm test:network').length, 1);
+});
+
+test('prepare accepts an explicit version and explicit candidate retirement', () => {
+  const prepare = workflow('prepare-release');
+  assert.equal(prepare.on.workflow_dispatch.inputs.version.required, false);
+  assert.equal(prepare.on.workflow_dispatch.inputs.retire.type, 'boolean');
+  const step = prepare.jobs.prepare.steps.find((item) => item.id === 'candidate');
+  assert.equal(step.env.TARGET_VERSION, '${{ inputs.version }}');
+  assert.equal(step.env.RETIRE_EXISTING, '${{ inputs.retire }}');
+});
