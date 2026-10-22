@@ -7,7 +7,7 @@ repository workflow in [AGENTS.md](AGENTS.md).
 
 ## Product
 
-Veil is a Windows 10/11 x64 app for temporary collaborative documents and a
+Veil is a Windows 10/11 x64 app for collaborative Markdown documents and a
 movable, resizable desktop overlay. The overlay can stay visible locally while
 compatible recording and screen-sharing methods capture the content underneath.
 Capture exclusion is best effort and never universal.
@@ -20,9 +20,14 @@ Guests install Veil, open or paste the link, enter a name, and explicitly join.
 Missing hosting configuration opens Settings and resumes sharing after a successful
 save; failure preserves the editable local document.
 
-Documents are temporary and remain in memory. Quitting or ending a session loses
-that document; copy important content first. There are no cloud accounts, durable
-document storage, viewer roles, permission management, or host migration. There is
+Documents are edited in memory and can be opened and manually saved as UTF-8
+Markdown through native Windows dialogs. Each tab owns its document and independent
+host or guest session; background tabs stay connected. The overlay follows the
+selected tab. Unsaved changes prompt Save / Discard / Cancel before closing or
+quitting. Optional local tab and draft recovery is off by default, restores saved
+files and crash drafts without reconnecting sessions, and deletes discarded drafts.
+There are no cloud accounts, cloud document storage, viewer roles, permission
+management, or host migration. There is
 no application-level participant cap; hardware and transport resources still limit
 capacity. Do not add participant caps or application API changes without a request.
 
@@ -82,9 +87,8 @@ document.
 Support opacity, font size, always on top, movement, resizing, hide/show, and
 click-through. Click-through requires a registered recovery shortcut. Ctrl+Alt+V
 restores interaction and the control panel; Ctrl+Alt+Shift+V toggles overlay visibility.
-Settings > Keybinds allows device-local rebinding of these global shortcuts and the new, join, copy-invite, and close-document actions, with duplicate detection and reset controls. Tray controls offer recovery as well. Closing the main window moves to the tray by
-default; the configurable quit behavior must remain explicit because documents
-are temporary.
+Settings > Keybinds supports device-local rebinding of document, file, invitation, and global overlay actions, with duplicate detection and reset controls. Tray controls offer recovery as well. Closing the main window moves to the tray by
+default; the configurable quit behavior must remain explicit so unsaved changes can be resolved before quitting.
 
 **Settings → General → Start Veil with Windows** is off by default. Enabling it
 registers Veil for the current user's Windows sign-in and launches quietly in the
@@ -121,7 +125,7 @@ update or incomplete installation shows a persistent attention badge on Settings
 viewing Updates does not clear it. Download and installation remain explicit.
 Updates use signed packages and reject invalid
 signatures; installation is blocked while a document session or embedded host is
-active. Preferences are distinct from temporary documents. Updater signatures do
+active. Preferences are distinct from document files and optional recovery snapshots. Updater signatures do
 not imply Authenticode signing or remove SmartScreen warnings. Restrict signing
 secrets to publication jobs; fork PRs receive none.
 

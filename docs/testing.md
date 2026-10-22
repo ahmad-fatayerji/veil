@@ -1,5 +1,56 @@
 # Verification record
 
+## Save, Open, tabs, and recovery acceptance
+
+The following cases require user testing on Windows 10/11 with WebView2. They are
+acceptance instructions, not verification records. Regression tests were added
+for Markdown conversion, workspace decisions, connection isolation, atomic writes,
+encoding and size failures, and update gating; execution remains with the user.
+
+1. Save and reopen Unicode titles, all formatting commands, nested tasks/lists,
+   quotes, code, and dividers. Repeat with BOM/CRLF, empty notes, unsupported
+   links/images/HTML/tables, and invalid UTF-8 or oversized files.
+2. Cancel Open and Save As; try read-only and unavailable locations. Confirm notes
+   and unsaved state survive. Edit a saved file externally and exercise Overwrite,
+   Save As, and Cancel. Make edits during a save; newer changes must stay unsaved.
+   Reopen the same path without duplicating its tab; Save As must not overwrite a
+   file open in another tab.
+3. Host one tab, join another, and edit a third locally. Check each tab's People,
+   Share, and Discord activity. Reconnect or close one session without interrupting
+   the others. Verify editor undo and selection survive tab switches.
+4. Edit in the overlay while switching tabs, then immediately save or close.
+   Verify edits reach their originating document and the overlay follows selection.
+   Check Ctrl+N/O/S/Shift+S/Tab/Shift+Tab/W, Ctrl+1–9, strikethrough on
+   Ctrl+Shift+X, and arrow/Home/End navigation in the tab strip.
+   With tabs in the title bar, drag and double-click the empty title bar space,
+   middle-click a tab to close it, and scroll an overflowing tab strip with the
+   mouse wheel. New, Open, or Join from a blank Home tab must replace it. The
+   People, overlay, Share, and ⋯ document menu controls must follow the selected
+   tab; saving must not flicker or disable the tabs.
+   Switch a shared tab to Markdown and edit while a collaborator edits another
+   paragraph in rich text. Both edits must survive, your caret must stay put, the
+   title must follow the leading `# Heading`, and switching back must keep undo.
+   Italic text must render slanted in rich text.
+   In the overlay, check each Formatting controls setting, the Markdown toggle,
+   the document switcher with several tabs, avatar activity tooltips, the
+   recovery hint appearing only in click-through mode, text opacity sparing the
+   formatting controls, and arrow cursors on controls with capture exclusion.
+5. Exercise tab close, tray Quit, Alt+F4, and window close configured as Quit.
+   Check Save / Discard / Cancel across several tabs, failed/cancelled saves,
+   remote edits during prompts, and the hosted-session warning. Cancel must keep
+   all sessions alive; closing to the tray must preserve the workspace.
+6. Enable restoration, leave saved and unsaved tabs open, force an unexpected
+   exit, and reopen. Restore content/order locally without reconnecting sessions.
+   Repeat normal quit with Save and Discard: discarded unnamed drafts must not
+   return. Disable restoration and verify snapshots disappear while current notes
+   remain. Check missing files, damaged recovery, and recovery write failures.
+7. Install a local test build and use Explorer's Open with on paths containing
+   spaces and Unicode, with Veil closed and running. The default editor must stay
+   unchanged; uninstall must remove only Veil's association. No publication is
+   required for this acceptance test.
+8. Updates must remain blocked with any document or background connection open,
+   including after closing the selected tab or selecting Home.
+
 ## Windows startup - 22 October 2026
 
 Added **Start Veil with Windows** in Settings > General, off by default. Sign-in

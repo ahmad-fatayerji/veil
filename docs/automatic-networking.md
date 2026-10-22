@@ -3,7 +3,7 @@
 The approved P2 flow replaces manual offer/answer and LAN/browser choices in the
 normal desktop app. Install Veil on each Windows PC. An operator deploys
 [veil-server](https://github.com/ahmad-fatayerji/veil-server), gives the host an HTTPS
-address and an individual host credential. Enter these once in Settings > Hosting server.
+address and an individual host credential. Enter these once in Settings > Sharing > Hosting server.
 The credential stays in Windows Credential Manager, scoped to the canonical server
 origin; the server address is saved separately. There is no bundled default server.
 

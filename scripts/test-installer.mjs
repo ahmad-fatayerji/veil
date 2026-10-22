@@ -156,7 +156,7 @@ try {
   assert.equal(
     await invoke(page, 'update_install').then(
       () => false,
-      (error) => String(error).includes('End or leave'),
+      (error) => /End or leave|close all tabs/.test(String(error)),
     ),
     true,
   );
@@ -189,7 +189,7 @@ try {
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       await page
         .getByRole('navigation', { name: 'Settings sections' })
-        .getByRole('button', { name: 'Updates', exact: true })
+        .getByRole('button', { name: 'About & updates', exact: true })
         .click();
     }
     await page.getByRole('button', { name: 'Check for updates', exact: true }).click();

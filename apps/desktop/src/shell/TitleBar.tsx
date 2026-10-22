@@ -46,12 +46,33 @@ function toggleMaximize(event: MouseEvent<HTMLElement>) {
   }
 }
 
-export function TitleBar({ start, end }: { start?: ReactNode; end?: ReactNode }) {
+export function TitleBar({
+  start,
+  tabs,
+  end,
+}: {
+  start?: ReactNode;
+  /** Document tabs replace the identity area; the remaining space stays draggable. */
+  tabs?: ReactNode;
+  end?: ReactNode;
+}) {
   return (
-    <header className="titlebar" onMouseDown={beginDrag} onDoubleClick={toggleMaximize}>
-      <div className="titlebar-identity">
-        {start ?? <span className="titlebar-wordmark">Veil</span>}
-      </div>
+    <header
+      className="titlebar"
+      data-tabs={tabs ? '' : undefined}
+      onMouseDown={beginDrag}
+      onDoubleClick={toggleMaximize}
+    >
+      {tabs ? (
+        <>
+          {tabs}
+          <div className="titlebar-drag" aria-hidden="true" />
+        </>
+      ) : (
+        <div className="titlebar-identity">
+          {start ?? <span className="titlebar-wordmark">Veil</span>}
+        </div>
+      )}
       <div className="titlebar-actions">{end}</div>
       <WindowControls />
     </header>
@@ -60,35 +81,13 @@ export function TitleBar({ start, end }: { start?: ReactNode; end?: ReactNode })
 
 export type ConnectionState = 'local' | 'sharing' | 'connected' | 'connecting' | 'disconnected';
 
-const states = {
+export const connectionStates = {
   local: { label: 'Local', tone: 'neutral' },
   sharing: { label: 'Sharing', tone: 'neutral' },
   connected: { label: 'Connected', tone: 'success' },
   connecting: { label: 'Connecting…', tone: 'warning' },
   disconnected: { label: 'Disconnected', tone: 'danger' },
 } as const;
-
-export function DocumentStatus({ state, count }: { state: ConnectionState; count?: number }) {
-  const { label, tone } = states[state];
-  return (
-    <span
-      className="status-pill"
-      data-tone={tone}
-      data-state={state}
-      title="Temporary document · not saved to disk"
-    >
-      <span className="status-dot" aria-hidden="true" />
-      <span className="status-label" role="status">
-        {label}
-      </span>
-      {state === 'connected' && count && count > 1 ? (
-        <span className="status-count" aria-hidden="true">
-          · {count}
-        </span>
-      ) : null}
-    </span>
-  );
-}
 
 export function PeopleButton({
   participants,

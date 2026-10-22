@@ -1,5 +1,8 @@
 export const defaultKeybinds = {
   newDocument: 'Ctrl+N',
+  openDocument: 'Ctrl+O',
+  saveDocument: 'Ctrl+S',
+  saveDocumentAs: 'Ctrl+Shift+S',
   joinDocument: 'Ctrl+J',
   copyInvite: 'Ctrl+Shift+C',
   closeDocument: 'Ctrl+W',
@@ -14,14 +17,17 @@ export const keybindActions: { id: KeybindAction; label: string; description: st
   {
     id: 'newDocument',
     label: 'New document',
-    description: 'Create a document. Confirms before replacing an open document.',
+    description: 'Create a document in a new tab.',
   },
   {
     id: 'joinDocument',
     label: 'Join with a link',
-    description: 'Open the join form. Confirms before leaving an open document.',
+    description: 'Open the join form in a new tab.',
   },
   { id: 'copyInvite', label: 'Copy invite link', description: 'While hosting a shared document.' },
+  { id: 'openDocument', label: 'Open document', description: 'Open a Markdown file in a tab.' },
+  { id: 'saveDocument', label: 'Save document', description: 'Save the selected document.' },
+  { id: 'saveDocumentAs', label: 'Save document as', description: 'Choose a file location.' },
   {
     id: 'closeDocument',
     label: 'Close document',

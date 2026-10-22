@@ -27,14 +27,9 @@ pub fn refresh_overlay_label(app: &AppHandle, visible: bool) {
     }
 }
 
-pub fn quit_immediately(app: &AppHandle) {
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        if let Err(error) = quit(&app).await {
-            let _ = show_main(&app);
-            let _ = app.emit_to("main", "app-quit-failed", error);
-        }
-    });
+pub fn request_quit(app: &AppHandle) {
+    let _ = show_main(app);
+    let _ = app.emit_to("main", "app-quit-requested", ());
 }
 
 pub(crate) fn show_main(app: &AppHandle) -> tauri::Result<()> {
@@ -62,7 +57,7 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
                 let _ = show_main(app);
             }
             "quit" => {
-                quit_immediately(app);
+                request_quit(app);
             }
             "overlay" => crate::overlay::tray_toggle(app),
             _ => {}
@@ -90,6 +85,15 @@ pub fn setup(app: &mut tauri::App) -> tauri::Result<()> {
 
 #[tauri::command]
 pub async fn app_quit(app: AppHandle, caller: WebviewWindow) -> Result<(), String> {
+    if caller.label() != "main" {
+        return Err("Only the control panel can quit Veil.".into());
+    }
+    request_quit(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn app_complete_quit(app: AppHandle, caller: WebviewWindow) -> Result<(), String> {
     if caller.label() != "main" {
         return Err("Only the control panel can quit Veil.".into());
     }

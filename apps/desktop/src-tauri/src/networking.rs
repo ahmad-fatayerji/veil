@@ -10,7 +10,7 @@ use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message};
 
 #[derive(Default)]
 pub struct Networking {
-    socket: Mutex<Option<mpsc::Sender<String>>>,
+    sockets: Mutex<std::collections::HashMap<String, mpsc::Sender<String>>>,
 }
 #[derive(Serialize, Deserialize, Default)]
 pub struct Preferences {
@@ -397,10 +397,11 @@ pub async fn network_connect(
     {
         let mut gate = updates.gate.lock().await;
         gate.allow_session()?;
-        gate.network_active = true;
+        gate.connections.insert(connection_id.clone());
     }
     let (tx, mut rx) = mpsc::channel::<String>(128);
-    *state.socket.lock().await = Some(tx);
+    state.sockets.lock().await.insert(connection_id.clone(), tx);
+    let app = caller.app_handle().clone();
     tauri::async_runtime::spawn(async move {
         let (mut sink, mut source) = socket.split();
         loop {
@@ -414,6 +415,17 @@ pub async fn network_connect(
                 }}
             }
         }
+        app.state::<Networking>()
+            .sockets
+            .lock()
+            .await
+            .remove(&connection_id);
+        app.state::<crate::updates::Updates>()
+            .gate
+            .lock()
+            .await
+            .connections
+            .remove(&connection_id);
         let _ = caller.emit(
             "veil:network",
             serde_json::json!({"connectionId":connection_id,"message":{"kind":"disconnected"}}),
@@ -425,6 +437,7 @@ pub async fn network_connect(
 pub async fn network_send(
     caller: WebviewWindow,
     state: State<'_, Networking>,
+    connection_id: String,
     message: Value,
 ) -> Result<(), String> {
     authorize(&caller)?;
@@ -433,10 +446,10 @@ pub async fn network_send(
         return Err("Signaling message exceeds the limit.".into());
     }
     state
-        .socket
+        .sockets
         .lock()
         .await
-        .as_ref()
+        .get(&connection_id)
         .ok_or("Signaling is disconnected.")?
         .try_send(bytes)
         .map_err(|_| "Signaling queue is full or disconnected.".into())
@@ -446,10 +459,11 @@ pub async fn network_disconnect(
     caller: WebviewWindow,
     state: State<'_, Networking>,
     updates: State<'_, crate::updates::Updates>,
+    connection_id: String,
 ) -> Result<(), String> {
     authorize(&caller)?;
-    state.socket.lock().await.take();
-    updates.gate.lock().await.network_active = false;
+    state.sockets.lock().await.remove(&connection_id);
+    updates.gate.lock().await.connections.remove(&connection_id);
     Ok(())
 }
 

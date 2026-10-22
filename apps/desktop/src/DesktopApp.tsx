@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { invoke } from './overlay/api';
+import { listen } from '@tauri-apps/api/event';
 
 const AutomaticApp = lazy(() =>
-  import('./AutomaticApp').then(({ AutomaticApp }) => ({ default: AutomaticApp })),
+  import('./workspace').then(({ DocumentWorkspace }) => ({ default: DocumentWorkspace })),
 );
 const LegacyApp = lazy(() =>
   import('./LegacyApp').then(({ LegacyApp }) => ({ default: LegacyApp })),
@@ -23,8 +24,23 @@ export function DesktopApp() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    if (!legacy) return;
+    const subscription = listen('app-quit-requested', () => {
+      // Retain the existing shutdown contract of the legacy regression surfaces.
+      void invoke('app_complete_quit');
+    });
+    return () => {
+      void subscription.then((stop) => stop()).catch(() => {});
+    };
+  }, [legacy]);
   // Resolve the saved mode before mounting either app and starting its effects.
-  const loading = <p role="status">Loading Veil…</p>;
+  // Announced to assistive technology only; startup shows just the window background.
+  const loading = (
+    <p role="status" className="visually-hidden">
+      Loading Veil…
+    </p>
+  );
   if (legacy === null) return loading;
   return <Suspense fallback={loading}>{legacy ? <LegacyApp /> : <AutomaticApp />}</Suspense>;
 }

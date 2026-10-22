@@ -206,7 +206,11 @@ try {
   await waitFor(async () => (await snapshot(main)).settings.visible, 'overlay shown');
   assert.equal(native('Probe').visible, true);
   assert.equal(native('Probe').topmost, true);
-  assert.equal(await overlay.getByRole('toolbar').count(), 0, 'Overlay has no editor toolbar.');
+  assert.equal(
+    await overlay.getByRole('toolbar').count(),
+    0,
+    'Overlay shows no formatting toolbar without a document.',
+  );
   const forbidden = await overlay.evaluate(() =>
     window.__TAURI_INTERNALS__
       .invoke('overlay_update', { patch: { opacity: 0.3 } })
@@ -233,7 +237,7 @@ try {
   );
   assert.equal(
     await overlay
-      .locator('.overlay-document > div[style]')
+      .locator('.overlay-document .document-editor')
       .evaluate((node) => getComputedStyle(node).opacity),
     '1',
     'Document stays fully opaque over a transparent window background.',
@@ -253,7 +257,7 @@ try {
     async () =>
       (await snapshot(main)).settings.textOpacity === 0 &&
       (await overlay
-        .locator('.overlay-document > div[style]')
+        .locator('.overlay-document .document-editor')
         .evaluate((node) => getComputedStyle(node).opacity)) === '0',
     'text opacity reaches zero without changing window opacity',
   );
@@ -316,6 +320,11 @@ try {
     async () => (await overlayEditor.textContent()) === 'Shared overlay document.',
     'overlay receives shared document',
   );
+  assert.equal(
+    await overlay.getByRole('toolbar', { name: 'Document formatting' }).count(),
+    1,
+    'Overlay shows its compact formatting toolbar by default.',
+  );
   guestBrowser = await chromium.launch();
   const guest = await guestBrowser.newPage();
   guest.on('pageerror', (error) => errors.push(error.message));
@@ -330,9 +339,8 @@ try {
   const authorActivity = guest.locator(
     '[data-participant-name="Desktop author"] .participant-activity',
   );
-  const overlayGuestActivity = overlay.locator(
-    '[data-participant-name="Browser guest"] .participant-activity',
-  );
+  // Overlay avatars expose activity as data, with the full label for assistive technology.
+  const overlayGuest = overlay.locator('[data-participant-name="Browser guest"]');
   await waitFor(
     async () =>
       (await overlay.getByRole('list', { name: 'Participants' }).getByRole('listitem').count()) ===
@@ -342,7 +350,7 @@ try {
   await guestEditor.press('Control+End');
   await guest.keyboard.insertText(' Guest activity.');
   await waitFor(
-    async () => (await overlayGuestActivity.textContent()).startsWith('Typing'),
+    async () => (await overlayGuest.getAttribute('data-activity')) === 'typing',
     'overlay shows remote typing',
   );
   const guestCaret = overlay.locator('.collaboration-carets__label[data-name="Browser guest"]');
@@ -355,12 +363,12 @@ try {
   );
   await overlay.screenshot({ path: resolve(directory, 'named-remote-cursor.png') });
   await waitFor(
-    async () => (await overlayGuestActivity.textContent()) === 'In document',
+    async () => (await overlayGuest.getAttribute('data-activity')) === 'document',
     'overlay typing settles after idle',
   );
   await guestEditor.press('Control+a');
   await waitFor(
-    async () => (await overlayGuestActivity.textContent()) === 'Selecting text',
+    async () => (await overlayGuest.getAttribute('data-activity')) === 'selecting',
     'overlay shows remote selection activity',
   );
   await waitFor(
@@ -403,18 +411,16 @@ try {
     'control-panel typing presence',
   );
   await waitFor(
-    async () => (await overlayGuestActivity.textContent()) === 'Away from document',
+    async () => (await overlayGuest.getAttribute('data-activity')) === 'away',
     'overlay shows remote away activity',
   );
   await waitFor(async () => (await guestCaret.count()) === 0, 'blur clears overlay remote cursor');
-  const alignment = await overlay
-    .locator('[data-participant-name="Browser guest"]')
-    .evaluate((row) => {
-      const name = row.querySelector('.overlay-person-name').getBoundingClientRect();
-      const activity = row.querySelector('.participant-activity').getBoundingClientRect();
-      return Math.abs(name.top + name.height / 2 - activity.top - activity.height / 2);
-    });
-  assert.ok(alignment < 1, 'Participant name and away status are vertically aligned.');
+  assert.match(
+    await overlayGuest.textContent(),
+    /Browser guest · Away from document/,
+    'Overlay avatar labels name the participant and their activity.',
+  );
+
   await waitFor(
     async () =>
       (await overlayEditor.textContent()) === (await guestEditor.textContent()) &&

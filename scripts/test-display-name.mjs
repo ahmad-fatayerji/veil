@@ -50,7 +50,7 @@ async function launch() {
   await waitFor(() => pages().some((page) => page.url().includes('?overlay')));
   const main = pages().find((page) => !page.url().includes('?overlay'));
   for (const page of pages()) page.on('pageerror', (error) => errors.push(error.message));
-  await expect(main.getByRole('button', { name: /^New document/ })).toBeVisible();
+  await expect(main.getByRole('button', { name: 'New document', exact: true })).toBeVisible();
   return main;
 }
 async function general(main) {
@@ -61,10 +61,14 @@ async function general(main) {
 }
 async function openJoin(main) {
   await main.getByRole('button', { name: /^Join with a link/ }).click();
-  await expect(main.locator('#automatic-name')).toBeVisible();
+  await expect(main.locator('[id$="-automatic-name"]')).toBeVisible();
 }
 async function quit(main) {
   await main.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
+  const unsaved = main.getByRole('dialog', { name: /^Save changes to / });
+  await waitFor(async () => app.exitCode !== null || (await unsaved.isVisible()), 'quit decision');
+  if (app.exitCode === null)
+    await unsaved.getByRole('button', { name: 'Discard', exact: true }).click();
   await waitFor(() => app.exitCode !== null);
   assert.equal(app.exitCode, 0);
   await browser.close();
@@ -74,8 +78,8 @@ async function quit(main) {
 try {
   let main = await launch();
   await openJoin(main);
-  await expect(main.locator('#automatic-name')).toHaveValue('');
-  await main.locator('#automatic-name').fill('Join form name');
+  await expect(main.locator('[id$="-automatic-name"]')).toHaveValue('');
+  await main.locator('[id$="-automatic-name"]').fill('Join form name');
   let settings = await general(main);
   await expect(settings.getByLabel('Your name', { exact: true })).toHaveValue('Join form name');
   await settings.getByLabel('Your name', { exact: true }).fill('Saved settings name');
@@ -88,12 +92,12 @@ try {
   );
   await settings.getByRole('button', { name: 'Close Settings', exact: true }).click();
   await openJoin(main);
-  await expect(main.locator('#automatic-name')).toHaveValue('Saved settings name');
-  await main.locator('#automatic-name').fill('Join name');
+  await expect(main.locator('[id$="-automatic-name"]')).toHaveValue('Saved settings name');
+  await main.locator('[id$="-automatic-name"]').fill('Join name');
   settings = await general(main);
   await expect(settings.getByLabel('Your name', { exact: true })).toHaveValue('Join name');
   await settings.getByRole('button', { name: 'Close Settings', exact: true }).click();
-  await main.getByRole('button', { name: /^New document/ }).click();
+  await main.getByRole('button', { name: 'New document', exact: true }).click();
   await main.locator('.tiptap').fill('Keep this document while changing my name');
   settings = await general(main);
   await settings.getByLabel('Your name', { exact: true }).fill('');
@@ -104,9 +108,9 @@ try {
 
   main = await launch();
   await openJoin(main);
-  await expect(main.locator('#automatic-name')).toHaveValue('');
-  await expect(main.locator('#automatic-name')).toHaveAttribute('maxlength', '40');
-  await main.locator('#automatic-invitation').fill('invalid invitation');
+  await expect(main.locator('[id$="-automatic-name"]')).toHaveValue('');
+  await expect(main.locator('[id$="-automatic-name"]')).toHaveAttribute('maxlength', '40');
+  await main.locator('[id$="-automatic-invitation"]').fill('invalid invitation');
   await expect(main.getByRole('button', { name: 'Join session', exact: true })).toBeDisabled();
   settings = await general(main);
   await expect(settings.getByLabel('Your name', { exact: true })).toHaveValue('');

@@ -20,12 +20,22 @@ mod receipt;
 pub struct Gate {
     pub document_active: bool,
     pub network_active: bool,
+    pub documents: std::collections::HashSet<String>,
+    pub connections: std::collections::HashSet<String>,
     pub installing: bool,
 }
 impl Gate {
     pub fn allow_install(&self, hosting: bool) -> Result<(), String> {
-        if self.document_active || self.network_active || hosting {
-            Err("End or leave the current session before installing an update. Documents are not saved automatically.".into())
+        if self.document_active
+            || self.network_active
+            || !self.documents.is_empty()
+            || !self.connections.is_empty()
+            || hosting
+        {
+            Err(
+                "Save your documents and close all tabs and sessions before installing an update."
+                    .into(),
+            )
         } else if self.installing {
             Err("An update is already installing.".into())
         } else {
@@ -242,8 +252,11 @@ pub async fn update_status(
 ) -> Result<UpdateInfo, String> {
     authorize(&caller)?;
     let gate = state.gate.lock().await;
-    let session_active =
-        gate.document_active || gate.network_active || app.state::<Hosting>().is_active().await;
+    let session_active = gate.document_active
+        || gate.network_active
+        || !gate.documents.is_empty()
+        || !gate.connections.is_empty()
+        || app.state::<Hosting>().is_active().await;
     let candidate = state.candidate.lock().await;
     let transfer = state.transfer.lock().unwrap();
     Ok(UpdateInfo {
@@ -562,6 +575,15 @@ mod tests {
         gate.network_active = true;
         assert!(gate.allow_install(false).is_err());
         gate.network_active = false;
+        gate.documents.insert("first".into());
+        gate.documents.insert("second".into());
+        gate.documents.remove("first");
+        assert!(gate.allow_install(false).is_err());
+        gate.documents.clear();
+        gate.connections.insert("background".into());
+        assert!(gate.allow_install(false).is_err());
+        gate.connections.clear();
+        assert!(gate.allow_install(false).is_ok());
         gate.installing = true;
         assert!(gate.allow_install(false).is_err());
         assert!(gate.allow_session().is_err());

@@ -1,9 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod accent;
 mod app_icon;
 #[cfg(windows)]
 mod browser_shortcuts;
 mod discord;
+mod files;
 mod hosting;
 mod lifecycle;
 mod networking;
@@ -27,10 +29,11 @@ fn main() {
         && std::env::var_os("VEIL_TEST_SETTINGS_DIR").is_some()
         && std::env::var_os("VEIL_TEST_SINGLE_INSTANCE").is_none())
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             if startup::is_background_launch(&args) {
                 return;
             }
+            files::receive_paths(app, args.into_iter().skip(1), std::path::Path::new(&cwd));
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
@@ -51,11 +54,18 @@ fn main() {
     builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .manage(files::Files::default())
         .manage(hosting::Hosting::default())
         .manage(networking::Networking::default())
         .manage(updates::Updates::default())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
+            files::receive_paths(
+                app.handle(),
+                std::env::args().skip(1),
+                &std::env::current_dir().unwrap_or_default(),
+            );
             overlay::setup(app, background_launch)?;
             updates::setup(app.handle())?;
             lifecycle::setup(app)?;
@@ -67,9 +77,17 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             lifecycle::app_quit,
+            lifecycle::app_complete_quit,
             app_icon::app_set_icon_theme,
+            accent::system_accent,
             startup::startup_status,
             startup::startup_configure,
+            files::file_open,
+            files::file_save,
+            files::file_release,
+            files::file_pending,
+            files::workspace_load,
+            files::workspace_store,
             discord::discord_preferences,
             discord::discord_configure,
             discord::discord_update,
@@ -112,7 +130,7 @@ fn main() {
                     if overlay::close_behavior(window.app_handle())
                         == lifecycle::CloseBehavior::Quit
                     {
-                        lifecycle::quit_immediately(window.app_handle());
+                        lifecycle::request_quit(window.app_handle());
                         return;
                     }
                     // A pending WebView focus restoration (for example after a dialog)

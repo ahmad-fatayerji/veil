@@ -22,42 +22,44 @@ pub async fn document_relay(
     {
         return Err("Document relay message is too large.".into());
     }
-    if caller.label() == "main" {
-        let updates = app.state::<crate::updates::Updates>();
-        let mut gate = updates.gate.lock().await;
-        match message.get("kind").and_then(Value::as_str) {
-            Some("session") => {
-                gate.allow_session()?;
-                gate.document_active = true;
-            }
-            Some("closed") => gate.document_active = false,
-            _ => {}
-        }
-    }
     app.emit_to(target, "desktop-document", message)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn document_open(app: AppHandle, caller: WebviewWindow) -> Result<(), String> {
+pub async fn document_open(
+    app: AppHandle,
+    caller: WebviewWindow,
+    document_id: Option<String>,
+) -> Result<(), String> {
     if caller.label() != "main" {
         return Err("Only the control panel can create documents.".into());
     }
     let updates = app.state::<crate::updates::Updates>();
     let mut gate = updates.gate.lock().await;
     gate.allow_session()?;
-    gate.document_active = true;
+    if let Some(id) = document_id {
+        gate.documents.insert(id);
+    } else {
+        gate.document_active = true;
+    }
     Ok(())
 }
 #[tauri::command]
-pub async fn document_closed(app: AppHandle, caller: WebviewWindow) -> Result<(), String> {
+pub async fn document_closed(
+    app: AppHandle,
+    caller: WebviewWindow,
+    document_id: Option<String>,
+) -> Result<(), String> {
     if caller.label() != "main" {
         return Err("Only the control panel can close documents.".into());
     }
-    app.state::<crate::updates::Updates>()
-        .gate
-        .lock()
-        .await
-        .document_active = false;
+    let updates = app.state::<crate::updates::Updates>();
+    let mut gate = updates.gate.lock().await;
+    if let Some(id) = document_id {
+        gate.documents.remove(&id);
+    } else {
+        gate.document_active = false;
+    }
     Ok(())
 }

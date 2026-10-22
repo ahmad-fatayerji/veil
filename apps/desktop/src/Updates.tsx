@@ -18,9 +18,11 @@ export interface UpdateInfo {
 }
 
 // This stays mounted in the control panel even when Settings is closed.
-export function useUpdateAttention() {
+export function useUpdateAttention(enabled = true) {
   const [attention, setAttention] = useState(false);
   useEffect(() => {
+    // Background tabs skip polling; each poll is a native IPC round trip.
+    if (!enabled) return;
     let active = true;
     const refresh = () => {
       void invoke<UpdateInfo>('update_status')
@@ -35,7 +37,7 @@ export function useUpdateAttention() {
       active = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [enabled]);
   return attention;
 }
 
@@ -183,8 +185,8 @@ export function Updates({
                 Version {info.availableVersion} is available
               </span>
               <p>
-                End or leave your session first. Documents are temporary; copy any text you want to
-                keep. Local overlay preferences are retained.
+                Save your documents and close all tabs and sessions first. Local overlay preferences
+                are retained.
               </p>
             </div>
             <Button

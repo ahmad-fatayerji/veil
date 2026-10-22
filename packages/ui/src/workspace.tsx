@@ -226,15 +226,18 @@ export function hasDocumentContent(connection: Pick<DemoConnection, 'doc'>) {
 export function DeveloperCredit({ onVisit }: { onVisit?: MouseEventHandler<HTMLAnchorElement> }) {
   return (
     <div className="developer-credit">
-      <p>Developed by Ahmad Fatayerji.</p>
-      <a
-        href="https://ahmadfatayerji.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={onVisit}
-      >
-        ahmadfatayerji.com
-      </a>
+      <p>
+        Developed by{' '}
+        <a
+          href="https://ahmadfatayerji.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onVisit}
+        >
+          Ahmad Fatayerji
+        </a>
+        .
+      </p>
     </div>
   );
 }

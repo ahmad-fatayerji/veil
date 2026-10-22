@@ -9,12 +9,24 @@ import { useVisibilityMenu } from './VisibilityMenu';
 
 type Message =
   | { kind: 'request' }
+  | { kind: 'flush'; requestId: string }
+  | { kind: 'flushed'; requestId: string }
   | { kind: 'closed' }
   | { kind: 'session'; id: string; update: number[]; user: Record<string, unknown> }
   | { kind: 'update'; id: string; update: number[] }
   | { kind: 'participants'; id: string; participants: Participant[] }
   | { kind: 'awareness'; id: string; update: number[] }
-  | { kind: 'presence'; id: string; cursor: unknown; activity: unknown };
+  | { kind: 'presence'; id: string; cursor: unknown; activity: unknown }
+  | { kind: 'tabs'; activeId: string; tabs: OverlayTab[] }
+  | { kind: 'select'; tabId: string };
+
+/** An open document as the overlay's switcher shows it. */
+export interface OverlayTab {
+  id: string;
+  title: string;
+  status: string;
+  dirty: boolean;
+}
 const relayOrigin = Symbol('desktop document relay');
 const send = (message: Message) => invoke('document_relay', { message });
 
@@ -81,35 +93,120 @@ export function DesktopEditor({
 
 // One network participant, two independent CRDT views. Incremental Yjs updates
 // preserve concurrent edits; presence from either editor uses the same identity.
-export function SessionBridge({ connection }: { connection: DemoConnection | null }) {
+/** Drain overlay edits before saving, closing a tab, or quitting. */
+export async function flushOverlay() {
+  const requestId = crypto.randomUUID();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let stop: (() => void) | undefined;
+  let finished = false;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('The overlay did not respond. Try again before closing or saving.')),
+        5000,
+      );
+      void listen<Message>('desktop-document', ({ payload }) => {
+        if (payload.kind === 'flushed' && payload.requestId === requestId) resolve();
+      })
+        .then((unlisten) => {
+          if (finished) {
+            unlisten();
+            return;
+          }
+          stop = unlisten;
+          return send({ kind: 'flush', requestId });
+        })
+        .catch(reject);
+    });
+  } finally {
+    finished = true;
+    clearTimeout(timer);
+    stop?.();
+  }
+}
+
+export function SessionBridge({
+  connection,
+  resolveDocument,
+  tabs = [],
+  activeId = '',
+  onSelectTab,
+}: {
+  connection: DemoConnection | null;
+  resolveDocument?: (id: string) => DemoConnection | null;
+  /** Open documents offered by the overlay's switcher. */
+  tabs?: OverlayTab[];
+  activeId?: string;
+  onSelectTab?: (id: string) => void;
+}) {
   const current = useRef(connection);
+  const resolver = useRef(resolveDocument);
+  const selectTab = useRef(onSelectTab);
+  const initial = useRef<() => void>(() => {});
+  const publishTabs = useRef<() => void>(() => {});
   const outgoing = useRef<Promise<unknown>>(Promise.resolve());
   const [error, setError] = useState('');
   useEffect(() => {
     current.current = connection;
+    resolver.current = resolveDocument;
+    selectTab.current = onSelectTab;
+  });
+  // Republish only when the switcher's content changes, not on every render.
+  const tabList = JSON.stringify({ activeId, tabs });
+  useEffect(() => {
+    const message = { kind: 'tabs', ...JSON.parse(tabList) } as Message;
+    publishTabs.current = () => {
+      outgoing.current = outgoing.current
+        .then(() => send(message))
+        .catch((cause: unknown) => setError(errorMessage(cause)));
+    };
+    publishTabs.current();
+  }, [tabList]);
+  useEffect(() => {
+    let active = true;
+    const subscription = listen<Message>('desktop-document', ({ payload }) => {
+      if (!active) return;
+      if (payload.kind === 'request') {
+        initial.current();
+        publishTabs.current();
+      } else if (payload.kind === 'select') selectTab.current?.(payload.tabId);
+      else if (payload.kind === 'update') {
+        const target =
+          resolver.current?.(payload.id) ??
+          (String(current.current?.doc.clientID) === payload.id ? current.current : null);
+        if (target) Y.applyUpdate(target.doc, new Uint8Array(payload.update), relayOrigin);
+      } else if (
+        payload.kind === 'presence' &&
+        current.current &&
+        payload.id === String(current.current.doc.clientID)
+      ) {
+        current.current.provider.awareness.setLocalState({
+          ...current.current.provider.awareness.getLocalState(),
+          cursor: payload.cursor,
+          activity: payload.activity,
+        });
+      }
+    });
+    void subscription
+      .then(() => {
+        if (active) initial.current();
+      })
+      .catch((cause) => {
+        if (active) setError(errorMessage(cause));
+      });
+    return () => {
+      active = false;
+      void subscription.then((stop) => stop()).catch(() => {});
+    };
+  }, []);
+  useEffect(() => {
     let active = true;
     const dispatch = (message: Message) => {
       outgoing.current = outgoing.current
         .then(() => send(message))
-        .catch((failure: unknown) => {
-          if (active) setError(errorMessage(failure));
+        .catch((cause: unknown) => {
+          if (active) setError(errorMessage(cause));
         });
-    };
-    const initial = () => {
-      if (connection) {
-        dispatch({
-          kind: 'session',
-          id: String(connection.doc.clientID),
-          update: Array.from(Y.encodeStateAsUpdate(connection.doc)),
-          user: connection.provider.awareness.getLocalState()?.user ?? {},
-        });
-        participants();
-        awareness({
-          added: [...connection.provider.awareness.getStates().keys()],
-          updated: [],
-          removed: [],
-        });
-      } else dispatch({ kind: 'closed' });
     };
     const participants = () => {
       if (connection)
@@ -119,10 +216,6 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
           participants: readParticipants(connection),
         });
     };
-    // Only remote identities belong in the overlay's awareness replica. Its own
-    // cursor remains independent and publishes through the main network identity.
-    // Forward update events (including heartbeats and removal tombstones), so
-    // idle remote cursors do not expire while the network still considers them live.
     const awareness = ({
       added,
       updated,
@@ -142,6 +235,25 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
           update: Array.from(encodeAwarenessUpdate(network, ids)),
         });
     };
+    const publish = () => {
+      if (!connection) {
+        dispatch({ kind: 'closed' });
+        return;
+      }
+      dispatch({
+        kind: 'session',
+        id: String(connection.doc.clientID),
+        update: Array.from(Y.encodeStateAsUpdate(connection.doc)),
+        user: connection.provider.awareness.getLocalState()?.user ?? {},
+      });
+      participants();
+      awareness({
+        added: [...connection.provider.awareness.getStates().keys()],
+        updated: [],
+        removed: [],
+      });
+    };
+    initial.current = publish;
     const update = (bytes: Uint8Array) => {
       if (connection)
         dispatch({
@@ -153,35 +265,12 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
     connection?.doc.on('update', update);
     connection?.provider.awareness.on('change', participants);
     connection?.provider.awareness.on('update', awareness);
-    const subscription = listen<Message>('desktop-document', ({ payload }) => {
-      if (!active || current.current !== connection) return;
-      if (payload.kind === 'request') initial();
-      else if (connection && 'id' in payload && payload.id === String(connection.doc.clientID)) {
-        if (payload.kind === 'update')
-          Y.applyUpdate(connection.doc, new Uint8Array(payload.update), relayOrigin);
-        else if (payload.kind === 'presence') {
-          connection.provider.awareness.setLocalState({
-            ...connection.provider.awareness.getLocalState(),
-            cursor: payload.cursor,
-            activity: payload.activity,
-          });
-        }
-      }
-    });
-    void subscription
-      .then(() => {
-        if (active) initial();
-      })
-      .catch((failure: unknown) => {
-        if (active) setError(errorMessage(failure));
-      });
+    publish();
     return () => {
       active = false;
       connection?.doc.off('update', update);
       connection?.provider.awareness.off('change', participants);
       connection?.provider.awareness.off('update', awareness);
-      if (connection) dispatch({ kind: 'closed' });
-      void subscription.then((unlisten) => unlisten()).catch(() => {});
     };
   }, [connection]);
   return error ? (
@@ -194,7 +283,12 @@ export function SessionBridge({ connection }: { connection: DemoConnection | nul
 export function useOverlayDocument() {
   const [connection, setConnection] = useState<EditorConnection | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [tabs, setTabs] = useState<{ activeId: string; tabs: OverlayTab[] }>({
+    activeId: '',
+    tabs: [],
+  });
   const [error, setError] = useState('');
+  const select = useRef<(id: string) => void>(() => {});
   useEffect(() => {
     let active = true;
     let outgoing: Promise<unknown> = Promise.resolve();
@@ -210,9 +304,14 @@ export function useOverlayDocument() {
       session?.destroy();
       session = null;
     };
+    select.current = (tabId) => dispatch({ kind: 'select', tabId });
     const subscription = listen<Message>('desktop-document', ({ payload }) => {
       if (!active) return;
-      if (payload.kind === 'closed') {
+      if (payload.kind === 'tabs') {
+        setTabs({ activeId: payload.activeId, tabs: payload.tabs });
+      } else if (payload.kind === 'flush') {
+        dispatch({ kind: 'flushed', requestId: payload.requestId });
+      } else if (payload.kind === 'closed') {
         clear();
         setConnection(null);
         setParticipants([]);
@@ -282,5 +381,12 @@ export function useOverlayDocument() {
       void subscription.then((unlisten) => unlisten()).catch(() => {});
     };
   }, []);
-  return { connection, participants, error };
+  return {
+    connection,
+    participants,
+    error,
+    tabs: tabs.tabs,
+    activeId: tabs.activeId,
+    selectTab: (id: string) => select.current(id),
+  };
 }

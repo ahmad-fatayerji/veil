@@ -1,6 +1,9 @@
 import { defaultKeybinds } from '../keybinds';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import {
+  Check,
+  ChevronDown,
+  FileCode,
   Move,
   MoveDiagonal,
   MoveDiagonal2,
@@ -10,9 +13,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import type { Participant } from '@veil/collaboration';
 import { invoke, useOverlay, errorMessage } from './api';
-import { activityLabels, useAppearance } from '@veil/ui';
-import { SharedEditor, useDocumentTitle } from '@veil/editor';
+import { Avatar, Menu, MenuItem, Tooltip, activityLabels, useAppearance } from '@veil/ui';
+import { SharedEditor, useDocumentTitle, type EditorMode } from '@veil/editor';
+import { connectionStates } from '../shell/TitleBar';
 import { useOverlayDocument } from './session';
 import { useVisibilityMenu } from './VisibilityMenu';
 
@@ -74,6 +79,14 @@ export function OverlayWindow() {
     };
   }, [setError]);
   const hint = excluded && interactive ? (active ?? hovered) : null;
+  // The overlay chooses its own view; switching documents keeps it.
+  const [mode, setMode] = useState<EditorMode>('rich');
+  const status = document.tabs.find((tab) => tab.id === document.activeId)?.status ?? 'local';
+  const connection =
+    connectionStates[
+      status in connectionStates ? (status as keyof typeof connectionStates) : 'local'
+    ];
+  const keepGesture = (event: PointerEvent) => event.stopPropagation();
   const gesture = (handle: Handle) => {
     if (!interactive || gesturePending.current) return;
     gesturePending.current = true;
@@ -92,6 +105,7 @@ export function OverlayWindow() {
         {
           fontSize: `${state?.settings.fontSize ?? 20}px`,
           '--overlay-window-opacity': state?.settings.opacity ?? 0.85,
+          '--overlay-text-opacity': state?.settings.textOpacity ?? 1,
         } as CSSProperties
       }
       onContextMenu={visibilityMenu.onContextMenu}
@@ -111,47 +125,108 @@ export function OverlayWindow() {
           }
         }}
       >
-        <span className="overlay-title">
-          <span className="overlay-title-text" title={title || undefined}>
-            {document.connection ? title || 'Untitled' : 'Veil'}
-          </span>
-          {state?.settings.clickThrough && <span className="overlay-chip">Click-through</span>}
-        </span>
-        <div className="overlay-header-actions">
-          {hint ? (
-            <OverlayHint handle={hint} />
+        <div className="overlay-title">
+          {document.connection && (
+            <span
+              className="overlay-status-dot"
+              data-tone={connection.tone}
+              title={connection.label}
+              aria-hidden="true"
+            />
+          )}
+          {document.connection && document.tabs.length > 1 && interactive ? (
+            // Header controls must not start a window move.
+            <div className="overlay-header-control" onPointerDown={keepGesture}>
+              <Menu
+                label={`Switch document, current: ${title || 'Untitled'}`}
+                align="start"
+                tooltip={false}
+                triggerClassName="overlay-switcher"
+                trigger={
+                  <>
+                    <span className="overlay-title-text">{title || 'Untitled'}</span>
+                    <ChevronDown size={14} aria-hidden="true" />
+                  </>
+                }
+              >
+                {document.tabs.map((tab) => (
+                  <MenuItem
+                    key={tab.id}
+                    icon={
+                      tab.id === document.activeId ? (
+                        <Check size={16} aria-hidden="true" />
+                      ) : (
+                        <span className="overlay-menu-spacer" aria-hidden="true" />
+                      )
+                    }
+                    onSelect={() => document.selectTab(tab.id)}
+                  >
+                    {tab.title}
+                    {tab.dirty && <span className="overlay-menu-unsaved"> · Unsaved</span>}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </div>
           ) : (
+            <span className="overlay-title-text" title={title || undefined}>
+              {document.connection ? title || 'Untitled' : 'Veil'}
+            </span>
+          )}
+          {state?.settings.clickThrough && (
             <span className="overlay-recovery-hint">
-              {state?.recoveryAvailable ? (
+              {state.recoveryAvailable ? (
                 <>
-                  <kbd className="kbd">{state.settings.keybinds.recoverControls}</kbd> restores
-                  controls
+                  <kbd className="kbd">{state.settings.keybinds.recoverControls}</kbd> to edit
                 </>
               ) : (
-                'Restore controls from the tray menu'
+                'Click-through · restore from the tray'
               )}
             </span>
           )}
-          <button
-            type="button"
-            className="overlay-close"
-            aria-label="Hide overlay"
-            title={
-              state?.hideShortcutAvailable
-                ? `Hide overlay (${state.settings.keybinds.toggleOverlay} to show again)`
-                : 'Hide overlay (use the tray to show again)'
-            }
-            disabled={!interactive}
-            onPointerEnter={() => setHovered(null)}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={() => {
-              void invoke('overlay_visibility', { visible: false }).catch((failure: unknown) =>
-                setError(errorMessage(failure)),
-              );
-            }}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
+        </div>
+        <div className="overlay-header-actions">
+          {hint && <OverlayHint handle={hint} />}
+          {document.connection && !state?.captureTest && (
+            <OverlayPeople people={document.participants} />
+          )}
+          {document.connection && !state?.captureTest && interactive && (
+            <button
+              type="button"
+              className="overlay-icon-button"
+              aria-label="Markdown view"
+              aria-pressed={mode === 'markdown'}
+              title={mode === 'markdown' ? 'Show rich text' : 'Show Markdown'}
+              disabled={!interactive}
+              onPointerEnter={() => setHovered(null)}
+              onPointerDown={keepGesture}
+              onClick={() => setMode(mode === 'markdown' ? 'rich' : 'markdown')}
+            >
+              <FileCode size={16} aria-hidden="true" />
+            </button>
+          )}
+          {/* Click-through can't reach header controls; the recovery hint replaces them. */}
+          {!state?.settings.clickThrough && (
+            <button
+              type="button"
+              className="overlay-icon-button overlay-close"
+              aria-label="Hide overlay"
+              title={
+                state?.hideShortcutAvailable
+                  ? `Hide overlay (${state.settings.keybinds.toggleOverlay} to show again)`
+                  : 'Hide overlay (use the tray to show again)'
+              }
+              disabled={!interactive}
+              onPointerEnter={() => setHovered(null)}
+              onPointerDown={keepGesture}
+              onClick={() => {
+                void invoke('overlay_visibility', { visible: false }).catch((failure: unknown) =>
+                  setError(errorMessage(failure)),
+                );
+              }}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </header>
       <article className="overlay-document" aria-label="Overlay document">
@@ -163,45 +238,27 @@ export function OverlayWindow() {
             <span>Local test card · no document changes</span>
           </div>
         )}
-        <div hidden={state?.captureTest} style={{ opacity: state?.settings.textOpacity ?? 1 }}>
+        <div className="overlay-editor" hidden={state?.captureTest}>
           {document.connection ? (
             <SharedEditor
               key={document.connection.doc.clientID}
               connection={document.connection}
               compact
+              mode={mode}
+              onModeChange={setMode}
+              formatting={interactive ? (state?.settings.formatting ?? 'toolbar') : 'none'}
             />
           ) : (
             <div className="overlay-empty">
-              <p>Join the document to start writing.</p>
+              <p>No document open.</p>
               <p>
-                Open the control panel with{' '}
-                {state?.settings.keybinds.recoverControls ?? defaultKeybinds.recoverControls} to
-                create a document or join a session.
+                Press {state?.settings.keybinds.recoverControls ?? defaultKeybinds.recoverControls}{' '}
+                to open Veil, then create or open a document.
               </p>
             </div>
           )}
         </div>
       </article>
-      {document.connection && !state?.captureTest && (
-        <ul className="overlay-participants" aria-label="Participants">
-          {document.participants.map((person) => (
-            <li key={person.id} data-participant-name={person.name}>
-              <span
-                className="overlay-person-dot"
-                style={{ backgroundColor: person.color }}
-                aria-hidden="true"
-              />
-              <span className="overlay-person-name" title={person.name}>
-                {person.name}
-                {person.local && ' (you)'}
-              </span>
-              <span className={`participant-activity activity-${person.activity}`}>
-                {activityLabels[person.activity]}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
       {(error || document.error) && (
         <p role="alert" className="overlay-error">
           {error || document.error}
@@ -224,6 +281,35 @@ export function OverlayWindow() {
           />
         ))}
     </main>
+  );
+}
+
+/** Participant avatars; hovering one shows the name and what they are doing. */
+function OverlayPeople({ people }: { people: Participant[] }) {
+  const shown = people.slice(0, 4);
+  const extra = people.length - shown.length;
+  return (
+    <ul className="overlay-people" aria-label="Participants">
+      {shown.map((person) => {
+        const label = `${person.name}${person.local ? ' (you)' : ''} · ${activityLabels[person.activity]}`;
+        return (
+          <li key={person.id} data-participant-name={person.name} data-activity={person.activity}>
+            <Tooltip content={label}>
+              <span className="overlay-person">
+                <Avatar person={person} size="sm" />
+                <span className="visually-hidden">{label}</span>
+              </span>
+            </Tooltip>
+          </li>
+        );
+      })}
+      {extra > 0 && (
+        <li className="overlay-people-more">
+          +{extra}
+          <span className="visually-hidden"> more participants</span>
+        </li>
+      )}
+    </ul>
   );
 }
 

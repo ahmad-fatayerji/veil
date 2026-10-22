@@ -1,8 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
-import { listen } from '@tauri-apps/api/event';
-import { ChevronDown, Copy, Eye, EyeOff, Link, LogOut, Pencil, Settings, X } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Link,
+  LogOut,
+  MoreHorizontal,
+  Pencil,
+  Radio,
+  Save,
+  Settings,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react';
 import {
   createPeerSession,
   joinShareLink,
@@ -14,7 +26,7 @@ import {
   type JoinMode,
 } from '@veil/collaboration';
 import { parseShareLink, decodeServerInvitation } from '@veil/protocol';
-import { useDocumentTitle } from '@veil/editor';
+import { loadMarkdown, useDocumentTitle } from '@veil/editor';
 import {
   Banner,
   Button,
@@ -24,30 +36,57 @@ import {
   MenuItem,
   MenuSeparator,
   ToastRegion,
-  hasDocumentContent,
   useAppearance,
   useParticipants,
 } from '@veil/ui';
 import { nativeSignaling } from './networking';
-import { SessionBridge } from './overlay/session';
+import type { Workspace, WorkspaceTab } from './workspace';
 import { useUpdateAttention } from './Updates';
 import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
-import { DocumentStatus, PeopleButton, TitleBar, type ConnectionState } from './shell/TitleBar';
+import { PeopleButton, type ConnectionState } from './shell/TitleBar';
 import { StatusBar } from './shell/StatusBar';
+import { OverlayStatus } from './shell/OverlayStatus';
 import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
 import { ShareDialog } from './dialogs/ShareDialog';
+import type { useDiscordPresence } from './discord';
 import { defaultKeybinds, matchesShortcut } from './keybinds';
-import { useDiscordPresence } from './discord';
 
-export function AutomaticApp() {
+export function AutomaticApp({
+  tab,
+  workspace,
+  active,
+  appearanceSettings,
+  discord,
+  actionsSlot,
+  toasts,
+}: {
+  tab: WorkspaceTab;
+  workspace: Workspace;
+  active: boolean;
+  appearanceSettings: ReturnType<typeof useAppearance>;
+  discord: ReturnType<typeof useDiscordPresence>;
+  /** The shared title bar's action area; the selected tab renders its controls there. */
+  actionsSlot: HTMLElement | null;
+  /** Workspace-wide messages, shown in this tab's toast region while it is selected. */
+  toasts?: ReactNode;
+}) {
   const [document, setDocument] = useState<PeerSession | null>(null);
+  const mounted = useRef(false);
+  // New-document tabs show a blank page, not the start screen, until creation settles.
+  const [opening, setOpening] = useState(tab.mode === 'new');
+  const createInitial = useRef(
+    () =>
+      void run(create).finally(() => {
+        if (mounted.current) setOpening(false);
+      }),
+  );
   const documentRef = useRef<PeerSession | null>(null);
   const network = useRef<AutomaticSession | null>(null);
   const [session, setSession] = useState<AutomaticSession | null>(null);
-  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(tab.mode === 'join');
   const [server, setServer] = useState('');
   const [savedServer, setSavedServer] = useState('');
   const [credential, setCredential] = useState('');
@@ -55,7 +94,7 @@ export function AutomaticApp() {
   const [testingServer, setTestingServer] = useState(false);
   const [savingServer, setSavingServer] = useState(false);
   const [name, setName] = useState(readDisplayName);
-  const [invitation, setInvitation] = useState('');
+  const [invitation, setInvitation] = useState(tab.invitation ?? '');
   const [link, setLink] = useState('');
   const [joinMode, setJoinMode] = useState<JoinMode>('auto');
   const [pendingGuests, setPendingGuests] = useState<PendingGuest[]>([]);
@@ -72,26 +111,19 @@ export function AutomaticApp() {
   const [development, setDevelopment] = useState(false);
   const [people, setPeople] = useState(false);
   const peopleButton = useRef<HTMLButtonElement>(null);
-  const updateAttention = useUpdateAttention();
+  const updateAttention = useUpdateAttention(active);
   const [settings, setSettings] = useState(false);
   const [section, setSection] = useState<Section>('General');
   const [shareOpen, setShareOpen] = useState(false);
   const [resumeShare, setResumeShare] = useState(false);
-  const [pendingLink, setPendingLink] = useState('');
-  const [confirmExit, setConfirmExit] = useState(false);
-  const [startAfterLeave, setStartAfterLeave] = useState<'new' | 'join' | null>(null);
   const [updating, setUpdating] = useState(false);
   const [connected, setConnected] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
-  const { appearance, setAppearance } = useAppearance();
+  const { appearance, setAppearance, accent, setAccent, systemAccent } = appearanceSettings;
   const overlay = useOverlay();
   const keybinds = overlay.state?.settings.keybinds ?? defaultKeybinds;
   const participants = useParticipants(document);
   const title = useDocumentTitle(document?.doc);
-  const discord = useDiscordPresence(
-    document ? title : null,
-    participants.filter((person) => !person.local).length,
-  );
   const onUpdateBusy = useCallback((value: boolean) => setUpdating(value), []);
   function signaling() {
     return nativeSignaling({
@@ -127,12 +159,20 @@ export function AutomaticApp() {
       });
   }
   useEffect(() => {
-    const unlistenFailure = listen<string>('app-quit-failed', (event) => setError(event.payload));
+    mounted.current = true;
+    let initializing = true;
+    void Promise.resolve().then(() => {
+      if (initializing && tab.mode === 'new' && !documentRef.current) createInitial.current();
+    });
     return () => {
-      void unlistenFailure.then((stop) => stop()).catch(() => {});
+      initializing = false;
+      mounted.current = false;
+      void network.current?.close();
+      if (!network.current) documentRef.current?.destroy();
     };
-  }, []);
+  }, [tab.mode]);
   useEffect(() => {
+    if (!active) return;
     void invoke<{ server: string; development: boolean }>('network_preferences')
       .then((p) => {
         setServer(p.server);
@@ -140,41 +180,7 @@ export function AutomaticApp() {
         setDevelopment(p.development);
       })
       .catch((e) => setError(errorMessage(e)));
-    return () => {
-      void network.current?.close();
-      if (!network.current) documentRef.current?.destroy();
-    };
-  }, []);
-  useEffect(() => {
-    let active = true;
-    const receive = (urls: string[]) => {
-      if (!active) return;
-      const code = urls.find((url) => url.startsWith('veil:'));
-      if (!code) return;
-      try {
-        parseShareLink(code, development);
-        if (documentRef.current || busyRef.current) setPendingLink(code);
-        else {
-          setInvitation(code);
-          setJoinOpen(true);
-          setError('');
-        }
-      } catch {
-        setError('This invitation link is invalid. Ask the host for a new link.');
-      }
-    };
-    const listener = onOpenUrl(receive);
-    void listener
-      .then(() => getCurrent())
-      .then((urls) => {
-        if (urls) receive(urls);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-      void listener.then((unlisten) => unlisten()).catch(() => {});
-    };
-  }, [development]);
+  }, [active]);
   useEffect(() => {
     if (!document) return;
     const changed = () => {
@@ -187,7 +193,14 @@ export function AutomaticApp() {
     changed();
     const timer = setInterval(() => {
       setServiceOnline(network.current?.serviceOnline ?? false);
-      setPendingGuests(network.current?.pendingGuests ?? []);
+      // Keep the previous array when nothing changed, so idle ticks don't re-render the tab.
+      setPendingGuests((previous) => {
+        const next = network.current?.pendingGuests ?? [];
+        return next.length === previous.length &&
+          next.every((guest, index) => guest === previous[index])
+          ? previous
+          : next;
+      });
     }, 1000);
     return () => {
       clearInterval(timer);
@@ -221,15 +234,25 @@ export function AutomaticApp() {
     setDocument(value);
   }
   async function create() {
-    await invoke('document_open');
+    await invoke('document_open', { documentId: tab.id });
+    if (!mounted.current) {
+      await invoke('document_closed', { documentId: tab.id });
+      return;
+    }
     try {
       const local = createPeerSession('host', name.trim() || 'You');
-      local.provider.connect();
-      adopt(local);
+      try {
+        if (tab.source !== undefined) loadMarkdown(local.doc, tab.source, tab.file?.path);
+        local.provider.connect();
+        adopt(local);
+      } catch (cause) {
+        local.destroy();
+        throw cause;
+      }
       setJoinOpen(false);
       setNotice('');
     } catch (e) {
-      await invoke('document_closed');
+      await invoke('document_closed', { documentId: tab.id });
       throw e;
     }
   }
@@ -242,7 +265,7 @@ export function AutomaticApp() {
     setJoinInProgress(true);
     let opened = false;
     try {
-      await invoke('document_open');
+      await invoke('document_open', { documentId: tab.id });
       opened = true;
       setCompatibilityNotice('');
       setNotice('Connecting to host...');
@@ -260,7 +283,7 @@ export function AutomaticApp() {
       setInvitation('');
       setJoinOpen(false);
     } catch (e) {
-      if (opened) await invoke('document_closed');
+      if (opened) await invoke('document_closed', { documentId: tab.id });
       setNotice('');
       throw e;
     } finally {
@@ -277,11 +300,13 @@ export function AutomaticApp() {
     if (!configuredServer) {
       setShareOpen(false);
       setResumeShare(true);
-      openSettings('Hosting server');
+      openSettings('Sharing');
       return;
     }
     if (network.current?.sessionEnded)
-      throw new Error('The sharing session ended. Keep this document open to copy its content.');
+      throw new Error(
+        'The sharing session ended. You can save this document locally before closing it.',
+      );
     if (!network.current) {
       const started = await shareDocument(
         documentRef.current,
@@ -342,14 +367,14 @@ export function AutomaticApp() {
       await share(saved.server);
     } else setNotice('Hosting settings saved on this device.');
   }
-  async function leave() {
+  const leave = useCallback(async () => {
     const current = network.current;
     network.current = null;
     try {
       if (current) await current.close();
       else documentRef.current?.destroy();
     } finally {
-      await invoke('document_closed');
+      await invoke('document_closed', { documentId: tab.id });
       documentRef.current = null;
       setDocument(null);
       setSession(null);
@@ -361,38 +386,11 @@ export function AutomaticApp() {
       setCompatibilityNotice('');
       setError('');
       setShareOpen(false);
-      setConfirmExit(false);
       setPeople(false);
     }
-  }
-  async function openStartAction(action: 'new' | 'join') {
-    if (documentRef.current) await leave();
-    setStartAfterLeave(null);
-    if (action === 'new') await create();
-    else setJoinOpen(true);
-  }
-  function requestStartAction(action: 'new' | 'join') {
-    if (document) {
-      // Switching documents must never silently discard temporary content or peers.
-      setStartAfterLeave(action);
-      setConfirmExit(true);
-    } else void run(() => openStartAction(action));
-  }
-  function cancelLeave() {
-    setStartAfterLeave(null);
-    setConfirmExit(false);
-  }
+  }, [tab.id]);
   function requestLeave() {
-    setStartAfterLeave(null);
-    if (document && hasDocumentContent(document)) setConfirmExit(true);
-    else void run(leave);
-  }
-  async function acceptIncoming() {
-    const incoming = pendingLink;
-    await leave();
-    setPendingLink('');
-    setInvitation(incoming);
-    setJoinOpen(true);
+    void workspace.close(tab);
   }
   function togglePeople(open = !people) {
     setPeople(open);
@@ -415,36 +413,22 @@ export function AutomaticApp() {
   }
   useEffect(() => {
     if (
+      !active ||
+      !document ||
       busy ||
       updating ||
       settings ||
       shareOpen ||
-      confirmExit ||
       compatibilityPrompt ||
-      pendingLink
+      window.document.querySelector('dialog[open]')
     )
       return;
     const onKey = (event: KeyboardEvent) => {
-      if (window.document.querySelector('dialog[open]')) return;
-      if (matchesShortcut(event, keybinds.newDocument)) {
+      if (matchesShortcut(event, keybinds.copyInvite) && !guest && link) {
         event.preventDefault();
-        event.stopPropagation();
-        requestStartAction('new');
-      } else if (matchesShortcut(event, keybinds.joinDocument)) {
-        event.preventDefault();
-        event.stopPropagation();
-        requestStartAction('join');
-      } else if (document && matchesShortcut(event, keybinds.closeDocument)) {
-        event.preventDefault();
-        event.stopPropagation();
-        requestLeave();
-      } else if (document && matchesShortcut(event, keybinds.copyInvite) && !guest && link) {
-        event.preventDefault();
-        event.stopPropagation();
         copyInvite();
       }
     };
-    // App bindings take priority over editor shortcuts, which can consume bubbling events.
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   });
@@ -463,131 +447,144 @@ export function AutomaticApp() {
           : 'local';
   const overlayVisible = !!overlay.state?.settings.visible;
   const leaveLabel = guest ? 'Leave session' : 'Close document';
+  useEffect(() => {
+    workspace.attach(tab, document);
+    return () => {
+      tab.unsubscribe?.();
+    };
+  }, [workspace, tab, document]);
+  useEffect(() => {
+    workspace.update(tab, {
+      close: leave,
+      busy: busy || updating,
+      status: connection,
+      hosted: !guest,
+      sharing: !!session,
+    });
+    // The tab controller always uses the latest closures without resetting its document.
+  }, [workspace, tab, busy, updating, connection, guest, session, leave]);
   const settingsButton = (
     <IconButton
       label="Settings"
       className="desktop-settings-button"
       attention={updateAttention}
       aria-description={updateAttention ? 'Update requires attention' : undefined}
-      onClick={() => openSettings(updateAttention ? 'Updates' : 'General')}
+      onClick={() => openSettings(updateAttention ? 'About & updates' : 'General')}
     >
       <Settings size={18} aria-hidden="true" />
     </IconButton>
   );
+  const fileName = tab.file?.path.split(/[\\/]/).pop();
+  const titlebarActions = document && (
+    <>
+      {/* A local document has only its author, so People appears once a session exists. */}
+      {session && (
+        <PeopleButton
+          ref={peopleButton}
+          participants={participants}
+          waiting={guest ? 0 : pendingGuests.length}
+          expanded={people}
+          onToggle={() => togglePeople()}
+        />
+      )}
+      <IconButton
+        label={overlayVisible ? 'Hide overlay' : 'Show overlay'}
+        shortcut={overlay.state?.hideShortcutAvailable ? keybinds.toggleOverlay : undefined}
+        aria-pressed={overlayVisible}
+        disabled={!overlay.state || busy}
+        onClick={toggleOverlay}
+      >
+        {overlayVisible ? (
+          <Eye size={18} aria-hidden="true" />
+        ) : (
+          <EyeOff size={18} aria-hidden="true" />
+        )}
+      </IconButton>
+      {!guest && (
+        // While an invite link is active the icon becomes a broadcast in the accent colour;
+        // Copy invite link lives in the document menu and on its shortcut.
+        <IconButton
+          label="Share"
+          className="share-button"
+          data-sharing={link ? '' : undefined}
+          disabled={busy}
+          onClick={requestShare}
+        >
+          {link ? (
+            <Radio size={18} aria-hidden="true" />
+          ) : (
+            <UserPlus size={18} aria-hidden="true" />
+          )}
+        </IconButton>
+      )}
+      <Menu
+        label={`Document menu: ${title.trim() || 'Untitled'}`}
+        trigger={<MoreHorizontal size={18} aria-hidden="true" />}
+      >
+        <MenuItem
+          icon={<Save size={16} aria-hidden="true" />}
+          shortcut={keybinds.saveDocument}
+          disabled={busy || workspace.working}
+          onSelect={() =>
+            void workspace.run(async () => {
+              await workspace.save(tab);
+            })
+          }
+        >
+          Save
+        </MenuItem>
+        <MenuItem
+          shortcut={keybinds.saveDocumentAs}
+          disabled={busy || workspace.working}
+          onSelect={() =>
+            void workspace.run(async () => {
+              await workspace.save(tab, true);
+            })
+          }
+        >
+          Save As…
+        </MenuItem>
+        <MenuSeparator />
+        <MenuItem
+          icon={<Pencil size={16} aria-hidden="true" />}
+          onSelect={() => {
+            const input = window.document.querySelector<HTMLInputElement>(
+              `#panel-${tab.id} .doc-title`,
+            );
+            input?.focus();
+            input?.select();
+          }}
+        >
+          Rename
+        </MenuItem>
+        {!guest && link && (
+          <MenuItem
+            icon={<Link size={16} aria-hidden="true" />}
+            shortcut={keybinds.copyInvite}
+            onSelect={copyInvite}
+          >
+            Copy invite link
+          </MenuItem>
+        )}
+        <MenuSeparator />
+        <MenuItem
+          tone="danger"
+          icon={
+            guest ? <LogOut size={16} aria-hidden="true" /> : <X size={16} aria-hidden="true" />
+          }
+          shortcut={keybinds.closeDocument}
+          disabled={busy}
+          onSelect={requestLeave}
+        >
+          {leaveLabel}
+        </MenuItem>
+      </Menu>
+    </>
+  );
   return (
     <div className="desktop-shell">
+      {active && actionsSlot && titlebarActions && createPortal(titlebarActions, actionsSlot)}
       <div className="desktop-content" inert={updating} aria-busy={busy || updating}>
-        {document ? (
-          <TitleBar
-            start={
-              <>
-                <Menu
-                  label={`Document menu: ${title.trim() || 'Untitled'}`}
-                  align="start"
-                  tooltip={false}
-                  triggerClassName="titlebar-title"
-                  trigger={
-                    <>
-                      <span
-                        className="titlebar-title-text"
-                        data-empty={title.trim() ? undefined : ''}
-                      >
-                        {title.trim() || 'Untitled'}
-                      </span>
-                      <ChevronDown size={14} aria-hidden="true" />
-                    </>
-                  }
-                >
-                  <MenuItem
-                    icon={<Pencil size={16} aria-hidden="true" />}
-                    onSelect={() => {
-                      const input = window.document.querySelector<HTMLInputElement>('.doc-title');
-                      input?.focus();
-                      input?.select();
-                    }}
-                  >
-                    Rename
-                  </MenuItem>
-                  {!guest && link && (
-                    <MenuItem
-                      icon={<Link size={16} aria-hidden="true" />}
-                      shortcut={keybinds.copyInvite}
-                      onSelect={copyInvite}
-                    >
-                      Copy invite link
-                    </MenuItem>
-                  )}
-                  <MenuSeparator />
-                  <MenuItem
-                    tone="danger"
-                    icon={
-                      guest ? (
-                        <LogOut size={16} aria-hidden="true" />
-                      ) : (
-                        <X size={16} aria-hidden="true" />
-                      )
-                    }
-                    shortcut={keybinds.closeDocument}
-                    disabled={busy}
-                    onSelect={requestLeave}
-                  >
-                    {leaveLabel}
-                  </MenuItem>
-                </Menu>
-                <DocumentStatus state={connection} count={participants.length} />
-              </>
-            }
-            end={
-              <>
-                <PeopleButton
-                  ref={peopleButton}
-                  participants={participants}
-                  waiting={guest ? 0 : pendingGuests.length}
-                  expanded={people}
-                  onToggle={() => togglePeople()}
-                />
-                <IconButton
-                  label={overlayVisible ? 'Hide overlay' : 'Show overlay'}
-                  shortcut={
-                    overlay.state?.hideShortcutAvailable ? keybinds.toggleOverlay : undefined
-                  }
-                  aria-pressed={overlayVisible}
-                  disabled={!overlay.state || busy}
-                  onClick={toggleOverlay}
-                >
-                  {overlayVisible ? (
-                    <Eye size={18} aria-hidden="true" />
-                  ) : (
-                    <EyeOff size={18} aria-hidden="true" />
-                  )}
-                </IconButton>
-                {!guest &&
-                  (link ? (
-                    <div className="split-button">
-                      <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
-                        Share
-                      </Button>
-                      <IconButton
-                        label="Copy invite link"
-                        shortcut={keybinds.copyInvite}
-                        className="split-button-icon"
-                        disabled={busy}
-                        onClick={copyInvite}
-                      >
-                        <Copy size={16} aria-hidden="true" />
-                      </IconButton>
-                    </div>
-                  ) : (
-                    <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
-                      Share
-                    </Button>
-                  ))}
-              </>
-            }
-          />
-        ) : (
-          <TitleBar />
-        )}
         <div className="app-banners">
           {document && connection === 'disconnected' && (
             <Banner
@@ -611,10 +608,10 @@ export function AutomaticApp() {
             </Banner>
           )}
         </div>
-        {!document ? (
+        {!document && opening ? (
+          <div className="document-opening" aria-busy="true" />
+        ) : !document ? (
           <StartScreen
-            keybinds={keybinds}
-            shortcutsDisabled={settings || updating || !!compatibilityPrompt || !!pendingLink}
             name={name}
             onNameChange={updateName}
             invitation={invitation}
@@ -623,6 +620,10 @@ export function AutomaticApp() {
             onJoinOpenChange={setJoinOpen}
             busy={busy}
             development={development}
+            onOpen={() => void workspace.open()}
+            keybinds={keybinds}
+            shortcutsDisabled={settings || shareOpen || !!compatibilityPrompt || workspace.working}
+            active={active}
             onCreate={() => void run(create)}
             onJoin={() => void run(join)}
           />
@@ -659,30 +660,40 @@ export function AutomaticApp() {
           start={
             document ? (
               <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={
-                    guest ? (
-                      <LogOut size={14} aria-hidden="true" />
+                {connection !== 'local' && (
+                  <span className="statusbar-connection" data-state={connection} role="status">
+                    {connection === 'sharing' || connection === 'connected' ? (
+                      <Users size={14} aria-hidden="true" />
                     ) : (
-                      <X size={14} aria-hidden="true" />
-                    )
-                  }
-                  disabled={busy}
-                  title={`${leaveLabel} (${keybinds.closeDocument})`}
-                  onClick={requestLeave}
-                >
-                  {leaveLabel}
-                </Button>
+                      <span className="statusbar-connection-dot" aria-hidden="true" />
+                    )}
+                    {connection === 'sharing'
+                      ? 'Sharing'
+                      : connection === 'connected'
+                        ? guest
+                          ? 'Connected'
+                          : `Shared with ${participants.length - 1}`
+                        : connection === 'connecting'
+                          ? 'Connecting…'
+                          : 'Disconnected'}
+                  </span>
+                )}
+                <span className="statusbar-note" title={tab.file?.path}>
+                  {tab.dirty
+                    ? 'Unsaved changes'
+                    : fileName
+                      ? `Saved · ${fileName}`
+                      : 'Not saved to a file'}
+                </span>
               </>
-            ) : (
-              <span className="statusbar-note">Overlay hidden from compatible screen capture</span>
+            ) : opening || !overlay.state ? null : (
+              <OverlayStatus state={overlay.state} onOpen={() => openSettings('Overlay')} />
             )
           }
           end={settingsButton}
         />
         <ToastRegion>
+          {active && toasts}
           {notice && !joinInProgress && (
             <Banner tone="info" className="toast" onDismiss={() => setNotice('')}>
               {notice}
@@ -696,7 +707,7 @@ export function AutomaticApp() {
               onDismiss={() => setError('')}
               actions={
                 /protocol|update/i.test(error) && (
-                  <Button size="sm" variant="ghost" onClick={() => openSettings('Updates')}>
+                  <Button size="sm" variant="ghost" onClick={() => openSettings('About & updates')}>
                     Open updates
                   </Button>
                 )
@@ -707,9 +718,8 @@ export function AutomaticApp() {
           )}
         </ToastRegion>
       </div>
-      <SessionBridge connection={document} />
       <Dialog
-        open={!!compatibilityPrompt}
+        open={active && !!compatibilityPrompt}
         title="Session compatibility"
         onClose={() => decideCompatibility(false)}
       >
@@ -721,67 +731,76 @@ export function AutomaticApp() {
           </Button>
         </div>
       </Dialog>
-      <SettingsDialog
-        open={settings}
-        section={section}
-        onSectionChange={setSection}
-        onClose={() => {
-          if (!updating) {
-            setSettings(false);
-            setResumeShare(false);
-          }
-        }}
-        updating={updating}
-        busy={busy}
-        updateAttention={updateAttention}
-        onUpdateBusy={onUpdateBusy}
-        name={name}
-        onNameChange={updateName}
-        discord={discord}
-        closeBehavior={overlay.state?.settings.closeBehavior ?? 'tray'}
-        closeBehaviorDisabled={!overlay.state || busy || updating}
-        onCloseBehaviorChange={(closeBehavior) =>
-          void run(async () => {
-            overlay.setState(
-              await invoke<OverlaySnapshot>('overlay_update', { patch: { closeBehavior } }),
-            );
-          })
-        }
-        appearance={appearance}
-        onAppearanceChange={setAppearance}
-        hosting={{
-          server,
-          credential,
-          savedServer,
-          status: serverTest,
-          testing: testingServer,
-          saving: savingServer,
-          resumeShare,
-          onServerChange: (value) => {
-            setServer(value);
-            setServerTest('');
-          },
-          onCredentialChange: (value) => {
-            setCredential(value);
-            setServerTest('');
-          },
-          onSave: () => void run(saveServer),
-          onTest: () => void run(testServer),
-          onForget: () =>
+      {/* Only the selected tab mounts Settings, so background tabs don't poll native state. */}
+      {active && (
+        <SettingsDialog
+          open={settings}
+          section={section}
+          onSectionChange={setSection}
+          onClose={() => {
+            if (!updating) {
+              setSettings(false);
+              setResumeShare(false);
+            }
+          }}
+          updating={updating}
+          busy={busy}
+          updateAttention={updateAttention}
+          onUpdateBusy={onUpdateBusy}
+          name={name}
+          onNameChange={updateName}
+          discord={discord}
+          restoreTabs={workspace.restore}
+          onRestoreTabsChange={(enabled) => void workspace.configureRestore(enabled)}
+          restoreTabsDisabled={workspace.working}
+          closeBehavior={overlay.state?.settings.closeBehavior ?? 'tray'}
+          closeBehaviorDisabled={!overlay.state || busy || updating}
+          onCloseBehaviorChange={(closeBehavior) =>
             void run(async () => {
-              await invoke('network_forget', { server: savedServer });
-              setCredential('');
+              overlay.setState(
+                await invoke<OverlaySnapshot>('overlay_update', { patch: { closeBehavior } }),
+              );
+            })
+          }
+          appearance={appearance}
+          onAppearanceChange={setAppearance}
+          accent={accent}
+          systemAccent={systemAccent}
+          onAccentChange={setAccent}
+          hosting={{
+            server,
+            credential,
+            savedServer,
+            status: serverTest,
+            testing: testingServer,
+            saving: savingServer,
+            resumeShare,
+            onServerChange: (value) => {
+              setServer(value);
               setServerTest('');
-              setNotice('Saved host credential removed.');
-            }),
-        }}
-        notice={notice}
-        error={error}
-        onOpenUrl={(url) => {
-          void openUrl(url).catch((cause) => setError(errorMessage(cause)));
-        }}
-      />
-      {joinInProgress && (
+            },
+            onCredentialChange: (value) => {
+              setCredential(value);
+              setServerTest('');
+            },
+            onSave: () => void run(saveServer),
+            onTest: () => void run(testServer),
+            onForget: () =>
+              void run(async () => {
+                await invoke('network_forget', { server: savedServer });
+                setCredential('');
+                setServerTest('');
+                setNotice('Saved host credential removed.');
+              }),
+          }}
+          notice={notice}
+          error={error}
+          onOpenUrl={(url) => {
+            void openUrl(url).catch((cause) => setError(errorMessage(cause)));
+          }}
+        />
+      )}
+      {active && joinInProgress && (
         <Dialog
           open
           title="Joining session"
@@ -805,7 +824,7 @@ export function AutomaticApp() {
         </Dialog>
       )}
       <ShareDialog
-        open={shareOpen}
+        open={active && shareOpen}
         onClose={() => setShareOpen(false)}
         started={!!session}
         link={link}
@@ -841,61 +860,6 @@ export function AutomaticApp() {
         notice={notice}
         error={error}
       />
-      <Dialog
-        open={confirmExit}
-        title={
-          startAfterLeave === 'join'
-            ? 'Join another document?'
-            : startAfterLeave === 'new'
-              ? 'Start a new document?'
-              : `${leaveLabel}?`
-        }
-        dismissOnBackdrop
-        onClose={cancelLeave}
-      >
-        <p>
-          This document is temporary. Copy any text you want to keep before{' '}
-          {guest ? 'leaving' : 'closing'}. {!guest && session && 'Everyone will be disconnected.'}
-        </p>
-        <div className="dialog-actions">
-          <Button onClick={cancelLeave}>Cancel</Button>
-          <Button
-            variant="danger"
-            disabled={busy}
-            onClick={() =>
-              void run(() => (startAfterLeave ? openStartAction(startAfterLeave) : leave()))
-            }
-          >
-            {startAfterLeave === 'join'
-              ? `${leaveLabel} and open join form`
-              : startAfterLeave === 'new'
-                ? `${leaveLabel} and create new`
-                : leaveLabel}
-          </Button>
-        </div>
-      </Dialog>
-      <Dialog
-        open={!!pendingLink}
-        title="Open another session?"
-        dismissOnBackdrop
-        onClose={() => setPendingLink('')}
-      >
-        <p>
-          {document && hasDocumentContent(document)
-            ? 'Your current document contains temporary content. Copy anything you want to keep before leaving.'
-            : 'Leave your current document before opening this invitation.'}
-        </p>
-        <div className="dialog-actions">
-          <Button onClick={() => setPendingLink('')}>Cancel</Button>
-          <Button
-            variant="primary"
-            disabled={busy || updating}
-            onClick={() => void run(acceptIncoming)}
-          >
-            Leave and open invitation
-          </Button>
-        </div>
-      </Dialog>
     </div>
   );
 }

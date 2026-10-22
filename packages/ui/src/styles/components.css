@@ -209,9 +209,36 @@
   :root[data-theme='dark'] .select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23a8a8a8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
+  /* A field with its action inside one border, so both share the same inner height. */
   .input-group {
     display: flex;
-    gap: var(--space-2);
+    align-items: center;
+    gap: var(--space-1);
+    height: var(--control-md);
+    padding: 3px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+  .input-group:has(.input[readonly]) {
+    background: var(--surface-sunken);
+  }
+  .input-group:focus-within {
+    border-color: var(--accent);
+  }
+  .input-group .input {
+    height: 100%;
+    padding: 0 6px;
+    border: 0;
+    background: transparent;
+  }
+  .input-group .input:focus-visible {
+    box-shadow: none;
+  }
+  .input-group .btn {
+    height: 100%;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
   }
 
   .switch {

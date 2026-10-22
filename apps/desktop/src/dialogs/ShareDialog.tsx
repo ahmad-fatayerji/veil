@@ -69,9 +69,7 @@ export function ShareDialog({
             />
           </Field>
           <div className="dialog-actions">
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
+            <Button onClick={onClose}>Cancel</Button>
             <Button type="submit" variant="primary" loading={busy} disabled={!name.trim()}>
               Create invite link
             </Button>
@@ -146,9 +144,7 @@ export function ShareDialog({
             Sharing is off. New people can’t join; current collaborators stay connected.
           </Banner>
           <div className="dialog-actions">
-            <Button variant="ghost" onClick={onClose}>
-              Close
-            </Button>
+            <Button onClick={onClose}>Close</Button>
             <Button variant="primary" loading={busy} onClick={onEnable}>
               Turn sharing back on
             </Button>

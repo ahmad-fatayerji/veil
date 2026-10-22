@@ -114,28 +114,6 @@
   .titlebar-title-text[data-empty] {
     color: var(--fg-muted);
   }
-  .split-button {
-    display: inline-flex;
-    align-items: stretch;
-    margin-inline: var(--space-1);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-  }
-  .titlebar .split-button .btn-sm {
-    margin-inline: 0;
-    border-radius: 0;
-  }
-  .titlebar .split-button .split-button-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 0;
-    border-left: 1px solid color-mix(in srgb, var(--on-accent) 35%, transparent);
-    background: var(--accent);
-    color: var(--on-accent);
-  }
-  .titlebar .split-button .split-button-icon:hover:not(:disabled) {
-    background: var(--accent-hover);
-  }
   .titlebar-actions {
     display: flex;
     align-items: center;
@@ -599,7 +577,7 @@
   }
   .settings-layout {
     display: grid;
-    grid-template-columns: 188px minmax(0, 1fr);
+    grid-template-columns: 204px minmax(0, 1fr);
     height: min(560px, calc(100dvh - 120px));
   }
   .settings-nav {
@@ -623,6 +601,7 @@
     color: var(--fg);
     font-size: var(--text-md);
     text-align: left;
+    white-space: nowrap;
   }
   .settings-nav button svg {
     flex-shrink: 0;
@@ -650,11 +629,88 @@
     opacity: 0.45;
   }
   .settings-nav-attention {
+    flex-shrink: 0;
     width: 6px;
     height: 6px;
     margin-left: auto;
     border-radius: var(--radius-full);
     background: var(--accent);
+  }
+  /* Accent color: label above a grid laid out like Windows Personalization > Colors. */
+  .setting-row.accent-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  .accent-picker {
+    display: grid;
+    grid-template-columns: repeat(9, 28px);
+    gap: 6px;
+  }
+  .accent-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-5);
+  }
+  .accent-disclosure {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-2);
+    height: var(--control-sm);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    font-size: var(--text-sm);
+  }
+  .accent-disclosure:hover {
+    background: var(--hover);
+  }
+  .accent-disclosure svg {
+    color: var(--fg-muted);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .accent-disclosure[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+  .accent-disclosure .accent-system-swatch {
+    width: 16px;
+    height: 16px;
+  }
+  .accent-swatch {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent);
+  }
+  .accent-swatch:hover:not(:disabled) {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--fg) 45%, transparent);
+  }
+  .accent-swatch[aria-checked='true'] {
+    box-shadow:
+      inset 0 0 0 2px var(--surface-raised),
+      0 0 0 2px var(--fg);
+  }
+  .accent-swatch:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 3px;
+  }
+  .accent-system {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .accent-system-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-sm);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent);
   }
   .settings-content {
     min-width: 0;
@@ -675,6 +731,27 @@
     color: var(--fg-muted);
     font-size: var(--text-sm);
     line-height: 1.55;
+  }
+  /* Titled groups within a page, matching the overlay page's groups. */
+  .settings-group {
+    display: grid;
+    gap: var(--space-2);
+  }
+  .settings-group + .settings-group {
+    margin-top: var(--space-2);
+  }
+  .settings-group-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .settings-group-heading h4 {
+    font-size: var(--text-md);
+  }
+  .settings-group-heading > span {
+    color: var(--fg-muted);
+    font-size: var(--text-xs);
   }
   .settings-card {
     border: 1px solid var(--border);

@@ -119,7 +119,7 @@ async function screenshot(page, name) {
     mask: [
       page.locator('#share-link'),
       page.locator('#automatic-credential'),
-      page.locator('#automatic-invitation'),
+      page.locator('[id$="-automatic-invitation"]'),
     ],
   });
 }
@@ -135,7 +135,7 @@ try {
   await expect(host.getByLabel('Invite link')).toHaveCount(0);
   await screenshot(host, 'welcome-light');
   assert.equal(await host.getByLabel('Server address').isVisible(), false);
-  await host.getByRole('button', { name: /^New document/ }).click();
+  await host.getByRole('button', { name: 'New document', exact: true }).click();
   const editor = host.getByRole('textbox', { name: 'Shared document' });
   await editor.fill('Written before sharing.');
   assert.equal(
@@ -283,7 +283,7 @@ try {
   await other.getByRole('textbox', { name: 'Shared document' }).press('Control+End');
   await other.keyboard.insertText(' After sharing stopped.');
   await expect(editor).toContainText('After sharing stopped.');
-  dialog = await settings(host, 'Hosting server');
+  dialog = await settings(host, 'Sharing');
   await dialog.getByLabel('Host access credential').fill('a'.repeat(64));
   await dialog.getByRole('button', { name: 'Save settings', exact: true }).click();
   await expect(dialog.locator('form').getByRole('status')).toContainText(
@@ -310,7 +310,7 @@ try {
   );
   await dialog.getByRole('button', { name: 'Close Settings' }).click();
   await expect(editor).toContainText('After sharing stopped.');
-  dialog = await settings(host, 'Appearance');
+  dialog = await settings(host, 'General');
   await dialog.getByRole('radio', { name: 'Dark', exact: true }).click();
   await dialog.getByRole('button', { name: 'Close Settings' }).click();
   await screenshot(host, 'workspace-dark');
@@ -344,13 +344,17 @@ try {
     true,
   );
   await closeDocument(host);
-  const confirmation = host.getByRole('dialog', { name: 'Close document?', exact: true });
+  const confirmation = host.getByRole('dialog', { name: /^Save changes to / });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
   await expect(editor).toContainText('After sharing stopped.');
   await closeDocument(host);
-  await confirmation.getByRole('button', { name: 'Close document', exact: true }).click();
-  await expect(host.getByRole('button', { name: /^New document/ })).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Discard', exact: true }).click();
+  await host
+    .getByRole('dialog', { name: 'End this shared session?', exact: true })
+    .getByRole('button', { name: 'End session', exact: true })
+    .click();
+  await expect(host.getByRole('button', { name: 'New document', exact: true })).toBeVisible();
   assert.equal((await invoke(host, 'update_status')).sessionActive, false);
   await expect(guest.getByRole('status').first()).toHaveText('Disconnected');
   assert.deepEqual(errors, []);
