@@ -19,6 +19,7 @@ export interface OverlaySettings {
   height: number;
   opacity: number;
   textOpacity: number;
+  opacityLinked: boolean;
   alwaysOnTop: boolean;
   clickThrough: boolean;
   captureExclusion: boolean;
@@ -46,6 +47,7 @@ export type OverlayPatch = Partial<
     | 'keybinds'
     | 'opacity'
     | 'textOpacity'
+    | 'opacityLinked'
     | 'alwaysOnTop'
     | 'clickThrough'
     | 'fontSize'

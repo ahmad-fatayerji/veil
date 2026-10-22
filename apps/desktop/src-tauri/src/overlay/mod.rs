@@ -131,6 +131,7 @@ pub struct Patch {
     keybinds: Option<Keybinds>,
     opacity: Option<f64>,
     text_opacity: Option<f64>,
+    opacity_linked: Option<bool>,
     always_on_top: Option<bool>,
     click_through: Option<bool>,
     font_size: Option<u32>,
@@ -581,6 +582,9 @@ pub fn overlay_update(
     }
     if let Some(value) = patch.text_opacity {
         next.text_opacity = value;
+    }
+    if let Some(value) = patch.opacity_linked {
+        next.opacity_linked = value;
     }
     if let Some(value) = patch.font_size {
         next.font_size = value;
