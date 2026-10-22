@@ -86,6 +86,12 @@ Tray controls offer recovery as well. Closing the main window moves to the tray 
 default; the configurable quit behavior must remain explicit because documents
 are temporary.
 
+**Settings → General → Start Veil with Windows** is off by default. Enabling it
+registers Veil for the current user's Windows sign-in and launches quietly in the
+system tray with both windows hidden. Opening Veil manually or through an
+invitation shows the control panel. The setting reads Windows startup registration
+and does not enable itself on launch or upgrade.
+
 Capture exclusion is enabled by default for supported Windows versions. Native
 status and actual capture results are different: verify saved recordings or remote
 output and document tool/mode-specific results. Never claim universal invisibility

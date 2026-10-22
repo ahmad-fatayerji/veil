@@ -1,5 +1,42 @@
 # Verification record
 
+## Windows startup - 22 October 2026
+
+Added **Start Veil with Windows** in Settings > General, off by default. Sign-in
+launches use `--autostart` and keep the control panel and overlay hidden while the
+tray initializes. Manual launches and invitations show the control panel; duplicate
+autostart launches do not reveal it. The toggle refreshes from Windows registration
+whenever Settings opens and reports read/write failures without optimistic changes.
+
+The autostart plugin is pinned to 2.5.1 for current-user registration. Native code
+quotes its registered executable path for installation paths containing spaces and
+removes the registration if enabling or quoting fails. Direct plugin commands are
+not granted to WebViews; the app's startup commands require the main window.
+
+TypeScript, changed-source ESLint, Prettier, rustfmt and `git diff --check` passed.
+Windows `cargo check -p veil-desktop --tests` passed, compiling the added launch
+argument regression cases. Test suites and native acceptance were not run.
+This feature does not change any server or peer protocol contract.
+
+Manual acceptance on an installed Windows build:
+
+1. With no startup registration, confirm the switch is off. Restart Veil and confirm
+   it stays off; signing in to Windows must not launch Veil.
+2. Enable the switch, quit, and sign in again. Confirm one tray icon, no control
+   panel or overlay flash, and no taskbar window, including after saving a visible
+   overlay in the previous run. Repeat with an installation path containing spaces.
+3. Open Veil from the tray, a normal app launch, and an invitation link while it is
+   running in the tray. Confirm the control panel opens and invitations still work.
+   Invoke the executable with `--autostart` again and confirm it stays hidden.
+4. Confirm tray overlay controls and Quit Veil still work. Disable startup, quit,
+   and sign in again; Veil must remain closed. Confirm the disabled choice survives
+   an app upgrade, and an enabled choice remains enabled without re-registering.
+5. Disable Veil through Windows Startup Apps, then reopen Settings and confirm the
+   switch reflects that change. Re-enable in Veil and confirm startup works again.
+6. With registration writes denied in a disposable Windows test account, confirm
+   an accessible error and the last confirmed switch value. Reopen Settings to
+   refresh the actual state. Confirm the overlay cannot invoke startup commands.
+
 ## Discord Rich Presence - 22 October 2026
 
 Added default-on Windows Discord activity and independent title/count privacy

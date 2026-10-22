@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "main",
+        "visible": false,
         "title": "Veil",
         "width": 1180,
         "height": 860,
