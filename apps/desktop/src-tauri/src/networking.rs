@@ -12,6 +12,14 @@ use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message};
 pub struct Networking {
     sockets: Mutex<std::collections::HashMap<String, mpsc::Sender<String>>>,
 }
+/// Veil's own server. Used until the user saves another one; it offers bounded public
+/// hosting, so sharing works without an operator-issued credential.
+pub const OFFICIAL_SERVER: &str = "https://veil.ahmadfatayerji.com";
+// Exact texts the UI matches to offer configuring another server.
+const SERVER_FULL: &str = "This Veil server is at capacity right now.";
+const PUBLIC_LIMIT: &str = "You've reached this server's free hosting limit.";
+const NO_PUBLIC_HOSTING: &str =
+    "This server doesn't offer public hosting. Enter an operator-issued host credential.";
 #[derive(Serialize, Deserialize, Default)]
 pub struct Preferences {
     server: String,
@@ -19,6 +27,12 @@ pub struct Preferences {
     development: bool,
     #[serde(default, skip_deserializing)]
     legacy: bool,
+    /// Suggested server while nothing is saved.
+    #[serde(default, skip_deserializing)]
+    official: String,
+    /// Whether a host credential is saved for `server` (the credential itself never reaches JS).
+    #[serde(default, skip_deserializing)]
+    credential: bool,
 }
 fn authorize(caller: &WebviewWindow) -> Result<(), String> {
     if caller.label() == "main" {
@@ -125,7 +139,15 @@ pub async fn network_preferences(
     preferences.development = cfg!(debug_assertions);
     preferences.legacy =
         cfg!(debug_assertions) && std::env::var("VEIL_TEST_LEGACY").as_deref() == Ok("1");
+    preferences.official = OFFICIAL_SERVER.into();
+    preferences.credential = saved_credential(&preferences.server).is_some();
     Ok(preferences)
+}
+fn saved_credential(server: &str) -> Option<String> {
+    if server.is_empty() {
+        return None;
+    }
+    entry(server).ok()?.get_password().ok()
 }
 #[tauri::command]
 pub async fn network_configure(
@@ -137,24 +159,29 @@ pub async fn network_configure(
     authorize(&caller)?;
     let server = server_url(&server)?.origin().ascii_serialization();
     let credential_store = entry(&server)?;
-    if let Some(secret) = credential.filter(|secret| !secret.is_empty()) {
+    let saved = if let Some(secret) = credential.filter(|secret| !secret.is_empty()) {
         // Authenticate before changing either Credential Manager or preferences.
         // This also prevents an invalid replacement from overwriting a working key.
-        test_credentials(&server, secret.clone()).await?;
+        test_server(&server, Some(secret.clone())).await?;
         credential_store
             .set_password(&secret)
             .map_err(|_| "Cannot save the host credential securely.")?;
+        true
+    } else if credential_store.get_password().is_ok() {
+        true
     } else {
-        credential_store
-            .get_password()
-            .map_err(|_| "Enter an operator-issued host credential before saving settings.")?;
-    }
+        // No credential: only servers offering public hosting can be saved.
+        test_server(&server, None).await?;
+        false
+    };
     let directory = settings_directory(&app)?;
     std::fs::create_dir_all(&directory).map_err(|_| "Cannot create settings directory.")?;
     let preferences = Preferences {
         server,
         development: cfg!(debug_assertions),
         legacy: false,
+        official: OFFICIAL_SERVER.into(),
+        credential: saved,
     };
     let temporary =
         tempfile::NamedTempFile::new_in(&directory).map_err(|_| "Cannot save settings.")?;
@@ -211,14 +238,13 @@ async fn request(
             .map_err(|_| "Unsupported request method.")?,
         url,
     );
+    // Without a saved credential the session is created on the server's public tier.
+    let mut anonymous = false;
     if path == "/v2/sessions" && method == "POST" {
-        let credential = match host_credential {
-            Some(secret) => secret,
-            None => entry(&origin.origin().ascii_serialization())?
-                .get_password()
-                .map_err(|_| "Configure an operator-issued host credential first.")?,
-        };
-        request = request.bearer_auth(credential);
+        match host_credential.or_else(|| saved_credential(&origin.origin().ascii_serialization())) {
+            Some(credential) => request = request.bearer_auth(credential),
+            None => anonymous = true,
+        }
     } else if let Some(ticket) = ticket {
         if ticket.len() != 64 || !ticket.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err("Invalid session authorization.".into());
@@ -251,17 +277,19 @@ async fn request(
         bytes.extend_from_slice(&chunk);
     }
     if !status.is_success() {
-        if status.as_u16() == 409 {
-            let value: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-            let message = match value.get("error").and_then(Value::as_str) {
-                Some("CLIENT_PROTOCOL_UNSUPPORTED") => Some("This app is no longer supported by the server. Open Settings > Updates, or ask the operator to update the server."),
-                Some("HOST_PROTOCOL_UNSUPPORTED") => Some("The host app is no longer supported by the server. Ask the host to update Veil."),
-                Some("PEER_PROTOCOL_UNSUPPORTED") => Some("Your app and the host use incompatible collaboration protocols. Open Settings > Updates or ask the host to update Veil."),
-                _ => None,
-            };
-            if let Some(message) = message {
-                return Err(message.into());
-            }
+        let value: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+        let message = match (status.as_u16(), value.get("error").and_then(Value::as_str)) {
+            (409, Some("CLIENT_PROTOCOL_UNSUPPORTED")) => Some("This app is no longer supported by the server. Open Settings > Updates, or ask the operator to update the server."),
+            (409, Some("HOST_PROTOCOL_UNSUPPORTED")) => Some("The host app is no longer supported by the server. Ask the host to update Veil."),
+            (409, Some("PEER_PROTOCOL_UNSUPPORTED")) => Some("Your app and the host use incompatible collaboration protocols. Open Settings > Updates or ask the host to update Veil."),
+            (503, Some("PUBLIC_CAPACITY_FULL" | "CAPACITY_FULL")) => Some(SERVER_FULL),
+            (429, Some("PUBLIC_LIMIT_REACHED")) => Some(PUBLIC_LIMIT),
+            (429, Some("PUBLIC_GUEST_LIMIT")) => Some("This document has reached the server's guest limit. Ask the host to use a server with more room."),
+            (401, _) if anonymous => Some(NO_PUBLIC_HOSTING),
+            _ => None,
+        };
+        if let Some(message) = message {
+            return Err(message.into());
         }
         return Err(match status.as_u16() {
             401 | 403 => "Server authorization rejected or session ended.",
@@ -274,8 +302,13 @@ async fn request(
 }
 // Probe authentication with a short-lived registration; never opens a socket,
 // publishes an invitation, changes preferences, or replaces stored credentials.
-async fn test_credentials(server: &str, credential: String) -> Result<(), String> {
-    if !valid_credential(&credential) {
+// Without a credential only the advertised public tier is checked, so testing
+// never spends the user's public session allowance.
+async fn test_server(server: &str, credential: Option<String>) -> Result<(), String> {
+    if credential
+        .as_deref()
+        .is_some_and(|secret| !valid_credential(secret))
+    {
         return Err("Invalid operator-issued host credential.".into());
     }
     let capabilities = request(server, "/v2/capabilities", "GET", Value::Null, None, None).await?;
@@ -284,6 +317,13 @@ async fn test_credentials(server: &str, credential: String) -> Result<(), String
     {
         return Err("This server needs an update to support short sharing links.".into());
     }
+    let Some(credential) = credential else {
+        return if capabilities.get("publicHosting").and_then(Value::as_u64) == Some(1) {
+            Ok(())
+        } else {
+            Err(NO_PUBLIC_HOSTING.into())
+        };
+    };
     let registration = request(
         server,
         "/v2/sessions",
@@ -336,13 +376,10 @@ pub async fn network_test(
 ) -> Result<(), String> {
     authorize(&caller)?;
     let origin = server_url(&server)?.origin().ascii_serialization();
-    let credential = match credential.filter(|secret| !secret.is_empty()) {
-        Some(secret) => secret,
-        None => entry(&origin)?.get_password().map_err(|_| {
-            "Enter an operator-issued host credential or save one for this server first."
-        })?,
-    };
-    test_credentials(&origin, credential).await
+    let credential = credential
+        .filter(|secret| !secret.is_empty())
+        .or_else(|| saved_credential(&origin));
+    test_server(&origin, credential).await
 }
 #[tauri::command]
 pub async fn network_connect(
@@ -391,6 +428,11 @@ pub async fn network_connect(
             if matches!(response.status().as_u16(), 401 | 403) =>
         {
             "Session authorization rejected."
+        }
+        tokio_tungstenite::tungstenite::Error::Http(ref response)
+            if response.status().as_u16() == 503 =>
+        {
+            SERVER_FULL
         }
         _ => "Signaling unavailable or HTTPS certificate invalid.",
     })?;
@@ -479,6 +521,11 @@ mod tests {
         assert!(!path_allowed("/v2/metrics", "GET"));
         assert!(!path_allowed("/v2/socket/a", "GET"));
         assert!(!path_allowed("/v2/sessions/../metrics", "DELETE"));
+    }
+    #[test]
+    fn official_server_is_a_valid_origin() {
+        let url = server_url(OFFICIAL_SERVER).unwrap();
+        assert_eq!(url.origin().ascii_serialization(), OFFICIAL_SERVER);
     }
     #[test]
     fn origins_reject_credential_exfiltration() {

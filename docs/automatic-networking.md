@@ -1,11 +1,24 @@
 # Automatic connections and selective relay
 
 The approved P2 flow replaces manual offer/answer and LAN/browser choices in the
-normal desktop app. Install Veil on each Windows PC. An operator deploys
-[veil-server](https://github.com/ahmad-fatayerji/veil-server), gives the host an HTTPS
-address and an individual host credential. Enter these once in Settings > Sharing > Hosting server.
+normal desktop app. Install Veil on each Windows PC. Until another server is saved,
+Settings > Sharing > Hosting server suggests Veil's public server
+(`https://veil.ahmadfatayerji.com`), which offers bounded public hosting without a
+credential. Settings explains its limits (up to five guests per document, a few
+sessions per connection, limited relay, no availability guarantee) and recommends
+self-hosting [veil-server](https://github.com/ahmad-fatayerji/veil-server) or using
+another server for reliable or larger sessions. An operator of another server gives
+the host an HTTPS address and, unless that server offers public hosting, an
+individual host credential. Enter these once in Settings > Sharing > Hosting server.
 The credential stays in Windows Credential Manager, scoped to the canonical server
-origin; the server address is saved separately. There is no bundled default server.
+origin; the server address is saved separately. The first share still opens Hosting
+settings so the user sees and confirms the server before anything is shared.
+
+When session creation fails because the server is full (`PUBLIC_CAPACITY_FULL` or
+`CAPACITY_FULL`) or this connection reached its public limit (`PUBLIC_LIMIT_REACHED`),
+Share shows a prompt instead of an error: **Configure your own server** opens Hosting
+settings with an empty address, **Try again** retries, and **Cancel** keeps the
+document local. Guests joining a public session that is full see the guest-limit message.
 
 Create document opens a local editor before any server request. Share attaches to
 that same document and uses saved configuration. Missing setup opens Hosting
@@ -28,14 +41,17 @@ removes it locally; operators revoke server authorization separately.
 Saving a new or replacement host credential automatically tests it before either
 the credential or server address is saved. A failed check keeps the entered values
 available for correction and leaves existing saved settings intact. Saving with an
-empty field requires a credential already stored for that exact origin; it reuses
-that credential without requiring another online test.
+empty field reuses a credential already stored for that exact origin without another
+online test. Without a stored credential, saving requires the server to advertise
+`publicHosting: 1`; otherwise it asks for an operator-issued host credential.
 
 Hosting server settings also include **Test connection**. It checks the entered server
 and credential before saving; an empty credential field uses the credential already
 stored for that exact server origin. Changing either field clears the previous result.
 The native test checks reusable-sharing support, creates a temporary authenticated
-registration, and immediately deletes it. It does not save settings, publish an
+registration, and immediately deletes it. Without a credential it only checks that
+the server advertises public hosting, so it never uses the public session allowance.
+It does not save settings, publish an
 invitation, open signaling, request TURN, or disturb an active document. Tests count
 against the server's session-creation rate limit. Connection/certificate errors,
 rejected credentials, unavailable capacity, and failed cleanup are reported in Settings.
@@ -95,7 +111,10 @@ stay in memory and are omitted from logs/preferences and masked in test screensh
 
 Deploy the compatible server before making the new desktop build available. Reusable sharing was introduced by [server PR #3](https://github.com/ahmad-fatayerji/veil-server/pull/3).
 The coordinated compatibility extension is [server PR #4](https://github.com/ahmad-fatayerji/veil-server/pull/4),
-commit `2aa361f15e3581356a5b6185f2072ba0541b1cd3`; desktop network CI pins that source.
+which with server PRs #3 and #5 is part of server `develop` (`ad89e11`). Desktop network
+CI pins the exact server source it tests against in `.github/workflows/ci.yml`. The
+optional public hosting tier and capacity errors are coordinated with the server's
+public-hosting PR; servers without it keep requiring a credential.
 The new server retains v2 routes and legacy clients. The old server cannot admit
 version-4 group links. No deployment or release is performed by this overhaul.
 

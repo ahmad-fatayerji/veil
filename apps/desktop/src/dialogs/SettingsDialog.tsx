@@ -22,6 +22,7 @@ import { OverlayControls } from '../overlay/Controls';
 import { Updates } from '../Updates';
 import type { useDiscordPresence } from '../discord';
 import { useWindowsStartup } from '../startup';
+import { SELF_HOSTING_URL, sameServer } from '../capacity';
 
 // Pages group settings by purpose; each page is split into titled groups.
 export type Section = 'General' | 'Sharing' | 'Overlay' | 'Keybinds' | 'About & updates';
@@ -86,6 +87,9 @@ export type HostingForm = {
   server: string;
   credential: string;
   savedServer: string;
+  /** Veil's free public server, suggested until another one is saved. */
+  official: string;
+  onUseAnother: () => void;
   status: string;
   testing: boolean;
   saving: boolean;
@@ -361,6 +365,26 @@ export function SettingsDialog({
                   Save your server settings to continue sharing this document.
                 </Banner>
               )}
+              {sameServer(hosting.server, hosting.official) && (
+                <Banner
+                  tone="info"
+                  actions={
+                    <>
+                      <Button size="sm" disabled={busy} onClick={hosting.onUseAnother}>
+                        Use another server
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => onOpenUrl(SELF_HOSTING_URL)}>
+                        Self-hosting guide
+                      </Button>
+                    </>
+                  }
+                >
+                  You're using Veil's free public server. It has limits: up to 5 guests per
+                  document, a few sessions at a time, and limited relay for hard-to-reach networks.
+                  Availability isn't guaranteed. For reliable or larger sessions, self-host the Veil
+                  server or use another server.
+                </Banner>
+              )}
               <form
                 className="settings-card setting-form"
                 onSubmit={(event) => {
@@ -383,7 +407,7 @@ export function SettingsDialog({
                     <Field
                       label="Host access credential"
                       htmlFor="automatic-credential"
-                      hint="Leave empty to keep your saved credential."
+                      hint="Optional on public servers. Leave empty to keep a saved credential."
                     >
                       <Input
                         id="automatic-credential"
@@ -426,8 +450,8 @@ export function SettingsDialog({
                 </div>
               </form>
               <p>
-                Your server operator provides the address and credential. Changes apply when you
-                start sharing a new document.
+                For your own or another server, its operator provides the address and, when
+                required, a credential. Changes apply when you start sharing a new document.
               </p>
             </SettingsGroup>
             <SettingsGroup title="Discord">

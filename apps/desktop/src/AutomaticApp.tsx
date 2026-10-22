@@ -53,6 +53,7 @@ import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
 import { ShareDialog } from './dialogs/ShareDialog';
 import type { useDiscordPresence } from './discord';
 import { defaultKeybinds, matchesShortcut } from './keybinds';
+import { capacityProblem, sameServer, type CapacityProblem } from './capacity';
 
 export function AutomaticApp({
   tab,
@@ -89,6 +90,8 @@ export function AutomaticApp({
   const [joinOpen, setJoinOpen] = useState(tab.mode === 'join');
   const [server, setServer] = useState('');
   const [savedServer, setSavedServer] = useState('');
+  const [official, setOfficial] = useState('');
+  const [capacity, setCapacity] = useState<CapacityProblem | null>(null);
   const [credential, setCredential] = useState('');
   const [serverTest, setServerTest] = useState('');
   const [testingServer, setTestingServer] = useState(false);
@@ -173,10 +176,12 @@ export function AutomaticApp({
   }, [tab.mode]);
   useEffect(() => {
     if (!active) return;
-    void invoke<{ server: string; development: boolean }>('network_preferences')
+    void invoke<{ server: string; official: string; development: boolean }>('network_preferences')
       .then((p) => {
-        setServer(p.server);
+        // Until another server is saved, sharing setup suggests Veil's public server.
+        setServer(p.server || p.official);
         setSavedServer(p.server);
+        setOfficial(p.official);
         setDevelopment(p.development);
       })
       .catch((e) => setError(errorMessage(e)));
@@ -308,14 +313,25 @@ export function AutomaticApp({
         'The sharing session ended. You can save this document locally before closing it.',
       );
     if (!network.current) {
-      const started = await shareDocument(
-        documentRef.current,
-        configuredServer,
-        name.trim() || 'You',
-        signaling(),
-        setNotice,
-        development,
-      );
+      let started: AutomaticSession;
+      try {
+        started = await shareDocument(
+          documentRef.current,
+          configuredServer,
+          name.trim() || 'You',
+          signaling(),
+          setNotice,
+          development,
+        );
+      } catch (e) {
+        // A full server is not a failure of this document; offer another server instead.
+        const problem = capacityProblem(errorMessage(e));
+        if (!problem) throw e;
+        setShareOpen(false);
+        setNotice('');
+        setCapacity(problem);
+        return;
+      }
       network.current = started;
       setSession(started);
       setJoinMode(started.joinMode);
@@ -330,12 +346,28 @@ export function AutomaticApp({
     if (!network.current && !name.trim()) setShareOpen(true);
     else void run(() => share());
   }
+  function switchToAnotherServer() {
+    setServer('');
+    setCredential('');
+    setServerTest('');
+    requestAnimationFrame(() => window.document.getElementById('automatic-server')?.focus());
+  }
+  function configureOwnServer() {
+    setCapacity(null);
+    setResumeShare(true);
+    openSettings('Sharing');
+    switchToAnotherServer();
+  }
   async function testServer() {
     setTestingServer(true);
     setServerTest('Testing connection...');
     try {
       await invoke('network_test', { server, credential: credential || null });
-      setServerTest('Connection successful. Host credential accepted.');
+      setServerTest(
+        credential || !sameServer(server, official)
+          ? 'Connection successful. Host credential accepted.'
+          : 'Connection successful. This server offers public hosting.',
+      );
     } catch (e) {
       setServerTest(errorMessage(e));
     } finally {
@@ -419,6 +451,7 @@ export function AutomaticApp({
       updating ||
       settings ||
       shareOpen ||
+      capacity ||
       compatibilityPrompt ||
       window.document.querySelector('dialog[open]')
     )
@@ -719,6 +752,38 @@ export function AutomaticApp({
         </ToastRegion>
       </div>
       <Dialog
+        open={active && !!capacity}
+        title={
+          capacity === 'limit'
+            ? "You've reached the free limit"
+            : sameServer(savedServer, official)
+              ? "Veil's public server is full right now"
+              : 'This server is full right now'
+        }
+        onClose={() => setCapacity(null)}
+      >
+        <p>
+          {capacity === 'limit'
+            ? "You're already sharing as many documents as this server allows for one connection. Stop sharing another document, or configure your own server for more room."
+            : "The server can't host another shared document right now. Try again in a few minutes, or configure your own server so sharing doesn't depend on shared capacity."}
+        </p>
+        <div className="dialog-actions">
+          <Button onClick={() => setCapacity(null)}>Cancel</Button>
+          <Button
+            disabled={busy}
+            onClick={() => {
+              setCapacity(null);
+              void run(() => share());
+            }}
+          >
+            Try again
+          </Button>
+          <Button variant="primary" onClick={configureOwnServer}>
+            Configure your own server
+          </Button>
+        </div>
+      </Dialog>
+      <Dialog
         open={active && !!compatibilityPrompt}
         title="Session compatibility"
         onClose={() => decideCompatibility(false)}
@@ -771,6 +836,8 @@ export function AutomaticApp({
             server,
             credential,
             savedServer,
+            official,
+            onUseAnother: switchToAnotherServer,
             status: serverTest,
             testing: testingServer,
             saving: savingServer,
