@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  Move,
+  MoveDiagonal,
+  MoveDiagonal2,
+  MoveHorizontal,
+  MoveVertical,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke, useOverlay, errorMessage } from './api';
 import { activityLabels, useAppearance } from '@veil/ui';
-import { SharedEditor } from '@veil/editor';
+import { SharedEditor, useDocumentTitle } from '@veil/editor';
 import { useOverlayDocument } from './session';
 import { useVisibilityMenu } from './VisibilityMenu';
 
@@ -17,22 +26,23 @@ const directions = [
   'southWest',
 ] as const;
 type Handle = (typeof directions)[number] | 'move';
-const hints: Record<Handle, string> = {
-  move: 'Move',
-  north: 'Resize ↕',
-  south: 'Resize ↕',
-  east: 'Resize ↔',
-  west: 'Resize ↔',
-  northEast: 'Resize ↗',
-  southWest: 'Resize ↗',
-  northWest: 'Resize ↘',
-  southEast: 'Resize ↘',
+const hints: Record<Handle, { label: string; icon: LucideIcon }> = {
+  move: { label: 'Move', icon: Move },
+  north: { label: 'Resize vertically', icon: MoveVertical },
+  south: { label: 'Resize vertically', icon: MoveVertical },
+  east: { label: 'Resize horizontally', icon: MoveHorizontal },
+  west: { label: 'Resize horizontally', icon: MoveHorizontal },
+  northEast: { label: 'Resize diagonally', icon: MoveDiagonal },
+  southWest: { label: 'Resize diagonally', icon: MoveDiagonal },
+  northWest: { label: 'Resize diagonally', icon: MoveDiagonal2 },
+  southEast: { label: 'Resize diagonally', icon: MoveDiagonal2 },
 };
 
 export function OverlayWindow() {
   useAppearance();
   const { state, error, setError } = useOverlay();
   const document = useOverlayDocument();
+  const title = useDocumentTitle(document.connection?.doc).trim();
   const [hovered, setHovered] = useState<Handle | null>(null);
   const [active, setActive] = useState<Handle | null>(null);
   const gesturePending = useRef(false);
@@ -100,17 +110,19 @@ export function OverlayWindow() {
           }
         }}
       >
-        <span>
-          veil{' '}
-          <span className="overlay-preview-tag">
-            {state?.settings.clickThrough ? 'click-through' : 'document'}
+        <span className="overlay-title">
+          <span className="overlay-title-text" title={title || undefined}>
+            {document.connection ? title || 'Untitled' : 'Veil'}
           </span>
+          {state?.settings.clickThrough && <span className="overlay-chip">Click-through</span>}
         </span>
         <div className="overlay-header-actions">
           {hint ? (
-            <span className="overlay-gesture-hint">{hints[hint]}</span>
+            <OverlayHint handle={hint} />
           ) : (
-            <span className="overlay-recovery-hint">Ctrl+Alt+V to restore controls</span>
+            <span className="overlay-recovery-hint">
+              <kbd className="kbd">Ctrl+Alt+V</kbd> restores controls
+            </span>
           )}
           <button
             type="button"
@@ -126,9 +138,7 @@ export function OverlayWindow() {
               );
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-              <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
       </header>
@@ -160,7 +170,11 @@ export function OverlayWindow() {
         <ul className="overlay-participants" aria-label="Participants">
           {document.participants.map((person) => (
             <li key={person.id} data-participant-name={person.name}>
-              <span className="overlay-person-dot" style={{ backgroundColor: person.color }} />
+              <span
+                className="overlay-person-dot"
+                style={{ backgroundColor: person.color }}
+                aria-hidden="true"
+              />
               <span className="overlay-person-name" title={person.name}>
                 {person.name}
                 {person.local && ' (you)'}
@@ -194,5 +208,15 @@ export function OverlayWindow() {
           />
         ))}
     </main>
+  );
+}
+
+function OverlayHint({ handle }: { handle: Handle }) {
+  const { label, icon: Icon } = hints[handle];
+  return (
+    <span className="overlay-gesture-hint">
+      <Icon size={12} aria-hidden="true" />
+      {label}
+    </span>
   );
 }

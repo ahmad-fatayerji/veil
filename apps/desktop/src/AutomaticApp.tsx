@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { listen } from '@tauri-apps/api/event';
+import { ChevronDown, Copy, Eye, EyeOff, Link, LogOut, Pencil, Settings, X } from 'lucide-react';
 import {
   createPeerSession,
   joinShareLink,
@@ -13,38 +14,38 @@ import {
   type JoinMode,
 } from '@veil/collaboration';
 import { parseShareLink, decodeServerInvitation } from '@veil/protocol';
+import { useDocumentTitle } from '@veil/editor';
 import {
-  Brand,
+  Banner,
+  Button,
   Dialog,
-  PeoplePanel,
+  IconButton,
+  Menu,
+  MenuItem,
+  MenuSeparator,
+  ToastRegion,
   hasDocumentContent,
   useAppearance,
-  DeveloperCredit,
-  AppVersion,
-  type Appearance,
+  useParticipants,
 } from '@veil/ui';
 import { nativeSignaling } from './networking';
-import { DesktopEditor, SessionBridge } from './overlay/session';
-import { OverlayControls } from './overlay/Controls';
-import { Updates, useUpdateAttention } from './Updates';
+import { SessionBridge } from './overlay/session';
+import { useUpdateAttention } from './Updates';
 import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
+import { DocumentStatus, PeopleButton, TitleBar, type ConnectionState } from './shell/TitleBar';
+import { StatusBar } from './shell/StatusBar';
+import { StartScreen } from './screens/StartScreen';
+import { DocumentScreen } from './screens/DocumentScreen';
+import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
+import { ShareDialog } from './dialogs/ShareDialog';
 
-type Section = 'General' | 'Appearance' | 'Hosting server' | 'Overlay' | 'Updates' | 'About';
-const sections: Section[] = [
-  'General',
-  'Appearance',
-  'Hosting server',
-  'Overlay',
-  'Updates',
-  'About',
-];
 export function AutomaticApp() {
   const [document, setDocument] = useState<PeerSession | null>(null);
   const documentRef = useRef<PeerSession | null>(null);
   const network = useRef<AutomaticSession | null>(null);
   const [session, setSession] = useState<AutomaticSession | null>(null);
-  const [tab, setTab] = useState<'create' | 'join'>('create');
+  const [joinOpen, setJoinOpen] = useState(false);
   const [server, setServer] = useState('');
   const [savedServer, setSavedServer] = useState('');
   const [credential, setCredential] = useState('');
@@ -67,7 +68,8 @@ export function AutomaticApp() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [development, setDevelopment] = useState(false);
-  const [people, setPeople] = useState(() => window.innerWidth >= 900);
+  const [people, setPeople] = useState(false);
+  const peopleButton = useRef<HTMLButtonElement>(null);
   const updateAttention = useUpdateAttention();
   const [settings, setSettings] = useState(false);
   const [section, setSection] = useState<Section>('General');
@@ -80,6 +82,8 @@ export function AutomaticApp() {
   const [serviceOnline, setServiceOnline] = useState(false);
   const { appearance, setAppearance } = useAppearance();
   const overlay = useOverlay();
+  const participants = useParticipants(document);
+  const title = useDocumentTitle(document?.doc);
   const onUpdateBusy = useCallback((value: boolean) => setUpdating(value), []);
   function signaling() {
     return nativeSignaling({
@@ -107,6 +111,12 @@ export function AutomaticApp() {
   function updateName(value: string) {
     saveDisplayName(value);
     setName(value);
+    const current = documentRef.current;
+    if (current)
+      current.provider.awareness.setLocalStateField('user', {
+        ...current.provider.awareness.getLocalState()?.user,
+        name: value.trim() || 'You',
+      });
   }
   useEffect(() => {
     const unlistenFailure = listen<string>('app-quit-failed', (event) => setError(event.payload));
@@ -138,7 +148,7 @@ export function AutomaticApp() {
         if (documentRef.current || busyRef.current) setPendingLink(code);
         else {
           setInvitation(code);
-          setTab('join');
+          setJoinOpen(true);
           setError('');
         }
       } catch {
@@ -178,6 +188,12 @@ export function AutomaticApp() {
       document.provider.off('sync', changed);
     };
   }, [document]);
+  // Informational notices are transient; errors stay until dismissed.
+  useEffect(() => {
+    if (!notice || busy || joinInProgress) return;
+    const timer = setTimeout(() => setNotice(''), 5000);
+    return () => clearTimeout(timer);
+  }, [notice, busy, joinInProgress]);
   async function run(action: () => Promise<void>) {
     if (busyRef.current) return;
     busyRef.current = true;
@@ -202,6 +218,7 @@ export function AutomaticApp() {
       const local = createPeerSession('host', name.trim() || 'You');
       local.provider.connect();
       adopt(local);
+      setJoinOpen(false);
       setNotice('');
     } catch (e) {
       await invoke('document_closed');
@@ -233,6 +250,7 @@ export function AutomaticApp() {
       setSession(joined);
       adopt(joined.session);
       setInvitation('');
+      setJoinOpen(false);
     } catch (e) {
       if (opened) await invoke('document_closed');
       setNotice('');
@@ -249,6 +267,7 @@ export function AutomaticApp() {
   async function share(configuredServer = savedServer) {
     if (!documentRef.current) return;
     if (!configuredServer) {
+      setShareOpen(false);
       setResumeShare(true);
       openSettings('Hosting server');
       return;
@@ -272,6 +291,11 @@ export function AutomaticApp() {
     setShareOpen(true);
     setNotice('');
     setServiceOnline(network.current.serviceOnline);
+  }
+  function requestShare() {
+    // Ask for a name before the first invitation so guests know who is hosting.
+    if (!network.current && !name.trim()) setShareOpen(true);
+    else void run(() => share());
   }
   async function testServer() {
     setTestingServer(true);
@@ -330,6 +354,7 @@ export function AutomaticApp() {
       setError('');
       setShareOpen(false);
       setConfirmExit(false);
+      setPeople(false);
     }
   }
   function requestLeave() {
@@ -341,320 +366,297 @@ export function AutomaticApp() {
     await leave();
     setPendingLink('');
     setInvitation(incoming);
-    setTab('join');
+    setJoinOpen(true);
+  }
+  function togglePeople(open = !people) {
+    setPeople(open);
+    if (!open) peopleButton.current?.focus();
+  }
+  function toggleOverlay() {
+    void run(async () => {
+      overlay.setState(
+        await invoke('overlay_visibility', { visible: !overlay.state?.settings.visible }),
+      );
+    });
   }
   const guest = session?.role === 'guest';
-  const status = !session
-    ? 'Local document'
+  function copyInvite() {
+    if (!link) return;
+    void run(async () => {
+      await navigator.clipboard.writeText(link);
+      setNotice('Invite link copied.');
+    });
+  }
+  useEffect(() => {
+    if (!document || busy || updating) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === 'w' && !event.shiftKey) {
+        event.preventDefault();
+        requestLeave();
+      } else if (key === 'c' && event.shiftKey && !guest && link) {
+        event.preventDefault();
+        copyInvite();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+  const connection: ConnectionState = !session
+    ? 'local'
     : guest
       ? connected
-        ? 'Connected'
+        ? 'connected'
         : session.sessionEnded
-          ? 'Disconnected'
-          : 'Connecting…'
+          ? 'disconnected'
+          : 'connecting'
       : peers.some((p) => p.state === 'connected')
-        ? 'Connected'
+        ? 'connected'
         : link
-          ? 'Sharing enabled'
-          : 'Local document';
+          ? 'sharing'
+          : 'local';
+  const overlayVisible = !!overlay.state?.settings.visible;
+  const leaveLabel = guest ? 'Leave session' : 'Close document';
+  const settingsButton = (
+    <IconButton
+      label="Settings"
+      className="desktop-settings-button"
+      attention={updateAttention}
+      aria-description={updateAttention ? 'Update requires attention' : undefined}
+      onClick={() => openSettings(updateAttention ? 'Updates' : 'General')}
+    >
+      <Settings size={18} aria-hidden="true" />
+    </IconButton>
+  );
   return (
-    <div className="app-shell desktop-shell">
+    <div className="desktop-shell">
       <div className="desktop-content" inert={updating} aria-busy={busy || updating}>
-        <header className="app-header">
-          <Brand />
-          {document && (
-            <span className={`status ${connected ? 'status-synced' : ''}`} role="status">
-              <span className="status-dot" />
-              {status}
-            </span>
-          )}
-          <div className="header-actions">
-            {document && (
+        {document ? (
+          <TitleBar
+            start={
               <>
-                {!guest && (
-                  <button
-                    className="primary-button"
-                    disabled={busy}
-                    onClick={() => void run(() => share())}
-                  >
-                    Share
-                  </button>
-                )}
-                <button
-                  className="secondary-button"
-                  aria-expanded={people}
-                  onClick={() => setPeople(!people)}
-                >
-                  People{pendingGuests.length > 0 ? ` (${pendingGuests.length} waiting)` : ''}
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!overlay.state || busy}
-                  onClick={() =>
-                    void run(async () => {
-                      overlay.setState(
-                        await invoke('overlay_visibility', {
-                          visible: !overlay.state?.settings.visible,
-                        }),
-                      );
-                    })
+                <Menu
+                  label={`Document menu: ${title.trim() || 'Untitled'}`}
+                  align="start"
+                  tooltip={false}
+                  triggerClassName="titlebar-title"
+                  trigger={
+                    <>
+                      <span
+                        className="titlebar-title-text"
+                        data-empty={title.trim() ? undefined : ''}
+                      >
+                        {title.trim() || 'Untitled'}
+                      </span>
+                      <ChevronDown size={14} aria-hidden="true" />
+                    </>
                   }
                 >
-                  {overlay.state?.settings.visible ? 'Hide overlay' : 'Show overlay'}
-                </button>
-              </>
-            )}
-          </div>
-        </header>
-        {!document ? (
-          <main className="welcome">
-            <div className="welcome-intro">
-              <span className="eyebrow">A LITTLE SPACE TO THINK TOGETHER</span>
-              <h1>
-                Your words.
-                <br />A shared space.
-              </h1>
-              <p>
-                Create a document, invite your people, and keep it close with the desktop overlay.
-              </p>
-            </div>
-            <section className="welcome-card" aria-label="Get started">
-              <div
-                className="segment-tabs"
-                role="tablist"
-                aria-label="Get started"
-                onKeyDown={(event) => {
-                  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-                  event.preventDefault();
-                  const next =
-                    event.key === 'Home'
-                      ? 'create'
-                      : event.key === 'End'
-                        ? 'join'
-                        : tab === 'create'
-                          ? 'join'
-                          : 'create';
-                  setTab(next);
-                  event.currentTarget.querySelector<HTMLButtonElement>(`#${next}-tab`)?.focus();
-                }}
-              >
-                <button
-                  role="tab"
-                  id="create-tab"
-                  aria-controls="start-panel"
-                  aria-selected={tab === 'create'}
-                  tabIndex={tab === 'create' ? 0 : -1}
-                  onClick={() => setTab('create')}
-                >
-                  Create document
-                </button>
-                <button
-                  role="tab"
-                  id="join-tab"
-                  aria-controls="start-panel"
-                  aria-selected={tab === 'join'}
-                  tabIndex={tab === 'join' ? 0 : -1}
-                  onClick={() => setTab('join')}
-                >
-                  Join session
-                </button>
-              </div>
-              <form
-                id="start-panel"
-                role="tabpanel"
-                aria-labelledby={tab === 'create' ? 'create-tab' : 'join-tab'}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void run(tab === 'create' ? create : join);
-                }}
-              >
-                <h2>{tab === 'create' ? 'Start with a blank page' : 'Join your people'}</h2>
-                <p>
-                  {tab === 'create'
-                    ? 'Write now. Share when you’re ready.'
-                    : 'Open a shared link or paste an invitation below.'}
-                </p>
-                <label htmlFor="automatic-name">
-                  Your name {tab === 'create' && <span className="muted">(optional)</span>}
-                </label>
-                <input
-                  id="automatic-name"
-                  autoComplete="nickname"
-                  placeholder="e.g. Alex"
-                  value={name}
-                  maxLength={40}
-                  disabled={busy}
-                  onChange={(e) => updateName(e.target.value)}
-                />
-                {tab === 'join' && (
-                  <>
-                    <label htmlFor="automatic-invitation">Session link</label>
-                    <textarea
-                      id="automatic-invitation"
-                      placeholder="veil://join/…"
-                      autoComplete="off"
-                      value={invitation}
-                      maxLength={4096}
-                      disabled={busy}
-                      onChange={(e) => setInvitation(e.target.value)}
-                    />
-                  </>
-                )}
-                <button
-                  className="primary-button"
-                  disabled={busy || (tab === 'join' && (!name.trim() || !invitation.trim()))}
-                >
-                  {busy ? 'Connecting…' : tab === 'create' ? 'Create document' : 'Join session'}
-                </button>
-              </form>
-              <p className="welcome-footnote">
-                Documents are temporary. Keep Veil open to keep your work.
-              </p>
-            </section>
-          </main>
-        ) : (
-          <main className={`workspace ${people ? 'with-sidebar' : ''}`}>
-            <section className="document-workspace" aria-label="Collaborative workspace">
-              <div className="document-heading">
-                <div>
-                  <span className="eyebrow">
-                    {guest ? 'JOINED SESSION' : session ? 'YOUR SHARED DOCUMENT' : 'YOUR DOCUMENT'}
-                  </span>
-                  <h1>Untitled document</h1>
-                </div>
-                <button className="quiet-button danger-text" disabled={busy} onClick={requestLeave}>
-                  {guest ? 'Leave session' : 'Close document'}
-                </button>
-              </div>
-              <div className="document-panel">
-                <DesktopEditor connection={document} />
-              </div>
-              <footer className="document-footer">
-                <span>Temporary document · not saved to disk</span>
-                <span>{guest ? 'Host must stay online' : 'Saved only in this open session'}</span>
-              </footer>
-            </section>
-            {people && (
-              <PeoplePanel
-                connection={document}
-                peers={peers}
-                role={guest ? 'guest' : 'host'}
-                onClose={() => setPeople(false)}
-              >
-                <details className="connection-details">
-                  <summary>Connection details</summary>
-                  <p>
-                    {session
-                      ? `Sharing service: ${serviceOnline ? 'Available' : 'Unavailable'}`
-                      : 'This document is local. Share to invite others.'}
-                  </p>
-                  {session && (
-                    <>
-                      <p>
-                        Direct connections are tried first. A relay is used automatically when
-                        needed.
-                      </p>
-                      <button
-                        className="secondary-button"
-                        disabled={busy}
-                        onClick={() => void run(() => session.reconnect())}
-                      >
-                        Reconnect
-                      </button>
-                    </>
+                  <MenuItem
+                    icon={<Pencil size={16} aria-hidden="true" />}
+                    onSelect={() => {
+                      const input = window.document.querySelector<HTMLInputElement>('.doc-title');
+                      input?.focus();
+                      input?.select();
+                    }}
+                  >
+                    Rename
+                  </MenuItem>
+                  {!guest && link && (
+                    <MenuItem
+                      icon={<Link size={16} aria-hidden="true" />}
+                      shortcut="Ctrl+Shift+C"
+                      onSelect={copyInvite}
+                    >
+                      Copy invite link
+                    </MenuItem>
                   )}
-                </details>
-                {!guest && pendingGuests.length > 0 && (
-                  <section aria-label="Join requests">
-                    <h3>Join requests</h3>
-                    <p className="muted">
-                      Names are supplied by guests and do not verify identity.
-                    </p>
-                    {pendingGuests.map((pending) => (
-                      <div key={pending.id}>
-                        <p>{pending.name}</p>
-                        <div className="form-actions">
-                          <button
-                            className="primary-button"
-                            disabled={busy}
-                            onClick={() =>
-                              void run(async () => {
-                                await session!.approveGuest(pending.id);
-                                setPendingGuests(session!.pendingGuests);
-                              })
-                            }
-                          >
-                            Approve
-                          </button>
-                          <button
-                            className="secondary-button"
-                            disabled={busy}
-                            onClick={() =>
-                              void run(async () => {
-                                await session!.rejectGuest(pending.id);
-                                setPendingGuests(session!.pendingGuests);
-                              })
-                            }
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                )}
-              </PeoplePanel>
-            )}
-          </main>
+                  <MenuSeparator />
+                  <MenuItem
+                    tone="danger"
+                    icon={
+                      guest ? (
+                        <LogOut size={16} aria-hidden="true" />
+                      ) : (
+                        <X size={16} aria-hidden="true" />
+                      )
+                    }
+                    shortcut="Ctrl+W"
+                    disabled={busy}
+                    onSelect={requestLeave}
+                  >
+                    {leaveLabel}
+                  </MenuItem>
+                </Menu>
+                <DocumentStatus state={connection} count={participants.length} />
+              </>
+            }
+            end={
+              <>
+                <PeopleButton
+                  ref={peopleButton}
+                  participants={participants}
+                  waiting={guest ? 0 : pendingGuests.length}
+                  expanded={people}
+                  onToggle={() => togglePeople()}
+                />
+                <IconButton
+                  label={overlayVisible ? 'Hide overlay' : 'Show overlay'}
+                  shortcut={overlay.state?.hideShortcutAvailable ? 'Ctrl+Alt+Shift+V' : undefined}
+                  aria-pressed={overlayVisible}
+                  disabled={!overlay.state || busy}
+                  onClick={toggleOverlay}
+                >
+                  {overlayVisible ? (
+                    <Eye size={18} aria-hidden="true" />
+                  ) : (
+                    <EyeOff size={18} aria-hidden="true" />
+                  )}
+                </IconButton>
+                {!guest &&
+                  (link ? (
+                    <div className="split-button">
+                      <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
+                        Share
+                      </Button>
+                      <IconButton
+                        label="Copy invite link"
+                        shortcut="Ctrl+Shift+C"
+                        className="split-button-icon"
+                        disabled={busy}
+                        onClick={copyInvite}
+                      >
+                        <Copy size={16} aria-hidden="true" />
+                      </IconButton>
+                    </div>
+                  ) : (
+                    <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
+                      Share
+                    </Button>
+                  ))}
+              </>
+            }
+          />
+        ) : (
+          <TitleBar />
         )}
-        {document && compatibilityNotice && (
-          <div className="app-notice compatibility-warning" role="status">
-            {compatibilityNotice}
-          </div>
-        )}
-        {notice && (
-          <div className="app-notice" role="status">
-            {notice}
-          </div>
-        )}
-        {error && (
-          <div className="app-notice error" role="alert">
-            {error}
-            {/protocol|update/i.test(error) && (
-              <button className="quiet-button" onClick={() => openSettings('Updates')}>
-                Open Updates
-              </button>
-            )}
-            <button className="quiet-button" onClick={() => setError('')}>
-              Dismiss
-            </button>
-          </div>
-        )}
-        <footer className="desktop-footer">
-          <button
-            className="desktop-settings-button"
-            aria-label="Settings"
-            aria-description={updateAttention ? 'Update requires attention' : undefined}
-            title={updateAttention ? 'Update requires attention' : 'Settings'}
-            onClick={() => openSettings(updateAttention ? 'Updates' : 'General')}
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+        <div className="app-banners">
+          {document && connection === 'disconnected' && (
+            <Banner
+              tone="warning"
+              actions={
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void run(() => session!.reconnect())}
+                >
+                  Reconnect
+                </Button>
+              }
             >
-              <path d="m9.5 3-.5 2-2 .9-1.9-.6-2.5 4.3 1.5 1.4v2l-1.5 1.4 2.5 4.3 1.9-.6 2 .9.5 2h5l.5-2 2-.9 1.9.6 2.5-4.3-1.5-1.4v-2l1.5-1.4-2.5-4.3-1.9.6-2-.9-.5-2z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            {updateAttention && <span className="settings-attention-dot" aria-hidden="true" />}
-          </button>
-        </footer>
+              Disconnected from the host. Your copy stays open until you leave.
+            </Banner>
+          )}
+          {document && compatibilityNotice && (
+            <Banner tone="warning" onDismiss={() => setCompatibilityNotice('')}>
+              {compatibilityNotice}
+            </Banner>
+          )}
+        </div>
+        {!document ? (
+          <StartScreen
+            name={name}
+            onNameChange={updateName}
+            invitation={invitation}
+            onInvitationChange={setInvitation}
+            joinOpen={joinOpen}
+            onJoinOpenChange={setJoinOpen}
+            busy={busy}
+            development={development}
+            onCreate={() => void run(create)}
+            onJoin={() => void run(join)}
+          />
+        ) : (
+          <DocumentScreen
+            document={document}
+            peers={peers}
+            role={guest ? 'guest' : 'host'}
+            sharing={!!session}
+            serviceOnline={serviceOnline}
+            busy={busy}
+            showPeople={people}
+            onClosePeople={() => togglePeople(false)}
+            pendingGuests={pendingGuests}
+            onApprove={(id) =>
+              void run(async () => {
+                await session!.approveGuest(id);
+                setPendingGuests(session!.pendingGuests);
+              })
+            }
+            onDecline={(id) =>
+              void run(async () => {
+                await session!.rejectGuest(id);
+                setPendingGuests(session!.pendingGuests);
+              })
+            }
+            onReconnect={() => void run(() => session!.reconnect())}
+            link={link}
+            onCopyLink={copyInvite}
+            onShare={requestShare}
+          />
+        )}
+        <StatusBar
+          start={
+            document ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={
+                    guest ? (
+                      <LogOut size={14} aria-hidden="true" />
+                    ) : (
+                      <X size={14} aria-hidden="true" />
+                    )
+                  }
+                  disabled={busy}
+                  title={`${leaveLabel} (Ctrl+W)`}
+                  onClick={requestLeave}
+                >
+                  {leaveLabel}
+                </Button>
+              </>
+            ) : (
+              <span className="statusbar-note">Overlay hidden from compatible screen capture</span>
+            )
+          }
+          end={settingsButton}
+        />
+        <ToastRegion>
+          {notice && !joinInProgress && (
+            <Banner tone="info" className="toast" onDismiss={() => setNotice('')}>
+              {notice}
+            </Banner>
+          )}
+          {error && (
+            <Banner
+              tone="danger"
+              role="alert"
+              className="toast"
+              onDismiss={() => setError('')}
+              actions={
+                /protocol|update/i.test(error) && (
+                  <Button size="sm" variant="ghost" onClick={() => openSettings('Updates')}>
+                    Open updates
+                  </Button>
+                )
+              }
+            >
+              {error}
+            </Banner>
+          )}
+        </ToastRegion>
       </div>
       <SessionBridge connection={document} />
       <Dialog
@@ -663,235 +665,72 @@ export function AutomaticApp() {
         onClose={() => decideCompatibility(false)}
       >
         <p>{compatibilityPrompt}</p>
-        <div className="form-actions">
-          <button className="secondary-button" onClick={() => decideCompatibility(false)}>
-            Cancel
-          </button>
-          <button className="primary-button" onClick={() => decideCompatibility(true)}>
+        <div className="dialog-actions">
+          <Button onClick={() => decideCompatibility(false)}>Cancel</Button>
+          <Button variant="primary" onClick={() => decideCompatibility(true)}>
             Join anyway
-          </button>
+          </Button>
         </div>
       </Dialog>
-      <Dialog
+      <SettingsDialog
         open={settings}
-        title="Settings"
-        locked={updating}
-        dismissOnBackdrop
-        wide
+        section={section}
+        onSectionChange={setSection}
         onClose={() => {
           if (!updating) {
             setSettings(false);
             setResumeShare(false);
           }
         }}
-      >
-        <div className="settings-layout">
-          <nav className="settings-nav" aria-label="Settings sections">
-            {sections.map((item) => (
-              <button
-                key={item}
-                aria-label={item}
-                aria-description={
-                  item === 'Updates' && updateAttention ? 'Update requires attention' : undefined
-                }
-                aria-current={section === item ? 'page' : undefined}
-                disabled={updating && item !== 'Updates'}
-                onClick={() => setSection(item)}
-              >
-                {item}
-                {item === 'Updates' && updateAttention && (
-                  <span className="settings-nav-attention" aria-hidden="true">
-                    &#8226;
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-          <div className="settings-content">
-            <section hidden={section !== 'General'}>
-              <h3>Window and app</h3>
-              <label htmlFor="close-behavior">When closing the main window</label>
-              <select
-                id="close-behavior"
-                value={overlay.state?.settings.closeBehavior ?? 'tray'}
-                disabled={!overlay.state || busy || updating}
-                onChange={(event) => {
-                  const closeBehavior = event.target.value;
-                  void run(async () => {
-                    overlay.setState(
-                      await invoke<OverlaySnapshot>('overlay_update', {
-                        patch: { closeBehavior },
-                      }),
-                    );
-                  });
-                }}
-              >
-                <option value="tray">Minimize to tray</option>
-                <option value="quit">Quit app</option>
-              </select>
-              <p>
-                Minimize to tray keeps your document, connections and visible overlay active. Quit
-                app closes Veil and its overlay immediately. You can reopen Veil, show or hide the
-                overlay, or quit from the tray menu.
-              </p>
-            </section>
-            <section hidden={section !== 'Appearance'}>
-              <h3>Appearance</h3>
-              <p>Make this space feel like yours.</p>
-              <label htmlFor="appearance">Theme</label>
-              <select
-                id="appearance"
-                value={appearance}
-                onChange={(e) => setAppearance(e.target.value as Appearance)}
-              >
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-              <label htmlFor="settings-name">Your name</label>
-              <input
-                id="settings-name"
-                value={name}
-                maxLength={40}
-                onChange={(e) => {
-                  updateName(e.target.value);
-                  if (document)
-                    document.provider.awareness.setLocalStateField('user', {
-                      ...document.provider.awareness.getLocalState()?.user,
-                      name: e.target.value.trim() || 'You',
-                    });
-                }}
-              />
-            </section>
-            <section hidden={section !== 'Hosting server'}>
-              <h3>Hosting server</h3>
-              <p>Configure once to share your documents. Guests only need your link.</p>
-              {resumeShare && (
-                <div className="notice">
-                  Save your server settings to continue sharing this document.
-                </div>
-              )}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run(saveServer);
-                }}
-              >
-                <label htmlFor="automatic-server">Server address</label>
-                <input
-                  id="automatic-server"
-                  value={server}
-                  placeholder="https://signal.example.com"
-                  autoComplete="off"
-                  disabled={busy}
-                  onChange={(e) => {
-                    setServer(e.target.value);
-                    setServerTest('');
-                  }}
-                />
-                <label htmlFor="automatic-credential">Host access credential</label>
-                <input
-                  id="automatic-credential"
-                  type="password"
-                  value={credential}
-                  placeholder="Leave empty to keep your saved credential"
-                  autoComplete="off"
-                  disabled={busy}
-                  onChange={(e) => {
-                    setCredential(e.target.value);
-                    setServerTest('');
-                  }}
-                />
-                <div className="form-actions">
-                  <button className="primary-button" disabled={busy || !server.trim()}>
-                    {savingServer
-                      ? 'Checking and saving...'
-                      : resumeShare
-                        ? 'Save and share'
-                        : 'Save settings'}
-                  </button>
-                  <button
-                    type="button"
-                    className="quiet-button"
-                    disabled={busy || !server.trim()}
-                    onClick={() => void run(testServer)}
-                  >
-                    {testingServer ? 'Testing...' : 'Test connection'}
-                  </button>
-                  <button
-                    type="button"
-                    className="quiet-button"
-                    disabled={busy || !savedServer}
-                    onClick={() =>
-                      void run(async () => {
-                        await invoke('network_forget', { server: savedServer });
-                        setCredential('');
-                        setServerTest('');
-                        setNotice('Saved host credential removed.');
-                      })
-                    }
-                  >
-                    Forget credential
-                  </button>
-                </div>
-                <p role="status" aria-live="polite">
-                  {serverTest}
-                </p>
-              </form>
-              <p className="muted">
-                Your server operator provides the address and credential. Changes apply when you
-                start sharing a new document.
-              </p>
-            </section>
-            <section hidden={section !== 'Overlay'}>
-              <h3>Overlay</h3>
-              <OverlayControls settingsOnly />
-            </section>
-            <section hidden={section !== 'Updates'}>
-              <h3>App updates</h3>
-              <Updates onBusy={onUpdateBusy} settingsView />
-            </section>
-            <section hidden={section !== 'About'}>
-              <h3>About Veil</h3>
-              <AppVersion />
-              <DeveloperCredit
-                onVisit={(event) => {
-                  event.preventDefault();
-                  void openUrl('https://ahmadfatayerji.com').catch((cause) => {
-                    setError(errorMessage(cause));
-                  });
-                }}
-              />
-              <button
-                type="button"
-                className="secondary-button repository-button"
-                onClick={() => {
-                  void openUrl('https://github.com/ahmad-fatayerji/veil').catch((cause) => {
-                    setError(errorMessage(cause));
-                  });
-                }}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M12 .297C5.37.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.043-1.61-4.043-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.084-.729.084-.729 1.205.084 1.838 1.237 1.838 1.237 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.605-2.665-.3-5.466-1.333-5.466-5.93 0-1.31.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23a11.52 11.52 0 0 1 3.003-.404c1.02.005 2.047.138 3.003.404 2.291-1.552 3.297-1.23 3.297-1.23.654 1.652.243 2.873.12 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.803 5.625-5.475 5.922.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
-                </svg>
-                View repository on GitHub
-              </button>
-            </section>
-            {notice && <p role="status">{notice}</p>}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-          </div>
-        </div>
-      </Dialog>
+        updating={updating}
+        busy={busy}
+        updateAttention={updateAttention}
+        onUpdateBusy={onUpdateBusy}
+        name={name}
+        onNameChange={updateName}
+        closeBehavior={overlay.state?.settings.closeBehavior ?? 'tray'}
+        closeBehaviorDisabled={!overlay.state || busy || updating}
+        onCloseBehaviorChange={(closeBehavior) =>
+          void run(async () => {
+            overlay.setState(
+              await invoke<OverlaySnapshot>('overlay_update', { patch: { closeBehavior } }),
+            );
+          })
+        }
+        appearance={appearance}
+        onAppearanceChange={setAppearance}
+        hosting={{
+          server,
+          credential,
+          savedServer,
+          status: serverTest,
+          testing: testingServer,
+          saving: savingServer,
+          resumeShare,
+          onServerChange: (value) => {
+            setServer(value);
+            setServerTest('');
+          },
+          onCredentialChange: (value) => {
+            setCredential(value);
+            setServerTest('');
+          },
+          onSave: () => void run(saveServer),
+          onTest: () => void run(testServer),
+          onForget: () =>
+            void run(async () => {
+              await invoke('network_forget', { server: savedServer });
+              setCredential('');
+              setServerTest('');
+              setNotice('Saved host credential removed.');
+            }),
+        }}
+        notice={notice}
+        error={error}
+        onOpenUrl={(url) => {
+          void openUrl(url).catch((cause) => setError(errorMessage(cause)));
+        }}
+      />
       {joinInProgress && (
         <Dialog
           open
@@ -903,149 +742,92 @@ export function AutomaticApp() {
         >
           <p role="status">{notice || 'Connecting to host...'}</p>
           <p className="muted">Approval requests expire after two minutes.</p>
-          <button
-            className="secondary-button"
-            onClick={() => {
-              joining.current?.abort();
-              decideCompatibility(false);
-            }}
-          >
-            Cancel join
-          </button>
+          <div className="dialog-actions">
+            <Button
+              onClick={() => {
+                joining.current?.abort();
+                decideCompatibility(false);
+              }}
+            >
+              Cancel join
+            </Button>
+          </div>
         </Dialog>
       )}
-      <Dialog open={shareOpen} title="Share document" onClose={() => setShareOpen(false)}>
-        <p>
-          {joinMode === 'auto'
-            ? 'Anyone with this link can join and edit.'
-            : 'Guests with this link need your approval before joining.'}{' '}
-          Send it to people you trust.
-        </p>
-        <label htmlFor="share-join-mode">Join mode</label>
-        <select
-          id="share-join-mode"
-          value={joinMode}
-          disabled={busy}
-          onChange={(event) => {
-            const mode = event.target.value as JoinMode;
-            network.current?.setJoinMode(mode);
-            setJoinMode(mode);
-          }}
-        >
-          <option value="auto">Auto join</option>
-          <option value="approval">Require approval</option>
-        </select>
-        <p className="muted">
-          Changing mode keeps this link. Existing guests stay connected; waiting requests still need
-          a decision.
-        </p>
-        {link ? (
-          <>
-            <label htmlFor="share-link">Session link</label>
-            <input
-              id="share-link"
-              value={link}
-              readOnly
-              autoComplete="off"
-              onFocus={(e) => e.target.select()}
-            />
-            <div className="form-actions">
-              <button
-                className="primary-button"
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await navigator.clipboard.writeText(link);
-                    setNotice('Link copied.');
-                  })
-                }
-              >
-                Copy link
-              </button>
-              <button
-                className="secondary-button"
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    setLink(await network.current!.enableSharing(true));
-                    setNotice('New link ready. The previous link no longer accepts new people.');
-                  })
-                }
-              >
-                Reset link
-              </button>
-            </div>
-            <p className="muted">
-              Works until sharing stops or this host session ends. Guests need Veil installed.
-            </p>
-            <button
-              className="quiet-button danger-text"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await network.current!.stopSharing();
-                  setLink('');
-                  setNotice('Sharing stopped. Existing collaborators stay connected.');
-                })
-              }
-            >
-              Stop sharing
-            </button>
-          </>
-        ) : (
-          <>
-            <p>New people cannot join. Existing collaborators stay connected.</p>
-            <button
-              className="primary-button"
-              disabled={busy}
-              onClick={() => void run(() => share())}
-            >
-              Enable sharing
-            </button>
-          </>
-        )}
-        {notice && <p role="status">{notice}</p>}
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-      </Dialog>
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        started={!!session}
+        link={link}
+        joinMode={joinMode}
+        onJoinModeChange={(mode) => {
+          network.current?.setJoinMode(mode);
+          setJoinMode(mode);
+        }}
+        name={name}
+        onNameChange={updateName}
+        busy={busy}
+        onStart={() => void run(() => share())}
+        onCopy={() =>
+          void run(async () => {
+            await navigator.clipboard.writeText(link);
+            setNotice('Link copied.');
+          })
+        }
+        onReset={() =>
+          void run(async () => {
+            setLink(await network.current!.enableSharing(true));
+            setNotice('New link ready. The previous link no longer accepts new people.');
+          })
+        }
+        onStop={() =>
+          void run(async () => {
+            await network.current!.stopSharing();
+            setLink('');
+            setNotice('Sharing stopped. Existing collaborators stay connected.');
+          })
+        }
+        onEnable={() => void run(() => share())}
+        notice={notice}
+        error={error}
+      />
       <Dialog
         open={confirmExit}
-        title={guest ? 'Leave session?' : 'Close document?'}
+        title={`${leaveLabel}?`}
+        dismissOnBackdrop
         onClose={() => setConfirmExit(false)}
       >
         <p>
           This document is temporary. Copy any text you want to keep before{' '}
           {guest ? 'leaving' : 'closing'}. {!guest && session && 'Everyone will be disconnected.'}
         </p>
-        <div className="form-actions">
-          <button className="secondary-button" onClick={() => setConfirmExit(false)}>
-            Cancel
-          </button>
-          <button className="danger-button" disabled={busy} onClick={() => void run(leave)}>
-            {guest ? 'Leave session' : 'Close document'}
-          </button>
+        <div className="dialog-actions">
+          <Button onClick={() => setConfirmExit(false)}>Cancel</Button>
+          <Button variant="danger" disabled={busy} onClick={() => void run(leave)}>
+            {leaveLabel}
+          </Button>
         </div>
       </Dialog>
-      <Dialog open={!!pendingLink} title="Open another session?" onClose={() => setPendingLink('')}>
+      <Dialog
+        open={!!pendingLink}
+        title="Open another session?"
+        dismissOnBackdrop
+        onClose={() => setPendingLink('')}
+      >
         <p>
           {document && hasDocumentContent(document)
             ? 'Your current document contains temporary content. Copy anything you want to keep before leaving.'
             : 'Leave your current document before opening this invitation.'}
         </p>
-        <div className="form-actions">
-          <button className="secondary-button" onClick={() => setPendingLink('')}>
-            Cancel
-          </button>
-          <button
-            className="primary-button"
+        <div className="dialog-actions">
+          <Button onClick={() => setPendingLink('')}>Cancel</Button>
+          <Button
+            variant="primary"
             disabled={busy || updating}
             onClick={() => void run(acceptIncoming)}
           >
             Leave and open invitation
-          </button>
+          </Button>
         </div>
       </Dialog>
     </div>

@@ -1,0 +1,108 @@
+/* Design tokens. Components use semantic tokens only; see design-system/veil/MASTER.md. */
+@layer tokens {
+  :root {
+    color-scheme: light;
+
+    --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-mono: 'Cascadia Code', 'Cascadia Mono', ui-monospace, Consolas, monospace;
+
+    --text-xs: 12px;
+    --text-sm: 13px;
+    --text-md: 14px;
+    --text-body: 16px;
+    --text-lg: 20px;
+    --text-xl: 28px;
+    --weight-regular: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-7: 32px;
+    --space-8: 48px;
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-full: 999px;
+
+    --control-sm: 28px;
+    --control-md: 32px;
+    --control-lg: 40px;
+
+    --dur-fast: 120ms;
+    --dur: 180ms;
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+    --z-sticky: 10;
+    --z-popover: 40;
+    --z-toast: 60;
+    --z-dialog: 100;
+
+    --bg: #f3f3f3;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-sunken: #ebebeb;
+    --surface-selected: #ffffff;
+    --fg: #1a1a1a;
+    --fg-muted: #5c5c5c;
+    --border: #e5e5e5;
+    --border-strong: #d1d1d1;
+    --hover: #0000000a;
+    --pressed: #00000012;
+    --accent: #0f62d6;
+    --accent-hover: #0d55bb;
+    --on-accent: #ffffff;
+    --accent-soft: #e8f0fc;
+    --danger: #c42b1c;
+    --danger-hover: #a92416;
+    --on-danger: #ffffff;
+    --caption-close: #c42b1c;
+    --success: #0f7b0f;
+    --warning: #9d5d00;
+    --focus-ring: var(--accent);
+    --scrim: #00000066;
+    --shadow-flyout: 0 8px 16px #00000024, 0 0 0 1px #0000000f;
+    --shadow-dialog: 0 32px 64px #0000003d, 0 0 0 1px #0000000f;
+
+    /* Aliases kept for the legacy shell and overlay controls. */
+    --canvas: var(--bg);
+    --text: var(--fg);
+    --muted: var(--fg-muted);
+    --shadow: var(--shadow-dialog);
+  }
+
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+
+    --bg: #1c1c1c;
+    --surface: #242424;
+    --surface-raised: #2c2c2c;
+    --surface-sunken: #171717;
+    --surface-selected: #404040;
+    --fg: #f0f0f0;
+    --fg-muted: #a8a8a8;
+    --border: #333333;
+    --border-strong: #454545;
+    --hover: #ffffff0f;
+    --pressed: #ffffff17;
+    --accent: #6ea8ff;
+    --accent-hover: #8cbaff;
+    --on-accent: #0b1a33;
+    --accent-soft: #1f2f47;
+    --danger: #ff99a4;
+    --danger-hover: #ffb3bb;
+    --on-danger: #2b0a0e;
+    --caption-close: #c42b1c;
+    --success: #6ccb5f;
+    --warning: #fce100;
+    --scrim: #00000099;
+    --shadow-flyout: 0 8px 16px #00000066, 0 0 0 1px #ffffff14;
+    --shadow-dialog: 0 32px 64px #00000080, 0 0 0 1px #ffffff14;
+  }
+}

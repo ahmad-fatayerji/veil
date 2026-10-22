@@ -50,14 +50,18 @@ async function launch() {
   await waitFor(() => pages().some((page) => page.url().includes('?overlay')));
   const main = pages().find((page) => !page.url().includes('?overlay'));
   for (const page of pages()) page.on('pageerror', (error) => errors.push(error.message));
-  await expect(main.locator('#automatic-name')).toBeVisible();
+  await expect(main.getByRole('button', { name: /^New document/ })).toBeVisible();
   return main;
 }
-async function appearance(main) {
+async function general(main) {
   await main.getByRole('button', { name: 'Settings', exact: true }).click();
   const settings = main.getByRole('dialog', { name: 'Settings', exact: true });
-  await settings.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await settings.getByRole('button', { name: 'General', exact: true }).click();
   return settings;
+}
+async function openJoin(main) {
+  await main.getByRole('button', { name: /^Join with a link/ }).click();
+  await expect(main.locator('#automatic-name')).toBeVisible();
 }
 async function quit(main) {
   await main.evaluate(() => window.__TAURI_INTERNALS__.invoke('app_quit')).catch(() => {});
@@ -69,25 +73,29 @@ async function quit(main) {
 }
 try {
   let main = await launch();
+  await openJoin(main);
   await expect(main.locator('#automatic-name')).toHaveValue('');
-  await main.locator('#automatic-name').fill('Create name');
-  let settings = await appearance(main);
-  await expect(settings.getByLabel('Your name', { exact: true })).toHaveValue('Create name');
-  await settings.getByLabel('Your name', { exact: true }).fill('Saved appearance name');
+  await main.locator('#automatic-name').fill('Join form name');
+  let settings = await general(main);
+  await expect(settings.getByLabel('Your name', { exact: true })).toHaveValue('Join form name');
+  await settings.getByLabel('Your name', { exact: true }).fill('Saved settings name');
   await quit(main);
 
   main = await launch();
-  await expect(main.locator('#automatic-name')).toHaveValue('Saved appearance name');
-  await main.getByRole('tab', { name: 'Join session', exact: true }).click();
-  await expect(main.locator('#automatic-name')).toHaveValue('Saved appearance name');
+  settings = await general(main);
+  await expect(settings.getByLabel('Your name', { exact: true })).toHaveValue(
+    'Saved settings name',
+  );
+  await settings.getByRole('button', { name: 'Close Settings', exact: true }).click();
+  await openJoin(main);
+  await expect(main.locator('#automatic-name')).toHaveValue('Saved settings name');
   await main.locator('#automatic-name').fill('Join name');
-  settings = await appearance(main);
+  settings = await general(main);
   await expect(settings.getByLabel('Your name', { exact: true })).toHaveValue('Join name');
   await settings.getByRole('button', { name: 'Close Settings', exact: true }).click();
-  await main.getByRole('tab', { name: 'Create document', exact: true }).click();
-  await main.getByRole('button', { name: 'Create document', exact: true }).click();
+  await main.getByRole('button', { name: /^New document/ }).click();
   await main.locator('.tiptap').fill('Keep this document while changing my name');
-  settings = await appearance(main);
+  settings = await general(main);
   await settings.getByLabel('Your name', { exact: true }).fill('');
   await settings.getByRole('button', { name: 'Close Settings', exact: true }).click();
   await expect(main.locator('.tiptap')).toContainText('Keep this document while changing my name');
@@ -95,12 +103,12 @@ try {
   await quit(main);
 
   main = await launch();
+  await openJoin(main);
   await expect(main.locator('#automatic-name')).toHaveValue('');
   await expect(main.locator('#automatic-name')).toHaveAttribute('maxlength', '40');
-  await main.getByRole('tab', { name: 'Join session', exact: true }).click();
   await main.locator('#automatic-invitation').fill('invalid invitation');
   await expect(main.getByRole('button', { name: 'Join session', exact: true })).toBeDisabled();
-  settings = await appearance(main);
+  settings = await general(main);
   await expect(settings.getByLabel('Your name', { exact: true })).toHaveValue('');
   await quit(main);
   assert.deepEqual(errors, []);

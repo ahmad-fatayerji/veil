@@ -95,9 +95,9 @@ try {
   await waitFor(() => pages().some((page) => !page.url().includes('?overlay')), 'main window');
   const page = pages().find((page) => !page.url().includes('?overlay'));
   page.on('pageerror', (error) => errors.push(error.message));
-  await expect(page.getByLabel('Session link')).toHaveValue(link);
-  await expect(page.getByRole('tab', { name: 'Join session' })).toHaveAttribute(
-    'aria-selected',
+  await expect(page.getByLabel('Invite link')).toHaveValue(link);
+  await expect(page.getByRole('button', { name: /^Join with a link/ })).toHaveAttribute(
+    'aria-expanded',
     'true',
   );
   assert.equal(
@@ -107,8 +107,7 @@ try {
   );
   open('veil://join/invalid');
   await expect(page.getByRole('alert')).toContainText('invalid');
-  await page.getByRole('tab', { name: 'Create document' }).click();
-  await page.getByRole('button', { name: 'Create document', exact: true }).click();
+  await page.getByRole('button', { name: /^New document/ }).click();
   const editor = page.getByRole('textbox', { name: 'Shared document' });
   await editor.fill('Keep this temporary document.');
   open(link);
@@ -120,7 +119,7 @@ try {
   await expect(editor).toHaveText('Keep this temporary document.');
   open(link);
   await confirmation.getByRole('button', { name: 'Leave and open invitation' }).click();
-  await expect(page.getByLabel('Session link')).toHaveValue(link);
+  await expect(page.getByLabel('Invite link')).toHaveValue(link);
   assert.equal(
     await page
       .evaluate(() => window.__TAURI_INTERNALS__.invoke('update_status'))
