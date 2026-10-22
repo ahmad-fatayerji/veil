@@ -219,7 +219,7 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
                   <span className="setting-row-text">
                     <span className="setting-row-label">Restore interaction</span>
                   </span>
-                  <Kbd>Ctrl+Alt+V</Kbd>
+                  <Kbd>{state.settings.keybinds.recoverControls}</Kbd>
                 </div>
               ) : (
                 <div className="setting-row">
@@ -233,7 +233,7 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
                   <span className="setting-row-text">
                     <span className="setting-row-label">Show or hide overlay</span>
                   </span>
-                  <Kbd>Ctrl+Alt+Shift+V</Kbd>
+                  <Kbd>{state.settings.keybinds.toggleOverlay}</Kbd>
                 </div>
               )}
             </div>

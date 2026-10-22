@@ -39,6 +39,7 @@ import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
 import { ShareDialog } from './dialogs/ShareDialog';
+import { defaultKeybinds, matchesShortcut } from './keybinds';
 import { useDiscordPresence } from './discord';
 
 export function AutomaticApp() {
@@ -83,6 +84,7 @@ export function AutomaticApp() {
   const [serviceOnline, setServiceOnline] = useState(false);
   const { appearance, setAppearance } = useAppearance();
   const overlay = useOverlay();
+  const keybinds = overlay.state?.settings.keybinds ?? defaultKeybinds;
   const participants = useParticipants(document);
   const title = useDocumentTitle(document?.doc);
   const discord = useDiscordPresence(
@@ -393,14 +395,23 @@ export function AutomaticApp() {
     });
   }
   useEffect(() => {
-    if (!document || busy || updating) return;
+    if (
+      !document ||
+      busy ||
+      updating ||
+      settings ||
+      shareOpen ||
+      confirmExit ||
+      compatibilityPrompt ||
+      pendingLink
+    )
+      return;
     const onKey = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-      const key = event.key.toLowerCase();
-      if (key === 'w' && !event.shiftKey) {
+      if (window.document.querySelector('dialog[open]')) return;
+      if (matchesShortcut(event, keybinds.closeDocument)) {
         event.preventDefault();
         requestLeave();
-      } else if (key === 'c' && event.shiftKey && !guest && link) {
+      } else if (matchesShortcut(event, keybinds.copyInvite) && !guest && link) {
         event.preventDefault();
         copyInvite();
       }
@@ -471,7 +482,7 @@ export function AutomaticApp() {
                   {!guest && link && (
                     <MenuItem
                       icon={<Link size={16} aria-hidden="true" />}
-                      shortcut="Ctrl+Shift+C"
+                      shortcut={keybinds.copyInvite}
                       onSelect={copyInvite}
                     >
                       Copy invite link
@@ -487,7 +498,7 @@ export function AutomaticApp() {
                         <X size={16} aria-hidden="true" />
                       )
                     }
-                    shortcut="Ctrl+W"
+                    shortcut={keybinds.closeDocument}
                     disabled={busy}
                     onSelect={requestLeave}
                   >
@@ -508,7 +519,9 @@ export function AutomaticApp() {
                 />
                 <IconButton
                   label={overlayVisible ? 'Hide overlay' : 'Show overlay'}
-                  shortcut={overlay.state?.hideShortcutAvailable ? 'Ctrl+Alt+Shift+V' : undefined}
+                  shortcut={
+                    overlay.state?.hideShortcutAvailable ? keybinds.toggleOverlay : undefined
+                  }
                   aria-pressed={overlayVisible}
                   disabled={!overlay.state || busy}
                   onClick={toggleOverlay}
@@ -527,7 +540,7 @@ export function AutomaticApp() {
                       </Button>
                       <IconButton
                         label="Copy invite link"
-                        shortcut="Ctrl+Shift+C"
+                        shortcut={keybinds.copyInvite}
                         className="split-button-icon"
                         disabled={busy}
                         onClick={copyInvite}
@@ -571,6 +584,8 @@ export function AutomaticApp() {
         </div>
         {!document ? (
           <StartScreen
+            keybinds={keybinds}
+            shortcutsDisabled={settings || updating || !!compatibilityPrompt || !!pendingLink}
             name={name}
             onNameChange={updateName}
             invitation={invitation}
