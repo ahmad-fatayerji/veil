@@ -234,7 +234,9 @@
   .workspace-new {
     display: flex;
     align-items: center;
-    align-self: center;
+    /* Match the tabs' height and bottom alignment so + lines up with each tab's ×. */
+    align-self: flex-end;
+    height: 32px;
     flex-shrink: 0;
     margin-left: var(--space-1);
   }
