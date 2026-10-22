@@ -24,11 +24,12 @@ fn parse_palette(bytes: &[u8]) -> Option<Vec<String>> {
     if bytes.len() < 28 {
         return None;
     }
+    let (entries, _) = bytes.as_chunks::<4>();
     Some(
-        bytes
-            .chunks_exact(4)
+        entries
+            .iter()
             .take(7)
-            .map(|rgba| format!("#{:02x}{:02x}{:02x}", rgba[0], rgba[1], rgba[2]))
+            .map(|[red, green, blue, _]| format!("#{red:02x}{green:02x}{blue:02x}"))
             .collect(),
     )
 }
