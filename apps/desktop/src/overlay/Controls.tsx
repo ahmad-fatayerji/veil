@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Eye, EyeOff, RotateCcw } from 'lucide-react';
-import { Button, Kbd, Slider, Switch } from '@veil/ui';
+import { Button, Slider, Switch } from '@veil/ui';
 import { errorMessage, invoke, useOverlay, type OverlayPatch, type OverlaySnapshot } from './api';
 
 function ToggleRow({
@@ -214,26 +214,11 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
                   onChange={(event) => void update({ clickThrough: event.target.checked })}
                 />
               </ToggleRow>
-              {state.recoveryAvailable ? (
-                <div className="setting-row">
-                  <span className="setting-row-text">
-                    <span className="setting-row-label">Restore interaction</span>
-                  </span>
-                  <Kbd>{state.settings.keybinds.recoverControls}</Kbd>
-                </div>
-              ) : (
+              {!state.recoveryAvailable && (
                 <div className="setting-row">
                   <p className="overlay-help">
                     Recovery shortcut unavailable. Click-through is disabled.
                   </p>
-                </div>
-              )}
-              {state.hideShortcutAvailable && (
-                <div className="setting-row">
-                  <span className="setting-row-text">
-                    <span className="setting-row-label">Show or hide overlay</span>
-                  </span>
-                  <Kbd>{state.settings.keybinds.toggleOverlay}</Kbd>
                 </div>
               )}
             </div>
