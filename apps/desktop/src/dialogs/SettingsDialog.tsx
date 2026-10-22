@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Info, Keyboard, Monitor, PictureInPicture2, Share2 } from 'lucide-react';
+import {
+  ChevronDown,
+  ExternalLink,
+  Globe,
+  Info,
+  Keyboard,
+  Monitor,
+  PictureInPicture2,
+  Server,
+  Share2,
+} from 'lucide-react';
 import {
   AppVersion,
   Banner,
@@ -22,6 +32,7 @@ import { OverlayControls } from '../overlay/Controls';
 import { Updates } from '../Updates';
 import type { useDiscordPresence } from '../discord';
 import { useWindowsStartup } from '../startup';
+import { SELF_HOSTING_URL } from '../capacity';
 
 // Pages group settings by purpose; each page is split into titled groups.
 export type Section = 'General' | 'Sharing' | 'Overlay' | 'Keybinds' | 'About & updates';
@@ -82,10 +93,79 @@ function AccentPicker({ value, onChange }: { value: Accent; onChange: (value: Ac
     </div>
   );
 }
+const publicLimits = [
+  'Up to 5 guests per document',
+  'A few shared documents at a time',
+  'Limited relay for strict networks',
+  'No uptime guarantee',
+];
+
+/** Which server sharing uses: our free public servers by default, or the user's own. */
+function ServerChoice({
+  official,
+  busy,
+  onUseAnother,
+  onUseOfficial,
+  onSelfHosting,
+}: {
+  official: boolean;
+  busy: boolean;
+  onUseAnother: () => void;
+  onUseOfficial: () => void;
+  onSelfHosting: () => void;
+}) {
+  const Icon = official ? Globe : Server;
+  return (
+    <div className="settings-card server-choice">
+      <div className="setting-row">
+        <div className="server-choice-title">
+          <span className="server-choice-icon" aria-hidden="true">
+            <Icon size={18} />
+          </span>
+          <div className="setting-row-text">
+            <span className="setting-row-label">
+              {official ? 'Our own public servers' : 'Another server'}
+            </span>
+            <p>
+              {official
+                ? 'Free and ready to use. No setup or credential needed.'
+                : 'Your own server, or one an operator gives you access to. A credential gives you private, unshared capacity.'}
+            </p>
+          </div>
+        </div>
+        <Button size="sm" disabled={busy} onClick={official ? onUseAnother : onUseOfficial}>
+          {official ? 'Use another server' : 'Use our own public servers'}
+        </Button>
+      </div>
+      {official && (
+        <div className="setting-row server-choice-details">
+          <ul className="server-limits" aria-label="Public server limits">
+            {publicLimits.map((limit) => (
+              <li key={limit}>{limit}</li>
+            ))}
+          </ul>
+          <p className="setting-row-hint">
+            For reliable or larger sessions, use your own server.{' '}
+            <button type="button" className="text-link" onClick={onSelfHosting}>
+              Self-hosting guide
+              <ExternalLink size={12} aria-hidden="true" />
+            </button>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Our free public servers, or another server (which may be ours, used privately with a credential). */
+export type HostingMode = 'public' | 'custom';
 export type HostingForm = {
   server: string;
   credential: string;
   savedServer: string;
+  mode: HostingMode;
+  onUseAnother: () => void;
+  onUseOfficial: () => void;
   status: string;
   testing: boolean;
   saving: boolean;
@@ -361,8 +441,19 @@ export function SettingsDialog({
                   Save your server settings to continue sharing this document.
                 </Banner>
               )}
+              <ServerChoice
+                official={hosting.mode === 'public'}
+                busy={busy}
+                onUseAnother={hosting.onUseAnother}
+                onUseOfficial={hosting.onUseOfficial}
+                onSelfHosting={() => onOpenUrl(SELF_HOSTING_URL)}
+              />
               <form
-                className="settings-card setting-form"
+                className={
+                  hosting.mode === 'custom'
+                    ? 'settings-card setting-form'
+                    : 'setting-form setting-form-plain'
+                }
                 onSubmit={(event) => {
                   event.preventDefault();
                   hosting.onSave();
@@ -370,31 +461,35 @@ export function SettingsDialog({
               >
                 <div className="setting-row">
                   <div className="setting-form-fields">
-                    <Field label="Server address" htmlFor="automatic-server">
-                      <Input
-                        id="automatic-server"
-                        value={hosting.server}
-                        placeholder="https://signal.example.com"
-                        autoComplete="off"
-                        disabled={busy}
-                        onChange={(event) => hosting.onServerChange(event.target.value)}
-                      />
-                    </Field>
-                    <Field
-                      label="Host access credential"
-                      htmlFor="automatic-credential"
-                      hint="Leave empty to keep your saved credential."
-                    >
-                      <Input
-                        id="automatic-credential"
-                        type="password"
-                        value={hosting.credential}
-                        autoComplete="off"
-                        disabled={busy}
-                        aria-describedby="automatic-credential-hint"
-                        onChange={(event) => hosting.onCredentialChange(event.target.value)}
-                      />
-                    </Field>
+                    {hosting.mode === 'custom' && (
+                      <>
+                        <Field label="Server address" htmlFor="automatic-server">
+                          <Input
+                            id="automatic-server"
+                            value={hosting.server}
+                            placeholder="https://signal.example.com"
+                            autoComplete="off"
+                            disabled={busy}
+                            onChange={(event) => hosting.onServerChange(event.target.value)}
+                          />
+                        </Field>
+                        <Field
+                          label="Host access credential"
+                          htmlFor="automatic-credential"
+                          hint="Leave empty to keep a saved credential, or on servers that offer public hosting."
+                        >
+                          <Input
+                            id="automatic-credential"
+                            type="password"
+                            value={hosting.credential}
+                            autoComplete="off"
+                            disabled={busy}
+                            aria-describedby="automatic-credential-hint"
+                            onChange={(event) => hosting.onCredentialChange(event.target.value)}
+                          />
+                        </Field>
+                      </>
+                    )}
                     <div className="dialog-actions dialog-actions-start">
                       <Button
                         type="submit"
@@ -411,13 +506,15 @@ export function SettingsDialog({
                       >
                         Test connection
                       </Button>
-                      <Button
-                        variant="ghost"
-                        disabled={busy || !hosting.savedServer}
-                        onClick={hosting.onForget}
-                      >
-                        Forget credential
-                      </Button>
+                      {hosting.mode === 'custom' && (
+                        <Button
+                          variant="ghost"
+                          disabled={busy || !hosting.savedServer}
+                          onClick={hosting.onForget}
+                        >
+                          Forget credential
+                        </Button>
+                      )}
                     </div>
                     <p className="settings-status" role="status" aria-live="polite">
                       {hosting.status}
@@ -426,8 +523,9 @@ export function SettingsDialog({
                 </div>
               </form>
               <p>
-                Your server operator provides the address and credential. Changes apply when you
-                start sharing a new document.
+                {hosting.mode === 'custom' &&
+                  "The server's operator provides the address and, when required, a credential. "}
+                Changes apply when you start sharing a new document.
               </p>
             </SettingsGroup>
             <SettingsGroup title="Discord">

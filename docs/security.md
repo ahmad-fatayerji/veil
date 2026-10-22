@@ -98,6 +98,12 @@ are stored in Windows Credential Manager, scoped to that origin; saved credentia
 are not returned to frontend JavaScript. Native administration belongs to the
 control panel, and frontend CSP does not allow arbitrary remote WebSockets.
 
+Servers may also offer bounded public hosting (`publicHosting: 1`): sessions are
+created without a host credential and limited per client network by the server.
+Veil's public server is suggested until another server is saved; public sessions
+use the same end-to-end invitation and signaling protections, but the operator of a
+shared public server can still observe metadata and deny service.
+
 Operators issue and revoke host authorization. Forgetting a saved credential only
 removes the local copy; server revocation is a separate operator action. The server
 persists credential hashes and configuration, but not collaborative documents.
