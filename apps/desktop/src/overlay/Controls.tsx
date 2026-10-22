@@ -1,5 +1,54 @@
-import { useRef, useState, type CSSProperties } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import { ChevronDown, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { Button, Kbd, Slider, Switch } from '@veil/ui';
 import { errorMessage, invoke, useOverlay, type OverlayPatch, type OverlaySnapshot } from './api';
+
+function ToggleRow({
+  label,
+  description,
+  children,
+}: {
+  label: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="setting-row overlay-toggle-row">
+      <span className="setting-row-text">
+        <span className="setting-row-label">{label}</span>
+        <span className="setting-row-hint">{description}</span>
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function RangeRow({
+  id,
+  label,
+  description,
+  output,
+  children,
+}: {
+  id: string;
+  label: string;
+  description?: string;
+  output: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="overlay-range">
+      <div className="overlay-range-heading">
+        <label className="setting-row-label" htmlFor={id}>
+          {label}
+        </label>
+        <output htmlFor={id}>{output}</output>
+      </div>
+      {description && <p>{description}</p>}
+      {children}
+    </div>
+  );
+}
 
 export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boolean }) {
   const { state, setState, error, setError } = useOverlay();
@@ -40,7 +89,9 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
     void flushRanges();
   }
   async function run(command: string, args?: Record<string, unknown>) {
-    setBusy(true);
+    // Only show the busy (disabled) state for slow commands; flashing every control
+    // greyed-out on each quick toggle reads as flicker.
+    const showBusy = setTimeout(() => setBusy(true), 350);
     setError('');
     try {
       await flushRanges();
@@ -48,6 +99,7 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
     } catch (failure) {
       setError(errorMessage(failure));
     } finally {
+      clearTimeout(showBusy);
       setBusy(false);
     }
   }
@@ -55,29 +107,34 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
   const windowOpacity = Math.round((draft.opacity ?? state?.settings.opacity ?? 0.85) * 100);
   const textOpacity = Math.round((draft.textOpacity ?? state?.settings.textOpacity ?? 1) * 100);
   const fontSize = draft.fontSize ?? state?.settings.fontSize ?? 20;
+  const visible = !!state?.settings.visible;
   return (
     <section className="overlay-controls" aria-label="Overlay controls">
       <div className="overlay-controls-row">
         <div className="overlay-heading">
           <span className="overlay-controls-title">Desktop overlay</span>
-          <span className="overlay-controls-subtitle">Your document, above other windows.</span>
+          <span className="overlay-controls-subtitle">
+            Your document in a window above other apps.
+          </span>
         </div>
-        <button
-          className="outline-button"
+        <Button
+          icon={
+            visible ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />
+          }
           disabled={!state || busy}
-          onClick={() => void run('overlay_visibility', { visible: !state?.settings.visible })}
+          onClick={() => void run('overlay_visibility', { visible: !visible })}
         >
-          {state?.settings.visible ? 'Hide overlay' : 'Show overlay'}
-        </button>
+          {visible ? 'Hide overlay' : 'Show overlay'}
+        </Button>
         {!settingsOnly && (
-          <button
-            className="quiet-button"
+          <Button
+            variant="ghost"
             aria-expanded={expanded}
             aria-controls="overlay-settings"
             onClick={() => setExpanded(!expanded)}
           >
             Settings
-          </button>
+          </Button>
         )}
       </div>
       {expanded && state && (
@@ -87,126 +144,111 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
               <h4 id="overlay-appearance-heading">Appearance</h4>
               <span>Saved on this device</span>
             </div>
-            <div className="overlay-settings-grid">
-              <label className="overlay-range" htmlFor="overlay-opacity">
-                Window opacity <output>{windowOpacity}%</output>
-                <span className="overlay-range-description">Background only</span>
-                <input
+            <div className="settings-card overlay-ranges">
+              <RangeRow
+                id="overlay-opacity"
+                label="Window opacity"
+                description="Background only"
+                output={`${windowOpacity}%`}
+              >
+                <Slider
                   id="overlay-opacity"
                   aria-label="Window opacity"
                   aria-valuetext={`${windowOpacity}%`}
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
+                  step={1}
                   value={windowOpacity}
                   disabled={!state.capabilities.transparency}
-                  style={{ '--range-progress': `${windowOpacity}%` } as CSSProperties}
                   onChange={(event) => range({ opacity: Number(event.target.value) / 100 })}
                 />
-              </label>
-              <label className="overlay-range" htmlFor="overlay-text-opacity">
-                Text opacity <output>{textOpacity}%</output>
-                <span className="overlay-range-description">Independent of background</span>
-                <input
+              </RangeRow>
+              <RangeRow
+                id="overlay-text-opacity"
+                label="Text opacity"
+                description="Independent of the background"
+                output={`${textOpacity}%`}
+              >
+                <Slider
                   id="overlay-text-opacity"
                   aria-label="Text opacity"
                   aria-valuetext={`${textOpacity}%`}
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
+                  step={1}
                   value={textOpacity}
-                  style={{ '--range-progress': `${textOpacity}%` } as CSSProperties}
                   onChange={(event) => range({ textOpacity: Number(event.target.value) / 100 })}
                 />
-              </label>
-              <label className="overlay-range overlay-font-range" htmlFor="overlay-font-size">
-                Font size <output>{fontSize} px</output>
-                <input
+              </RangeRow>
+              <RangeRow id="overlay-font-size" label="Font size" output={`${fontSize} px`}>
+                <Slider
                   id="overlay-font-size"
                   aria-label="Font size"
                   aria-valuetext={`${fontSize} pixels`}
-                  type="range"
-                  min="12"
-                  max="48"
-                  step="2"
+                  min={12}
+                  max={48}
+                  step={2}
                   value={fontSize}
-                  style={
-                    { '--range-progress': `${((fontSize - 12) / 36) * 100}%` } as CSSProperties
-                  }
                   onChange={(event) => range({ fontSize: Number(event.target.value) })}
                 />
-                <span className="overlay-range-limits" aria-hidden="true">
-                  <span>A</span>
-                  <span>A</span>
-                </span>
-              </label>
+              </RangeRow>
             </div>
           </section>
           <section className="overlay-setting-group" aria-labelledby="overlay-behavior-heading">
             <div className="overlay-group-heading">
               <h4 id="overlay-behavior-heading">Window behavior</h4>
             </div>
-            <label className="overlay-toggle-row">
-              <span>
-                <strong>Always on top</strong>
-                <small>Keep the overlay above other windows.</small>
-              </span>
-              <input
-                type="checkbox"
-                aria-label="Always on top"
-                checked={state.settings.alwaysOnTop}
-                disabled={!state.capabilities.alwaysOnTop || busy}
-                onChange={(event) => void update({ alwaysOnTop: event.target.checked })}
-              />
-            </label>
-            <label className="overlay-toggle-row">
-              <span>
-                <strong>Click-through</strong>
-                <small>Send clicks to the window underneath. Turn off to edit.</small>
-              </span>
-              <input
-                type="checkbox"
-                aria-label="Click-through"
-                checked={state.settings.clickThrough}
-                disabled={!state.capabilities.clickThrough || !state.recoveryAvailable || busy}
-                onChange={(event) => void update({ clickThrough: event.target.checked })}
-              />
-            </label>
-            <div className="overlay-shortcuts">
+            <div className="settings-card">
+              <ToggleRow label="Always on top" description="Keep the overlay above other windows.">
+                <Switch
+                  aria-label="Always on top"
+                  checked={state.settings.alwaysOnTop}
+                  disabled={!state.capabilities.alwaysOnTop || busy}
+                  onChange={(event) => void update({ alwaysOnTop: event.target.checked })}
+                />
+              </ToggleRow>
+              <ToggleRow
+                label="Click-through"
+                description="Send clicks to the window underneath. Turn off to edit."
+              >
+                <Switch
+                  aria-label="Click-through"
+                  checked={state.settings.clickThrough}
+                  disabled={!state.capabilities.clickThrough || !state.recoveryAvailable || busy}
+                  onChange={(event) => void update({ clickThrough: event.target.checked })}
+                />
+              </ToggleRow>
               {state.recoveryAvailable ? (
-                <div>
-                  <span>Restore interaction</span>
-                  <kbd>Ctrl+Alt+V</kbd>
+                <div className="setting-row">
+                  <span className="setting-row-text">
+                    <span className="setting-row-label">Restore interaction</span>
+                  </span>
+                  <Kbd>Ctrl+Alt+V</Kbd>
                 </div>
               ) : (
-                <p className="overlay-help">
-                  Recovery shortcut unavailable. Click-through is disabled.
-                </p>
+                <div className="setting-row">
+                  <p className="overlay-help">
+                    Recovery shortcut unavailable. Click-through is disabled.
+                  </p>
+                </div>
               )}
               {state.hideShortcutAvailable && (
-                <div>
-                  <span>Show / hide overlay</span>
-                  <kbd>Ctrl+Alt+Shift+V</kbd>
+                <div className="setting-row">
+                  <span className="setting-row-text">
+                    <span className="setting-row-label">Show or hide overlay</span>
+                  </span>
+                  <Kbd>Ctrl+Alt+Shift+V</Kbd>
                 </div>
               )}
             </div>
             <div className="overlay-settings-actions">
-              <button
-                className="outline-button"
-                disabled={busy}
-                onClick={() => void run('overlay_recover')}
-              >
+              <Button disabled={busy} onClick={() => void run('overlay_recover')}>
                 Restore interaction
-              </button>
-              <button
-                className="quiet-button"
+              </Button>
+              <Button
+                variant="ghost"
+                icon={<RotateCcw size={14} aria-hidden="true" />}
                 disabled={busy}
                 onClick={() => void run('overlay_reset_position')}
               >
                 Reset position & size
-              </button>
+              </Button>
               <span>
                 {state.settings.width} &times; {state.settings.height} px
               </span>
@@ -220,46 +262,52 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
               <p className="overlay-help">Some window controls are unavailable on this platform.</p>
             )}
           </section>
-          <div className="capture-settings overlay-setting-group">
+          <section
+            className="capture-settings overlay-setting-group"
+            aria-labelledby="overlay-capture-heading"
+          >
             <div className="overlay-group-heading">
-              <h4>Screen capture</h4>
+              <h4 id="overlay-capture-heading">Screen capture</h4>
             </div>
-            <label className="overlay-toggle-row">
-              <span>
-                <strong>Capture exclusion</strong>
-                <small>Exclude the overlay from compatible captures.</small>
-              </span>
-              <input
-                type="checkbox"
-                aria-label="Exclude overlay from compatible captures"
-                checked={state.settings.captureExclusion}
-                disabled={
-                  busy ||
-                  (state.capabilities.captureExclusion === 'unsupported' &&
-                    !state.settings.captureExclusion)
-                }
-                onChange={(event) => void update({ captureExclusion: event.target.checked })}
-              />
-            </label>
-            <p
-              className="overlay-help overlay-capture-status"
-              role="status"
-              data-capture-status={state.capture.status}
-            >
-              {state.capture.message}
-            </p>
+            <div className="settings-card">
+              <ToggleRow
+                label="Capture exclusion"
+                description="Exclude the overlay from compatible captures."
+              >
+                <Switch
+                  aria-label="Exclude overlay from compatible captures"
+                  checked={state.settings.captureExclusion}
+                  disabled={
+                    busy ||
+                    (state.capabilities.captureExclusion === 'unsupported' &&
+                      !state.settings.captureExclusion)
+                  }
+                  onChange={(event) => void update({ captureExclusion: event.target.checked })}
+                />
+              </ToggleRow>
+              <div className="setting-row">
+                <p
+                  className="overlay-help overlay-capture-status"
+                  role="status"
+                  data-capture-status={state.capture.status}
+                >
+                  {state.capture.message}
+                </p>
+              </div>
+            </div>
             <p className="overlay-help">
               The control panel remains capturable. Results vary by tool and mode; test before
               sharing.
             </p>
             <button
-              className="quiet-button overlay-disclosure"
+              type="button"
+              className="overlay-disclosure"
               aria-expanded={captureExpanded}
               aria-controls="capture-compatibility"
               onClick={() => setCaptureExpanded(!captureExpanded)}
             >
-              Capture compatibility test{' '}
-              <span aria-hidden="true">{captureExpanded ? '\u2212' : '+'}</span>
+              Capture compatibility test
+              <ChevronDown size={16} aria-hidden="true" />
             </button>
             {captureExpanded && (
               <section
@@ -286,32 +334,31 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
                   </li>
                 </ol>
                 <div className="capture-actions">
-                  <button
-                    className="outline-button"
+                  <Button
                     disabled={busy}
                     onClick={() =>
                       void run('overlay_capture_test', { enabled: !state.captureTest })
                     }
                   >
                     {state.captureTest ? 'Return to document' : 'Show test card'}
-                  </button>
-                  <button
-                    className="quiet-button"
+                  </Button>
+                  <Button
+                    variant="ghost"
                     disabled={busy}
                     onClick={() => void run('overlay_capture_check')}
                   >
                     Recheck native setting
-                  </button>
+                  </Button>
                   {(state.settings.captureExclusion || state.capture.status === 'error') && (
-                    <button
-                      className="quiet-button"
+                    <Button
+                      variant="ghost"
                       disabled={busy}
                       onClick={() =>
                         void update({ captureExclusion: state.settings.captureExclusion })
                       }
                     >
                       Reapply setting
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <p className="overlay-help">
@@ -320,7 +367,7 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
                 </p>
               </section>
             )}
-          </div>
+          </section>
         </div>
       )}
       {(error || state?.warning) && (

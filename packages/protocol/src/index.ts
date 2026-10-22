@@ -1,5 +1,7 @@
 export const PROTOCOL_VERSION = 1;
 export const DOCUMENT_FRAGMENT = 'document';
+// Shared Y.Text in the same Y.Doc. Clients that predate it ignore it and keep editing the body.
+export const DOCUMENT_TITLE = 'title';
 export const HOST_URL = 'http://127.0.0.1:4444';
 export const ROOM_NAME = 'm0-demo';
 export {

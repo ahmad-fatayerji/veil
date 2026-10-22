@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Banner, Button, Select } from '@veil/ui';
 import { errorMessage, invoke } from './overlay/api';
 import { progressLabel, type UpdateProgress } from './update-progress';
 
@@ -134,83 +135,127 @@ export function Updates({
       setError(errorMessage(failure));
     }
   }
-  return (
-    <div className="desktop-updates">
-      {info?.completion && (
-        <div
-          className={`update-result ${info.completion.success ? 'update-success' : 'update-warning'}`}
-        >
-          <p role={info.completion.success ? 'status' : 'alert'}>{info.completion.message}</p>
-          <button className="secondary-button" disabled={busy} onClick={() => void dismissResult()}>
-            Dismiss update result
-          </button>
+  const body = (
+    <>
+      <div className="settings-card">
+        <div className="setting-row">
+          <div className="setting-row-text">
+            <span className="setting-row-label">
+              {info ? `Veil ${info.currentVersion}` : 'Veil'}
+            </span>
+            <p>Updates are downloaded over HTTPS and signature-verified before installation.</p>
+          </div>
+          <Button
+            loading={pending && !installing}
+            disabled={busy || !info || cooldown > 0}
+            onClick={() => void run(false)}
+          >
+            Check for updates
+          </Button>
         </div>
-      )}
-      <details open={settingsView || undefined}>
-        <summary>App updates {info && `· ${info.currentVersion}`}</summary>
-        <p>Updates are downloaded over HTTPS and signature-verified before installation.</p>
-        <label>
-          Update channel{' '}
-          <select
+        <div className="setting-row">
+          <div className="setting-row-text">
+            <label className="setting-row-label" htmlFor="update-channel">
+              Update channel
+            </label>
+            <p>
+              {info?.channel === 'beta'
+                ? 'Beta updates are experimental builds for testing.'
+                : 'Switching to stable does not downgrade a newer beta.'}
+            </p>
+          </div>
+          <Select
+            id="update-channel"
             value={info?.channel ?? 'stable'}
             disabled={busy || !info}
             onChange={(event) => void setChannel(event.target.value as 'stable' | 'beta')}
           >
             <option value="stable">Stable</option>
             <option value="beta">Beta</option>
-          </select>
-        </label>
-        {info?.channel === 'beta' && <p>Beta updates are experimental builds for testing.</p>}
-        <p>Switching to stable does not downgrade a newer beta.</p>
-        <button
-          className="secondary-button"
-          disabled={busy || !info || cooldown > 0}
-          onClick={() => void run(false)}
-        >
-          Check for updates
-        </button>
-        {info?.availableVersion && (
-          <>
-            <p>Available: {info.availableVersion}</p>
-            {info.notes && <p className="release-notes">{info.notes}</p>}
-            <p>
-              End or leave your session first. Documents are temporary; copy any text you want to
-              keep. Local overlay preferences are retained.
-            </p>
-            <button
-              className="primary-button"
+          </Select>
+        </div>
+      </div>
+      {info?.availableVersion && (
+        <div className="settings-card update-available">
+          <div className="setting-row">
+            <div className="setting-row-text">
+              <span className="setting-row-label">
+                Version {info.availableVersion} is available
+              </span>
+              <p>
+                End or leave your session first. Documents are temporary; copy any text you want to
+                keep. Local overlay preferences are retained.
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              loading={installing}
               disabled={busy || info.sessionActive || cooldown > 0}
               onClick={() => void run(true)}
             >
               Install update and restart
-            </button>
-          </>
-        )}
-        {info?.sessionActive && <p>Installation is blocked while a session is open.</p>}
-        {cooldown > 0 && (
-          <p role="status">GitHub is limiting requests. Retry in {cooldown} seconds.</p>
-        )}
-        {busy && info?.progress.stage === 'downloading' && (
-          <progress
-            aria-label="Update download progress"
-            max={info.progress.total || undefined}
-            value={info.progress.total ? info.progress.downloaded : undefined}
-          />
-        )}
-        {info?.canCancel && (
-          <button className="secondary-button" disabled={cancelling} onClick={() => void cancel()}>
+            </Button>
+          </div>
+          {info.notes && <p className="release-notes">{info.notes}</p>}
+        </div>
+      )}
+      {info?.sessionActive && (
+        <p className="update-note">Installation is blocked while a session is open.</p>
+      )}
+      {cooldown > 0 && (
+        <p className="update-note" role="status">
+          GitHub is limiting requests. Retry in {cooldown} seconds.
+        </p>
+      )}
+      {busy && info?.progress.stage === 'downloading' && (
+        <progress
+          aria-label="Update download progress"
+          max={info.progress.total || undefined}
+          value={info.progress.total ? info.progress.downloaded : undefined}
+        />
+      )}
+      {info?.canCancel && (
+        <div>
+          <Button disabled={cancelling} onClick={() => void cancel()}>
             {cancelling ? 'Cancelling…' : 'Cancel download'}
-          </button>
-        )}
-        {(stageMessage || message) && (
-          <p role="status">{cancelling ? 'Cancelling download…' : stageMessage || message}</p>
-        )}
-        {(error || info?.checkError) && (
-          <p className="error" role="alert">
-            {error || info?.checkError}
-          </p>
-        )}
-      </details>
+          </Button>
+        </div>
+      )}
+      {(stageMessage || message) && (
+        <p className="update-note" role="status">
+          {cancelling ? 'Cancelling download…' : stageMessage || message}
+        </p>
+      )}
+      {(error || info?.checkError) && (
+        <p className="error" role="alert">
+          {error || info?.checkError}
+        </p>
+      )}
+    </>
+  );
+  return (
+    <div className="desktop-updates">
+      {info?.completion && (
+        <Banner
+          tone={info.completion.success ? 'info' : 'warning'}
+          role={info.completion.success ? 'status' : 'alert'}
+          actions={
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => void dismissResult()}>
+              Dismiss update result
+            </Button>
+          }
+        >
+          {info.completion.message}
+        </Banner>
+      )}
+      {settingsView ? (
+        body
+      ) : (
+        <details>
+          <summary>App updates {info && `· ${info.currentVersion}`}</summary>
+          {body}
+        </details>
+      )}
     </div>
   );
 }

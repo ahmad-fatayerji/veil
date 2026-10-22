@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { errorMessage, invoke } from './api';
 
 // Render inside the owning webview so both windows share the app theme and the
@@ -69,7 +70,7 @@ export function useVisibilityMenu(
         ? createPortal(
             <div
               ref={menu}
-              className={`overlay-visibility-menu${captureExcluded ? ' is-capture-excluded' : ''}`}
+              className={`menu overlay-visibility-menu${captureExcluded ? ' is-capture-excluded' : ''}`}
               role="menu"
               aria-label="Overlay visibility"
               style={{ left: position.x, top: position.y }}
@@ -99,6 +100,7 @@ export function useVisibilityMenu(
                 ref={item}
                 type="button"
                 role="menuitem"
+                className="menu-item"
                 onClick={() => {
                   dismiss(true);
                   void invoke('overlay_visibility', { visible }).catch((failure: unknown) =>
@@ -106,21 +108,11 @@ export function useVisibilityMenu(
                   );
                 }}
               >
-                <svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true">
-                  <rect
-                    x="3"
-                    y="4"
-                    width="14"
-                    height="12"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                  />
-                  <path d="M6 10h8" fill="none" stroke="currentColor" strokeWidth="1.4" />
-                  {visible && (
-                    <path d="M10 6v8" fill="none" stroke="currentColor" strokeWidth="1.4" />
-                  )}
-                </svg>
+                {visible ? (
+                  <Eye size={16} aria-hidden="true" />
+                ) : (
+                  <EyeOff size={16} aria-hidden="true" />
+                )}
                 {label}
               </button>
             </div>,
