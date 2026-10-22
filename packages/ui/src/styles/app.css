@@ -284,9 +284,10 @@
   }
   .launcher-watermark {
     position: absolute;
-    /* Same crop as the Discord cover: full height, bleeding off the right edge. */
+    /* Full height, anchored to the centred content (not the window edge) so the
+       left arm stays behind the Join card at every window size. */
     top: 0;
-    right: -12%;
+    left: calc(50% - 50px);
     height: 100%;
     width: auto;
     fill: var(--brand-watermark);
