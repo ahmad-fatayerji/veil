@@ -256,7 +256,7 @@ pub async fn update_status(
         || gate.network_active
         || !gate.documents.is_empty()
         || !gate.connections.is_empty()
-        || app.state::<Hosting>().is_active().await;
+        || app.state::<Hosting>().is_active();
     let candidate = state.candidate.lock().await;
     let transfer = state.transfer.lock().unwrap();
     Ok(UpdateInfo {
@@ -349,7 +349,7 @@ pub async fn update_install(
         .map_err(|_| "An update operation is already running.")?;
     state.cooldown()?;
     let mut gate = state.gate.lock().await;
-    gate.allow_install(app.state::<Hosting>().is_active().await)?;
+    gate.allow_install(app.state::<Hosting>().is_active())?;
     let candidate = state
         .candidate
         .lock()

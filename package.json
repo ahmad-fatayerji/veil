@@ -29,7 +29,8 @@
     "test:release": "node --test scripts/*.test.mjs",
     "test:updates": "node scripts/test-updates.mjs",
     "release:verify": "node scripts/gitflow.mjs verify",
-    "test:sharing": "node scripts/test-create-share-join.mjs"
+    "test:sharing": "node scripts/test-create-share-join.mjs",
+    "test:closing": "node scripts/test-closing.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
