@@ -119,6 +119,7 @@ async function screenshot(page, name) {
     mask: [
       page.locator('#share-link'),
       page.locator('#automatic-credential'),
+      page.locator('#share-credential'),
       page.locator('[id$="-automatic-invitation"]'),
     ],
   });
@@ -144,19 +145,21 @@ try {
     'local document blocks updates',
   );
   await host.getByRole('button', { name: 'Share', exact: true }).click();
-  // The first invitation asks who is hosting before any server setup.
-  const shareSetup = host.getByRole('dialog', { name: 'Share document', exact: true });
-  await shareSetup.getByRole('textbox', { name: /Your name/ }).fill('Alex');
-  await shareSetup.getByRole('button', { name: 'Create invite link', exact: true }).click();
-  let dialog = host.getByRole('dialog', { name: 'Settings', exact: true });
-  await expect(dialog.getByRole('heading', { name: 'Hosting server' })).toBeVisible();
-  // Our public servers are the default and need no address; a test server is "another server".
+  // The first invitation asks who is hosting and where, without leaving the Share dialog.
+  let dialog = host.getByRole('dialog', { name: 'Share document', exact: true });
+  await dialog.getByRole('textbox', { name: /Your name/ }).fill('Alex');
+  // Our public servers are the default and need no address; a test server is "my own server".
+  const publicServers = dialog.getByRole('radio', { name: 'Veil public servers' });
+  await expect(publicServers).toHaveAttribute('aria-checked', 'true');
   await expect(dialog.getByLabel('Server address')).toHaveCount(0);
-  await dialog.getByRole('button', { name: 'Use another server', exact: true }).click();
+  await screenshot(host, 'share-hosting-choice');
+  await dialog.getByRole('radio', { name: 'My own server', exact: true }).click();
+  await expect(dialog.getByLabel('Server address')).toBeFocused();
   await dialog.getByLabel('Server address').fill(server);
   const testConnection = dialog.getByRole('button', { name: 'Test connection', exact: true });
   const testResult = dialog.locator('form').getByRole('status');
-  const saveAndShare = dialog.getByRole('button', { name: 'Save and share', exact: true });
+  const saveAndShare = dialog.getByRole('button', { name: 'Create invite link', exact: true });
+  await expect(host.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0);
   async function assertUnsaved() {
     assert.equal(
       (await invoke(host, 'network_preferences')).server,
