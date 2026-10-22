@@ -8,6 +8,7 @@ import {
   LogOut,
   MoreHorizontal,
   Pencil,
+  Radio,
   Save,
   Settings,
   UserPlus,
@@ -492,8 +493,8 @@ export function AutomaticApp({
         )}
       </IconButton>
       {!guest && (
-        // While an invite link is active the icon takes the accent colour; Copy invite
-        // link lives in the document menu and on its shortcut.
+        // While an invite link is active the icon becomes a broadcast in the accent colour;
+        // Copy invite link lives in the document menu and on its shortcut.
         <IconButton
           label="Share"
           className="share-button"
@@ -501,7 +502,11 @@ export function AutomaticApp({
           disabled={busy}
           onClick={requestShare}
         >
-          <UserPlus size={18} aria-hidden="true" />
+          {link ? (
+            <Radio size={18} aria-hidden="true" />
+          ) : (
+            <UserPlus size={18} aria-hidden="true" />
+          )}
         </IconButton>
       )}
       <Menu
