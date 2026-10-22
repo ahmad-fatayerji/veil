@@ -757,7 +757,7 @@ export function AutomaticApp({
           capacity === 'limit'
             ? "You've reached the free limit"
             : sameServer(savedServer, official)
-              ? "Veil's public server is full right now"
+              ? 'Our public servers are full right now'
               : 'This server is full right now'
         }
         onClose={() => setCapacity(null)}
@@ -838,6 +838,11 @@ export function AutomaticApp({
             savedServer,
             official,
             onUseAnother: switchToAnotherServer,
+            onUseOfficial: () => {
+              setServer(official);
+              setCredential('');
+              setServerTest('');
+            },
             status: serverTest,
             testing: testingServer,
             saving: savingServer,

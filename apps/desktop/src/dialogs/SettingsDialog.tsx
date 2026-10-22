@@ -90,6 +90,7 @@ export type HostingForm = {
   /** Veil's free public server, suggested until another one is saved. */
   official: string;
   onUseAnother: () => void;
+  onUseOfficial: () => void;
   status: string;
   testing: boolean;
   saving: boolean;
@@ -365,6 +366,13 @@ export function SettingsDialog({
                   Save your server settings to continue sharing this document.
                 </Banner>
               )}
+              {!sameServer(hosting.server, hosting.official) && (
+                <div className="dialog-actions dialog-actions-start">
+                  <Button size="sm" disabled={busy} onClick={hosting.onUseOfficial}>
+                    Use our own public servers
+                  </Button>
+                </div>
+              )}
               {sameServer(hosting.server, hosting.official) && (
                 <Banner
                   tone="info"
@@ -379,10 +387,10 @@ export function SettingsDialog({
                     </>
                   }
                 >
-                  You're using Veil's free public server. It has limits: up to 5 guests per
-                  document, a few sessions at a time, and limited relay for hard-to-reach networks.
-                  Availability isn't guaranteed. For reliable or larger sessions, self-host the Veil
-                  server or use another server.
+                  You're using our own public servers, free for everyone. They have limits: up to 5
+                  guests per document, a few sessions at a time, and limited relay for hard-to-reach
+                  networks. Availability isn't guaranteed. For reliable or larger sessions,
+                  self-host the Veil server or use another server.
                 </Banner>
               )}
               <form
