@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod app_icon;
 mod discord;
 mod hosting;
 mod lifecycle;
@@ -42,7 +43,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             lifecycle::app_quit,
-            lifecycle::app_set_icon_theme,
+            app_icon::app_set_icon_theme,
             discord::discord_preferences,
             discord::discord_configure,
             discord::discord_update,
@@ -76,6 +77,9 @@ fn main() {
             updates::update_dismiss_result,
         ])
         .on_window_event(|window, event| {
+            if let tauri::WindowEvent::ScaleFactorChanged { .. } = event {
+                app_icon::scale_changed(window);
+            }
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
