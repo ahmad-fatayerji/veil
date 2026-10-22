@@ -26,6 +26,30 @@ recovery, and relay renewal remain valid until the session ends. End the session
 to disconnect everyone. The host must stay available; there is no host migration
 or durable recovery after quitting.
 
+## Discord Rich Presence
+
+Discord Rich Presence is enabled by default in the Windows desktop app. When
+Discord is running and activity sharing is allowed in Discord, Veil shares the
+current document title (labeled "Document: ...") and how many other participants are connected. Solo
+documents show a solo editing message; without a document it shows "No document
+open". Pending join requests are excluded from the count.
+
+In **Settings > General**, turn off **Show document title** to use "Editing a
+document" instead, or turn off **Show participant count** to omit that information.
+Turn off **Discord Rich Presence** to clear Veil's activity and stop connecting
+to Discord. All three settings default to on and are remembered on this device;
+the individual privacy choices are retained when Rich Presence is disabled.
+If saved preferences cannot be read, presence stays paused until a setting is
+saved. If saving fails, changes still apply for the current run and Settings
+shows a warning that they may not survive a restart.
+
+Only the title and aggregate count are shared through local Discord IPC. Veil
+does not include document contents, participant names, credentials, or invitation
+links. Activity data stays in Veil's memory, but sharing it with Discord is subject
+to Discord's own visibility and data handling. Presence continues while Veil is
+in the tray and is cleared when Veil quits. Discord absence or restart does not
+interrupt editing. Browser and legacy development tools do not publish presence.
+
 ## Encrypted peer connections and signaling
 
 Document and awareness traffic travel over WebRTC data channels protected by
