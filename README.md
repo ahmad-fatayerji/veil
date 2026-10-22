@@ -4,108 +4,116 @@
 
 # Veil
 
-**Visible to you. Hidden from compatible recordings.**
+**Your notes. Your collaborators. Your overlay.**
 
-Real-time collaborative notes for Windows, with a desktop overlay that can stay out of compatible screen recordings and screen sharing.
+A Windows workspace for Markdown notes, live collaboration, and an overlay that stays visible to you while compatible recordings capture what's underneath.
 
-[**Download for Windows**](https://github.com/ahmad-fatayerji/veil/releases/latest) · [Getting started](#get-started) · [Self-hosting](https://github.com/ahmad-fatayerji/veil-server) · [Report an issue](https://github.com/ahmad-fatayerji/veil/issues)
+[**Download for Windows**](https://github.com/ahmad-fatayerji/veil/releases/latest) · [Get started](#get-started) · [Share a document](#share-a-document) · [Report an issue](https://github.com/ahmad-fatayerji/veil/issues)
 
 [![Latest release](https://img.shields.io/github/v/release/ahmad-fatayerji/veil)](https://github.com/ahmad-fatayerji/veil/releases/latest) [![MIT license](https://img.shields.io/github/license/ahmad-fatayerji/veil)](LICENSE) [![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)](https://github.com/ahmad-fatayerji/veil/releases/latest)
 
-<img src="docs/media/workspace.png" alt="Veil's dark workspace with a shared document and two participants in the People panel" width="1000" />
-
 </div>
 
-Veil keeps your notes on your screen while **hiding the overlay from compatible recording and screen-sharing methods**. Read your talking points, follow a checklist, or collaborate with your team in a floating window without including that overlay in supported captures. Start writing locally, then invite people when you're ready.
+Keep talking points beside a presentation, work through a checklist during a call, or write with someone in real time. Start with a local document, open your own Markdown files, and share a tab when you need another pair of hands. No account is required.
 
-## See it in action
+> This README describes the current `develop` source. Features may reach the Windows installer in a later release; check the [release notes](https://github.com/ahmad-fatayerji/veil/releases) for your installed version.
 
-### Keep your notes on screen, out of the recording
+## A workspace for your notes
 
-**Recording exclusion is a core Veil feature.** The overlay stays visible on your desktop while compatible capture methods record the content underneath it. Exclusion is on by default; check **Settings → Overlay → Exclude overlay from compatible captures** to keep it enabled for your notes during recordings, presentations, or screen sharing.
-
-Capture exclusion has been verified with OBS Display Capture using DXGI and Windows Graphics Capture, and with FFmpeg GDI and DXGI capture on the tested Windows machine. Other tools and capture modes can behave differently: check a saved recording or the remote viewer's screen before relying on it. The control panel remains capturable. See the [capture compatibility results and built-in test](docs/capture-compatibility.md).
-
-### Write together
-
-Create a document, share a session link, and edit together in real time. The People panel shows who's there and their activity; named cursors and selections keep everyone's work easy to follow.
-
-![Real Veil session: Alex writes a shared checklist and Sam adds a line from another app instance](docs/media/write-together.gif)
-
-### Keep your notes close
-
-The overlay shows the same live document in a separate window. Move it, resize it, choose your font size and opacity, and keep it on top of other apps. Turn on click-through when you want to interact with the window underneath.
-
-<img src="docs/media/live-overlay.gif" alt="The real Veil overlay displaying the shared notes while its font size changes" width="640" />
-
-[View the overlay screenshot](docs/media/overlay.png).
-
-<details>
-<summary>See the overlay controls</summary>
-
-![Veil Overlay settings: opacity, font size, always on top, click-through, and recovery controls](docs/media/overlay-settings.png)
-
-</details>
-
-| Make it yours           | What you can do                                                                                           |
-| ----------------------- | --------------------------------------------------------------------------------------------------------- |
-| Hidden from recordings  | Keep the overlay visible to you while excluding it from compatible screen recordings and screen sharing.  |
-| A document in seconds   | Write locally without setting up a server.                                                                |
-| A shared space          | Invite multiple participants with a reusable session link. There is no application-level participant cap. |
-| Notes that stay visible | Edit from the control panel or the movable, resizable overlay.                                            |
-| Your preferred look     | Choose light, dark, or system theme and match your Windows accent color or pick your own.                 |
-| Connections you control | Self-host the sharing server; peer connections use a direct path when available and TURN when needed.     |
-| Updates in the app      | Check for signed updates in Settings and choose the stable or beta channel.                               |
+- **Multiple documents, independent sessions.** Create, open, and switch between tabs. Each document can have its own shared session, and background tabs stay connected. The overlay follows your selected tab.
+- **Rich text or Markdown.** Switch between formatted editing and Markdown source. Both views edit the same live document, including headings, emphasis, lists, nested checklists, quotes, code, and dividers. Your view choice stays local.
+- **Files you control.** Open and save UTF-8 `.md` files with native Windows dialogs. Each participant can save a private local copy. Veil is available through **Open with** without replacing your default Markdown editor.
+- **Live collaboration.** See named cursors, selections, and participant activity. Invite people with a short reusable link and choose automatic joining or approval for new guests.
+- **An editable desktop overlay.** Move, resize, keep it on top, or let clicks pass through to the app underneath. Adjust font size, background opacity, and text opacity independently, or link the opacity sliders. Choose a compact formatting toolbar, a selection toolbar, or shortcuts only.
+- **A setup that fits your desktop.** Choose light, dark, or system theme; follow your Windows accent color or pick your own. Rebind shortcuts, keep Veil in the tray, and optionally start it with Windows.
 
 ## Get started
 
-1. [Download the latest Windows installer](https://github.com/ahmad-fatayerji/veil/releases/latest) and run the setup `.exe`. Veil supports Windows 10 and 11 on x64; the installer installs WebView2 if needed.
-2. Open Veil, enter an optional name, and choose **Create document**. You can start writing immediately.
-3. Choose **Show overlay** to keep your document in view. Under **Settings → Overlay**, keep **Exclude overlay from compatible captures** enabled and check your recording or screen-sharing output. Customize the overlay's appearance there too.
+1. [Download the latest Windows installer](https://github.com/ahmad-fatayerji/veil/releases/latest) and run the setup `.exe`. Veil supports **Windows 10 and 11, x64**; setup installs WebView2 if needed.
+2. Choose **Create document** to start writing, or **Open** (`Ctrl+O`) to work with an existing Markdown file.
+3. Choose **Show overlay** to bring the selected document onto your desktop. Customize it under **Settings → Overlay**.
+4. Save with **Ctrl+S**. For a new document, choose a filename and folder; use **Ctrl+Shift+S** to save a separate copy.
 
-![Veil's welcome screen with Create document and Join session tabs](docs/media/welcome.png)
+Local writing does not need a sharing server. Unsaved changes prompt **Save / Discard / Cancel** before closing a tab or quitting. Optional **Settings → General → Reopen tabs and unsaved drafts** restores your workspace and crash drafts locally; it is off by default and does not replace saving your files.
 
-Open multiple documents in tabs; each tab can host or join its own session. Switching tabs keeps background sessions connected and changes the document shown in the overlay. Veil is available under Windows **Open with** for `.md` files without changing your default editor. See [saving and recovery](docs/document-files.md).
+See [document files, tabs, and recovery](docs/document-files.md) for details.
 
-### Invite your people
+## Keep the overlay out of compatible captures
 
-The host needs a [self-hosted Veil server](https://github.com/ahmad-fatayerji/veil-server) with HTTPS and an operator-issued host credential. Configure it under **Settings → Sharing → Hosting server**, then choose **Share → Copy link** and send the link to your guests.
+The overlay can remain on your screen while compatible recording and screen-sharing methods capture the content beneath it. **Exclude overlay from compatible captures** is enabled by default under **Settings → Overlay**.
 
-Guests install Veil, open the link (or paste it into **Join session**), enter a name, and join. They don't need to configure a server. Keep the host app open for the session to continue.
+Capture exclusion has been verified with OBS Display Capture using DXGI and Windows Graphics Capture, and FFmpeg GDI and DXGI capture on the documented Windows test machine. Results depend on the recorder and capture mode. **Check a saved recording or the remote viewer's screen before relying on it.** The main control panel remains capturable.
 
-### A few things to know
+Use the built-in capture test and see [capture compatibility and recorded results](docs/capture-compatibility.md). Exclusion is a display feature, not encryption or access control.
 
-- **Save your notes as Markdown.** Use **Open** (`Ctrl+O`), **Save** (`Ctrl+S`), or **Save As** (`Ctrl+Shift+S`) with Windows file dialogs. Unsaved changes prompt you to save or discard before closing or quitting. Each participant can save a private local copy.
-- Closing the main window moves Veil to the tray by default. Use **Quit Veil** in the tray menu to exit, or change the close behavior in Settings.
-- **Ctrl+Alt+V** restores interaction and brings back the control panel. **Ctrl+Alt+Shift+V** hides or shows the overlay.
-- Overlay capture exclusion works only with compatible capture methods. Test your recording or screen-sharing setup first; the control panel remains capturable. See [capture compatibility](docs/capture-compatibility.md).
-- Update packages are signed for Veil's updater. Windows SmartScreen may still show a warning because the installer does not currently have an Authenticode signature.
+| Default shortcut              | Action                                                |
+| ----------------------------- | ----------------------------------------------------- |
+| `Ctrl+Alt+V`                  | Restore interaction and bring back the control panel. |
+| `Ctrl+Alt+Shift+V`            | Hide or show the overlay.                             |
+| `Ctrl+N`                      | Create a document tab.                                |
+| `Ctrl+J`                      | Join with a session link.                             |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Switch document tabs.                                 |
+| `Ctrl+W`                      | Close the selected tab.                               |
 
-## Security and privacy
+Change assignments in **Settings → Keybinds**. Click-through requires a registered recovery shortcut; tray controls also let you recover the overlay. Closing the main window moves Veil to the tray by default and keeps your documents and sessions running. Choose **Quit Veil** from the tray to exit, or change the close behavior in Settings.
 
-- **Encrypted collaboration:** peer connections use WebRTC DTLS; authenticated signaling binds the host identity and derives separate encryption keys for each admitted guest link. The sharing server does not receive document contents or the invitation root secret.
-- **Control new joins:** share links grant editing access. Keep them private; **Reset link** replaces the invitation and **Stop sharing** blocks new joins. Already connected guests retain access until the session ends.
-- **Local document files:** Markdown files are saved where you choose. Optional **Settings → General → Reopen tabs and unsaved drafts** stores recovery drafts on this device; it is off by default. Files and recovery drafts are not encrypted by Veil. Host credentials stay in Windows Credential Manager. Participants can save, copy, or record shared content.
-- **Verified updates:** the updater checks signed packages and blocks installation while a document session is active. Updater signatures are separate from Windows publisher certificates.
+## Share a document
 
-Recording exclusion applies to compatible capture methods; it is not encryption or access control. Veil has not undergone an independent security audit. Read the [security model and reporting guidance](docs/security.md) for trust boundaries and limitations.
+1. Open a document and choose **Share**. On first use, Veil opens **Settings → Sharing → Hosting server** so you can confirm your server choice.
+2. Use **Veil's public servers**, or configure your own compatible server. Save the configuration to continue sharing the same document.
+3. Choose **Copy link** and send it to your guests. They install Veil, open the link or paste it into **Join session**, enter a name, and join. Guests do not need to configure a server.
+4. Keep the host app and shared tab open. The People panel shows participants and, when approval is required, incoming join requests.
+
+**Auto join** is the default. Choose **Require approval** to review guests before they receive document access. Everyone admitted can read and edit; display names do not verify identity.
+
+### Public servers or your own
+
+Veil offers public hosting without a host credential. These are shared resources: the public tier allows **up to five guests per document**, limits sessions per connection and relay usage, and has no availability guarantee. If capacity is reached, Veil offers **Try again** or **Configure your own server**; your local document remains available.
+
+For larger sessions or control over hosting, deploy [veil-server](https://github.com/ahmad-fatayerji/veil-server) or use another operator's compatible server. Enter its HTTPS address and, when required, an operator-issued host credential under **Settings → Sharing → Hosting server**. **Test connection** checks the configuration before you save it. Saved host credentials stay in Windows Credential Manager.
+
+Veil itself has no application-level participant cap; a server's policy, device resources, and network capacity determine practical limits. Connections use a direct WebRTC path when available, with TURN relay fallback when needed. See [networking and server setup](docs/automatic-networking.md).
+
+### Manage access
+
+Treat invitation links as secrets. **Reset link** replaces the invitation, and **Stop sharing** blocks new joins; both cancel pending requests. Already admitted guests retain access until the session ends. Close the hosted shared tab or quit Veil to disconnect everyone. There is no host migration, and restoring a saved document does not reconnect its old session.
+
+## Privacy and preferences
+
+- **Encrypted collaboration.** Document traffic uses WebRTC DTLS, with authenticated host identity and separate encryption keys for each guest's signaling. Sharing servers do not receive document contents or the invitation root secret; operators can observe connection metadata and affect service availability.
+- **Local storage.** Markdown files are saved where you choose. Optional tab and draft recovery stores snapshots on this device. Files and recovery drafts are not encrypted by Veil, and authorized participants can save, copy, or record shared content.
+- **Discord activity.** Discord Rich Presence is enabled by default. When Discord is running and allows activity sharing, Veil shares the selected document's title and participant count. Under **Settings → Sharing → Discord**, hide either detail or disable the integration. Activity continues while Veil is in the tray.
+- **Startup and updates.** Starting with Windows is optional and off by default; enabling it launches Veil quietly in the tray. Veil checks for updates in the background, while downloading and installing remain explicit. Choose stable or beta under Updates; package signatures are verified before installation.
+
+Veil has not undergone an independent security audit. Updater signatures are separate from Windows publisher certificates: the installer currently lacks an Authenticode signature, so SmartScreen may show a warning. Read the [security model](docs/security.md), or [report a vulnerability privately](https://github.com/ahmad-fatayerji/veil/security/advisories/new).
 
 ## Build and contribute
 
-Veil is open source: this repository contains the desktop app, shared editor packages, installers, and release automation. Contributions start from `develop`; `main` contains approved release source.
+The app is built with **Tauri, Rust, React, TypeScript, Tiptap, and Yjs**. This repository contains the desktop app, shared packages, development tools, and release automation. The production sharing server lives in [veil-server](https://github.com/ahmad-fatayerji/veil-server).
 
-For local Windows development, install Node.js 22.12+, pnpm 10.30.1, Rust, the Visual Studio C++ build tools, and WebView2. Then:
+For Windows development, install Node.js **22.12+**, pnpm **10.30.1**, Rust, the Visual Studio C++ build tools, and WebView2:
 
 ```powershell
-git clone https://github.com/ahmad-fatayerji/veil.git
+git clone --branch develop https://github.com/ahmad-fatayerji/veil.git
 cd veil
 pnpm install --frozen-lockfile
 pnpm dev:desktop
 ```
 
-[Project specification](PROJECT_SPEC.md) · [Architecture](docs/architecture.md) · [Testing](docs/testing.md) · [Networking](docs/automatic-networking.md) · [Releases](docs/releasing.md) · [Contributing workflow](AGENTS.md)
+| Path                        | Purpose                                                               |
+| --------------------------- | --------------------------------------------------------------------- |
+| `apps/desktop`              | Windows app, native integration, workspace, and overlay.              |
+| `packages/editor`           | Shared rich text and Markdown editing.                                |
+| `packages/collaboration`    | Document synchronization, peer connections, and session coordination. |
+| `packages/protocol`         | Shared protocol types and compatibility declarations.                 |
+| `packages/ui`               | Shared interface components and styling.                              |
+| `apps/web`, `packages/host` | Retained browser and local development/test tools.                    |
 
-Found a bug or have an idea? [Open an issue](https://github.com/ahmad-fatayerji/veil/issues) with the steps to reproduce it and your Veil version.
+Read [AGENTS.md](AGENTS.md) before contributing. Ordinary work starts from `develop` and is reviewed through PRs; `main` holds approved release source. The standalone development host listens on loopback and must not be exposed as a public service.
+
+[Project specification](PROJECT_SPEC.md) · [Architecture](docs/architecture.md) · [Overlay](docs/overlay.md) · [Testing](docs/testing.md) · [Releases](docs/releasing.md)
+
+Found a bug or have an idea? [Open an issue](https://github.com/ahmad-fatayerji/veil/issues) with your Veil version and steps to reproduce it.
 
 ## Star history
 
