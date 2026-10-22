@@ -275,6 +275,10 @@
   .workspace-panel .desktop-content {
     grid-template-rows: auto minmax(0, 1fr) auto;
   }
+  /* Share matches the other title bar icons; an active invite link tints it. */
+  .share-button[data-sharing] {
+    color: var(--accent);
+  }
   /* Connection status reads as plain status-bar text; colour appears only for problems. */
   .statusbar-connection {
     display: inline-flex;

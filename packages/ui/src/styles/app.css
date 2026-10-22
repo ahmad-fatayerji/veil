@@ -114,28 +114,6 @@
   .titlebar-title-text[data-empty] {
     color: var(--fg-muted);
   }
-  .split-button {
-    display: inline-flex;
-    align-items: stretch;
-    margin-inline: var(--space-1);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-  }
-  .titlebar .split-button .btn-sm {
-    margin-inline: 0;
-    border-radius: 0;
-  }
-  .titlebar .split-button .split-button-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 0;
-    border-left: 1px solid color-mix(in srgb, var(--on-accent) 35%, transparent);
-    background: var(--accent);
-    color: var(--on-accent);
-  }
-  .titlebar .split-button .split-button-icon:hover:not(:disabled) {
-    background: var(--accent-hover);
-  }
   .titlebar-actions {
     display: flex;
     align-items: center;

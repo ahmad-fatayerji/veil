@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import {
-  Copy,
   Eye,
   EyeOff,
   Link,
@@ -11,6 +10,7 @@ import {
   Pencil,
   Save,
   Settings,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react';
@@ -491,27 +491,19 @@ export function AutomaticApp({
           <EyeOff size={18} aria-hidden="true" />
         )}
       </IconButton>
-      {!guest &&
-        (link ? (
-          <div className="split-button">
-            <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
-              Share
-            </Button>
-            <IconButton
-              label="Copy invite link"
-              shortcut={keybinds.copyInvite}
-              className="split-button-icon"
-              disabled={busy}
-              onClick={copyInvite}
-            >
-              <Copy size={16} aria-hidden="true" />
-            </IconButton>
-          </div>
-        ) : (
-          <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
-            Share
-          </Button>
-        ))}
+      {!guest && (
+        // While an invite link is active the icon takes the accent colour; Copy invite
+        // link lives in the document menu and on its shortcut.
+        <IconButton
+          label="Share"
+          className="share-button"
+          data-sharing={link ? '' : undefined}
+          disabled={busy}
+          onClick={requestShare}
+        >
+          <UserPlus size={18} aria-hidden="true" />
+        </IconButton>
+      )}
       <Menu
         label={`Document menu: ${title.trim() || 'Untitled'}`}
         trigger={<MoreHorizontal size={18} aria-hidden="true" />}
