@@ -84,7 +84,7 @@ test('About credits the developer and Settings closes with Escape', async ({ pag
   await expect(dialog.getByRole('heading', { name: 'Developer', exact: true })).toHaveCount(0);
   await expect(dialog).not.toContainText('Documents are temporary.');
   await expect(dialog).not.toContainText('Documents live in memory.');
-  const website = dialog.getByRole('link', { name: 'ahmadfatayerji.com' });
+  const website = dialog.getByRole('link', { name: 'Ahmad Fatayerji', exact: true });
   await expect(website).toHaveAttribute('href', 'https://ahmadfatayerji.com');
   await expect(website).toHaveAttribute('target', '_blank');
   await expect(website).toHaveAttribute('rel', 'noopener noreferrer');
