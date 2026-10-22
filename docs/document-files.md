@@ -14,8 +14,15 @@ Headings, emphasis, lists, nested checklists, quotes, code, and dividers retain
 their formatting. Unsupported constructs remain visible as literal Markdown.
 Files must be UTF-8 and at most 16 MiB; recovery data is also limited to 16 MiB.
 
-Tabs show unsaved changes and connection status. **New** (`Ctrl+N`) and **Join**
-create tabs. Use `Ctrl+Tab` / `Ctrl+Shift+Tab` to navigate and `Ctrl+W` to close.
+Tabs live in the window's title bar. Each tab shows a dot for unsaved changes,
+which becomes a close button on hover, and an icon for its connection: a link
+while sharing, and a green, amber, or red dot when connected, connecting, or
+disconnected. Hover a tab for its file path and status. **+** (`Ctrl+N`) creates a
+document; the arrow next to it offers **Open file…** and **Join with link…**
+(`Ctrl+J`). Starting from a blank **Home** tab replaces it. Use `Ctrl+Tab` /
+`Ctrl+Shift+Tab` or `Ctrl+1`–`Ctrl+8` to navigate (`Ctrl+9` selects the last
+tab), and `Ctrl+W` or a middle-click to close. The **⋯** document menu holds
+Save, Save As, Rename, Copy invite link, and Close or Leave.
 Each tab has its own editor history and optional host or guest session.
 Background sessions stay connected. Share, People, Discord activity, and the
 overlay follow the selected tab. Strikethrough uses `Ctrl+Shift+X`. File and document

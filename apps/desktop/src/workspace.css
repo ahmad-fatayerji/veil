@@ -5,70 +5,248 @@
     flex-direction: column;
     background: var(--bg);
   }
+
+  /* Title bar tabs ------------------------------------------------------ */
+  /* The tab row is the window's title bar: a sunken strip whose selected tab
+     shares the editor's background, so it reads as the top of the page. */
+  .titlebar[data-tabs] {
+    flex-shrink: 0;
+    gap: 0;
+    padding-left: var(--space-2);
+    background: var(--surface-sunken);
+  }
+  .titlebar-drag {
+    flex: 1;
+    align-self: stretch;
+    min-width: var(--space-7);
+  }
+  .titlebar-tab-actions {
+    display: contents;
+  }
+  .workspace-tabbar {
+    display: flex;
+    align-items: flex-end;
+    align-self: stretch;
+    min-width: 0;
+    flex: 0 1 auto;
+  }
   .workspace-tabs {
     display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    min-height: 36px;
+    align-items: flex-end;
+    align-self: stretch;
+    gap: 2px;
+    min-width: 0;
     overflow-x: auto;
-    border-bottom: 1px solid var(--border);
-    padding: 0 var(--space-2);
-    gap: 3px;
+    overflow-y: hidden;
+    scrollbar-width: none;
   }
+  .workspace-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  /* Overlay fades (not mask-image, which would also clip the tabs' inline tooltips). */
+  .workspace-tabs-viewport {
+    position: relative;
+    display: flex;
+    align-self: stretch;
+    min-width: 0;
+  }
+  .workspace-tabs-viewport::before,
+  .workspace-tabs-viewport::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 24px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease-out);
+  }
+  .workspace-tabs-viewport::before {
+    left: 0;
+    background: linear-gradient(to right, var(--surface-sunken), transparent);
+  }
+  .workspace-tabs-viewport::after {
+    right: 0;
+    background: linear-gradient(to left, var(--surface-sunken), transparent);
+  }
+  .workspace-tabs-viewport[data-overflow~='start']::before,
+  .workspace-tabs-viewport[data-overflow~='end']::after {
+    opacity: 1;
+  }
+
   .workspace-tab {
+    position: relative;
     display: flex;
     align-items: center;
-    flex-shrink: 0;
-    max-width: 260px;
-    border-radius: var(--radius-sm);
+    flex: 0 1 200px;
+    min-width: 96px;
+    height: 32px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     color: var(--fg-muted);
+    transition:
+      background var(--dur) var(--ease-out),
+      color var(--dur) var(--ease-out);
   }
-  .workspace-tab[data-active='true'] {
+  .workspace-tab:hover {
     background: var(--hover);
     color: var(--fg);
   }
-  .workspace-tab > button,
-  .workspace-tab-action {
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--text-xs);
-    min-height: 32px;
+  .workspace-tab[data-active='true'] {
+    flex-shrink: 0;
+    background: var(--bg);
+    color: var(--fg);
   }
+  /* A hairline separates neighbouring inactive tabs, as in Windows 11 Notepad. */
+  .workspace-tab + .workspace-tab::before {
+    content: '';
+    position: absolute;
+    left: -2px;
+    top: 9px;
+    bottom: 9px;
+    width: 1px;
+    background: var(--border-strong);
+  }
+  .workspace-tab:hover::before,
+  .workspace-tab[data-active='true']::before,
+  .workspace-tab:hover + .workspace-tab::before,
+  .workspace-tab[data-active='true'] + .workspace-tab::before {
+    opacity: 0;
+  }
+
   .workspace-tab > button[role='tab'] {
     display: flex;
     align-items: center;
+    flex: 1;
+    gap: var(--space-2);
     min-width: 0;
-    gap: 8px;
-    padding: 0 8px;
+    height: 100%;
+    padding: 0 var(--space-1) 0 var(--space-3);
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: default;
+  }
+  .workspace-tab[data-active='true'] > button[role='tab'] {
+    font-weight: var(--weight-medium);
+  }
+  .workspace-tab > button[aria-disabled='true'] {
+    cursor: progress;
   }
   .workspace-tab-title {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
+    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 150px;
   }
-  .workspace-tab-status {
-    font-size: 10px;
+  .workspace-tab-icon {
+    flex-shrink: 0;
     color: var(--fg-muted);
   }
-  .workspace-tab-close,
-  .workspace-tab-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  .workspace-tab-dot {
     flex-shrink: 0;
-    padding: 0 8px;
+    width: 7px;
+    height: 7px;
+    border-radius: var(--radius-full);
+    background: var(--fg-muted);
   }
-  .workspace-tabs button:hover {
+  .workspace-tab-dot[data-tone='success'] {
+    background: var(--success);
+  }
+  .workspace-tab-dot[data-tone='warning'] {
+    background: var(--warning);
+    animation: workspace-tab-pulse 1.2s ease-in-out infinite;
+  }
+  .workspace-tab-dot[data-tone='danger'] {
+    background: var(--danger);
+  }
+  @keyframes workspace-tab-pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  /* The trailing slot shows ● for unsaved changes and becomes × on hover. */
+  .workspace-tab-close {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-right: var(--space-1);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--fg-muted);
+    cursor: default;
+  }
+  .workspace-tab-close > * {
+    grid-area: 1 / 1;
+  }
+  .workspace-tab-close:hover {
     background: var(--hover);
+    color: var(--fg);
   }
-  .workspace-tabs button:focus-visible {
+  .workspace-tab-close svg {
+    opacity: 0;
+  }
+  .workspace-tab:hover .workspace-tab-close svg,
+  .workspace-tab:focus-within .workspace-tab-close svg,
+  .workspace-tab[data-active='true']:not([data-dirty]) .workspace-tab-close svg {
+    opacity: 1;
+  }
+  .workspace-tab-unsaved {
+    display: none;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: currentColor;
+  }
+  .workspace-tab[data-dirty] .workspace-tab-unsaved {
+    display: block;
+  }
+  .workspace-tab[data-dirty]:hover .workspace-tab-unsaved,
+  .workspace-tab[data-dirty]:focus-within .workspace-tab-unsaved {
+    display: none;
+  }
+
+  .workspace-tab > button:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: -2px;
   }
+  .workspace-tab-tooltip {
+    display: grid;
+    gap: 2px;
+    max-width: 360px;
+    overflow-wrap: anywhere;
+  }
+  .workspace-tab-tooltip > span {
+    color: var(--fg-muted);
+  }
+
+  /* + creates a document; the chevron offers Open and Join. */
+  .workspace-new {
+    display: flex;
+    align-items: center;
+    align-self: center;
+    flex-shrink: 0;
+    margin-left: var(--space-1);
+  }
+  .workspace-new .icon-btn {
+    width: 28px;
+    height: 28px;
+  }
+  .workspace-new .workspace-new-more {
+    width: 20px;
+  }
+
+  /* Panels -------------------------------------------------------------- */
   .workspace-panel {
     flex: 1;
     min-height: 0;
@@ -79,11 +257,19 @@
   .workspace-panel .desktop-shell {
     height: 100%;
   }
-  .workspace-feedback {
-    position: fixed;
-    bottom: 48px;
-    right: 16px;
-    max-width: min(480px, calc(100vw - 32px));
-    z-index: 110;
+  /* The workspace owns the title bar, so each tab's content has no title bar row. */
+  .workspace-panel .desktop-content {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  @media (max-width: 700px) {
+    .workspace-tab {
+      flex-basis: 140px;
+      min-width: 72px;
+    }
+    .workspace-tab-icon,
+    .workspace-tab-dot {
+      display: none;
+    }
   }
 }

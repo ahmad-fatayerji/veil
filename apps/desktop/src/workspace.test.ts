@@ -135,6 +135,48 @@ describe('document workspace lifecycle', () => {
     tab.document!.doc.destroy();
   });
 
+  it('replaces a pristine Home tab instead of leaving it behind', async () => {
+    const workspace = new Workspace();
+    const home = workspace.add('start');
+    home.unsubscribe = vi.fn();
+    workspace.newTab();
+    expect(workspace.tabs).toHaveLength(1);
+    expect(workspace.active()!.mode).toBe('new');
+    expect(home.unsubscribe).toHaveBeenCalledOnce();
+
+    const again = workspace.add('start');
+    workspace.joinTab();
+    expect(workspace.tabs.map((tab) => tab.mode)).toEqual(['new', 'join']);
+    expect(workspace.tabs).not.toContain(again);
+
+    workspace.add('start');
+    vi.mocked(invoke).mockResolvedValueOnce({
+      id: 'file-1',
+      path: 'C:\\Notes.md',
+      content: '# Notes\n',
+    });
+    await workspace.open('C:\\Notes.md');
+    expect(workspace.tabs.map((tab) => tab.mode)).toEqual(['new', 'join', 'new']);
+    expect(workspace.active()!.file?.path).toBe('C:\\Notes.md');
+  });
+
+  it('keeps a Home tab that is in use or not selected', () => {
+    const workspace = new Workspace();
+    const used = workspace.add('start');
+    used.document = {} as PeerSession;
+    workspace.newTab();
+    expect(workspace.tabs).toContain(used);
+
+    const busy = workspace.add('start', { busy: true });
+    workspace.newTab();
+    expect(workspace.tabs).toContain(busy);
+
+    const background = workspace.add('start');
+    workspace.select(used);
+    workspace.newTab();
+    expect(workspace.tabs).toContain(background);
+  });
+
   it('removes discarded drafts from normal-quit recovery and reopens saved tabs from disk', async () => {
     vi.useFakeTimers();
     const workspace = new Workspace();

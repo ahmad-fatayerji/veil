@@ -1,7 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
-import { Plus, FolderOpen, X } from 'lucide-react';
+import { ChevronDown, FolderOpen, Home, Link2, Plus, X } from 'lucide-react';
 import * as Y from 'yjs';
 import type { PeerSession } from '@veil/collaboration';
 import {
@@ -12,12 +12,23 @@ import {
   useDocumentTitle,
 } from '@veil/editor';
 import { DOCUMENT_TITLE, parseShareLink } from '@veil/protocol';
-import { Banner, Button, Dialog, useAppearance, useParticipants } from '@veil/ui';
+import {
+  Banner,
+  Button,
+  Dialog,
+  IconButton,
+  Menu,
+  MenuItem,
+  Tooltip,
+  useAppearance,
+  useParticipants,
+} from '@veil/ui';
 import { useDiscordPresence } from './discord';
 import { AutomaticApp } from './AutomaticApp';
 import { SessionBridge, flushOverlay } from './overlay/session';
 import { errorMessage, invoke, useOverlay } from './overlay/api';
-import { defaultKeybinds, matchesShortcut } from './keybinds';
+import { defaultKeybinds, matchesShortcut, type Keybinds } from './keybinds';
+import { TitleBar, connectionStates } from './shell/TitleBar';
 import './workspace.css';
 
 export interface DocumentFile {
@@ -117,6 +128,11 @@ export class Workspace {
     this.notice = '';
     this.changed();
   };
+  dismissNotice = () => {
+    if (!this.notice) return;
+    this.notice = '';
+    this.changed();
+  };
   active = () => this.tabs.find((tab) => tab.id === this.activeId);
   select = (tab: WorkspaceTab) => {
     this.activeId = tab.id;
@@ -136,10 +152,23 @@ export class Workspace {
       baseline: emptyFingerprint,
       ...seed,
     };
-    this.tabs.push(tab);
+    // A pristine Home tab is replaced, so opening the first document never leaves it behind.
+    const home = this.active();
+    const index =
+      mode !== 'start' && home?.mode === 'start' && !home.document && !home.busy
+        ? this.tabs.indexOf(home)
+        : -1;
+    if (index >= 0) {
+      home!.unsubscribe?.();
+      this.tabs.splice(index, 1, tab);
+    } else this.tabs.push(tab);
     this.select(tab);
     return tab;
   }
+  selectIndex = (index: number) => {
+    const tab = this.tabs[index];
+    if (tab && !this.working) this.select(tab);
+  };
   newTab = () => {
     if (!this.working) this.add('new');
   };
@@ -303,7 +332,8 @@ export class Workspace {
     tab.externalChange = false;
     tab.baseline = fingerprint;
     tab.dirty = documentFingerprint(doc) !== fingerprint;
-    this.notice = tab.dirty ? 'Saved. Newer changes are still unsaved.' : 'Document saved.';
+    // The status bar already shows "Saved"; only explain the less obvious outcome.
+    if (tab.dirty) this.notice = 'Saved. Newer changes are still unsaved.';
     this.changed();
     return true;
   }
@@ -537,11 +567,19 @@ export function DocumentWorkspace() {
     participants.filter((person) => !person.local).length,
   );
   const appearanceSettings = useAppearance();
+  const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     document
       .getElementById(`tab-${activeId}`)
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [activeId]);
+  // Informational notices are transient; errors stay until dismissed.
+  const notice = workspace.notice;
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(workspace.dismissNotice, 5000);
+    return () => clearTimeout(timer);
+  }, [workspace, notice]);
   useEffect(() => {
     let active = true;
     let initialized = false;
@@ -600,6 +638,21 @@ export function DocumentWorkspace() {
       ];
       const cycle =
         (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'tab';
+      // Ctrl+1–8 select a tab and Ctrl+9 the last one, unless a custom keybind claims them.
+      const digit =
+        !action &&
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        /^Digit[1-9]$/.test(event.code)
+          ? Number(event.code.slice(5))
+          : 0;
+      if (digit) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        workspace.selectIndex(digit === 9 ? workspace.tabs.length - 1 : digit - 1);
+        return;
+      }
       if (!cycle && (!action || !commands.includes(action))) return;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -625,91 +678,26 @@ export function DocumentWorkspace() {
     return () => window.removeEventListener('keydown', key, true);
   }, [workspace, keybinds]);
   if (!workspace.ready) return <p role="status">Opening workspace…</p>;
+  const toasts = (
+    <>
+      {workspace.notice && (
+        <Banner tone="info" role="status" className="toast" onDismiss={workspace.dismissNotice}>
+          {workspace.notice}
+        </Banner>
+      )}
+      {workspace.error && (
+        <Banner tone="danger" role="alert" className="toast" onDismiss={workspace.dismiss}>
+          {workspace.error}
+        </Banner>
+      )}
+    </>
+  );
   return (
     <div className="document-workspace" aria-busy={workspace.working}>
-      <div className="workspace-tabs" role="tablist" aria-label="Documents">
-        {workspace.tabs.map((tab, index) => (
-          <div className="workspace-tab" data-active={tab.id === workspace.activeId} key={tab.id}>
-            <button
-              id={`tab-${tab.id}`}
-              role="tab"
-              type="button"
-              aria-selected={tab.id === workspace.activeId}
-              aria-controls={`panel-${tab.id}`}
-              tabIndex={tab.id === workspace.activeId ? 0 : -1}
-              title={[tab.file?.path, tab.status, tab.dirty ? 'Unsaved changes' : '']
-                .filter(Boolean)
-                .join(' · ')}
-              disabled={workspace.working}
-              onClick={() => workspace.select(tab)}
-              onKeyDown={(event) => {
-                const next =
-                  event.key === 'ArrowRight'
-                    ? (index + 1) % workspace.tabs.length
-                    : event.key === 'ArrowLeft'
-                      ? (index - 1 + workspace.tabs.length) % workspace.tabs.length
-                      : event.key === 'Home'
-                        ? 0
-                        : event.key === 'End'
-                          ? workspace.tabs.length - 1
-                          : -1;
-                if (next < 0) return;
-                event.preventDefault();
-                workspace.select(workspace.tabs[next]);
-                document.getElementById(`tab-${workspace.tabs[next].id}`)?.focus();
-              }}
-            >
-              <span className="workspace-tab-title">
-                {tab.title ||
-                  (tab.mode === 'start'
-                    ? 'Welcome'
-                    : tab.mode === 'join' && !tab.document
-                      ? 'Join session'
-                      : 'Untitled')}
-              </span>
-              {tab.status !== 'local' && <span className="workspace-tab-status">{tab.status}</span>}
-              {tab.dirty && <span aria-label="Unsaved changes">●</span>}
-            </button>
-            <button
-              type="button"
-              className="workspace-tab-close"
-              aria-label={`Close ${tab.title || 'tab'}`}
-              disabled={workspace.working}
-              onClick={() => void workspace.close(tab)}
-            >
-              <X size={13} />
-            </button>
-          </div>
-        ))}
-        <button
-          className="workspace-tab-action"
-          type="button"
-          title={`New document (${keybinds.newDocument})`}
-          aria-label="New document"
-          disabled={workspace.working}
-          onClick={workspace.newTab}
-        >
-          <Plus size={16} />
-        </button>
-        <button
-          className="workspace-tab-action"
-          type="button"
-          title={`Open (${keybinds.openDocument})`}
-          aria-label="Open document"
-          disabled={workspace.working}
-          onClick={() => void workspace.open()}
-        >
-          <FolderOpen size={16} />
-        </button>
-        <button
-          className="workspace-tab-action"
-          type="button"
-          disabled={workspace.working}
-          onClick={() => workspace.joinTab()}
-        >
-          Join
-        </button>
-      </div>
+      <TitleBar
+        tabs={<TabStrip workspace={workspace} keybinds={keybinds} />}
+        end={<div ref={setActionsSlot} className="titlebar-tab-actions" />}
+      />
       {workspace.tabs.map((tab) => (
         <div
           key={tab.id}
@@ -726,6 +714,8 @@ export function DocumentWorkspace() {
             active={tab.id === workspace.activeId}
             discord={discord}
             appearanceSettings={appearanceSettings}
+            actionsSlot={actionsSlot}
+            toasts={toasts}
           />
         </div>
       ))}
@@ -736,17 +726,6 @@ export function DocumentWorkspace() {
             ?.document ?? null
         }
       />
-      {(workspace.error || workspace.notice) && (
-        <div className="workspace-feedback">
-          <Banner
-            tone={workspace.error ? 'danger' : 'info'}
-            role={workspace.error ? 'alert' : 'status'}
-            onDismiss={workspace.dismiss}
-          >
-            {workspace.error || workspace.notice}
-          </Banner>
-        </div>
-      )}
       <Dialog
         open={!!workspace.prompt}
         title={workspace.prompt?.title ?? ''}
@@ -771,6 +750,184 @@ export function DocumentWorkspace() {
           ))}
         </div>
       </Dialog>
+    </div>
+  );
+}
+
+function tabLabel(tab: WorkspaceTab) {
+  if (tab.title) return tab.title;
+  if (tab.document) return 'Untitled';
+  return tab.mode === 'start' ? 'Home' : tab.mode === 'join' ? 'Join session' : 'Untitled';
+}
+
+function TabIcon({ tab }: { tab: WorkspaceTab }) {
+  if (!tab.document && tab.mode === 'start')
+    return <Home size={14} className="workspace-tab-icon" aria-hidden="true" />;
+  if (tab.status === 'sharing')
+    return <Link2 size={14} className="workspace-tab-icon" aria-hidden="true" />;
+  if (!(tab.status in connectionStates) || tab.status === 'local') return null;
+  const { tone } = connectionStates[tab.status as keyof typeof connectionStates];
+  return (
+    <span
+      className="workspace-tab-dot"
+      data-tone={tone}
+      data-state={tab.status}
+      aria-hidden="true"
+    />
+  );
+}
+
+function TabStrip({ workspace, keybinds }: { workspace: Workspace; keybinds: Keybinds }) {
+  const strip = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState('');
+  // Fade each edge that hides tabs; recomputed after every render, resize and scroll.
+  const measure = useCallback(() => {
+    const element = strip.current;
+    if (!element) return;
+    const start = element.scrollLeft > 1;
+    const end = element.scrollLeft + element.clientWidth < element.scrollWidth - 1;
+    setEdges([start && 'start', end && 'end'].filter(Boolean).join(' '));
+  }, []);
+  useEffect(measure);
+  useEffect(() => {
+    const element = strip.current;
+    if (!element) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [measure]);
+  const onlyHome =
+    workspace.tabs.length === 1 &&
+    workspace.tabs[0].mode === 'start' &&
+    !workspace.tabs[0].document;
+  return (
+    <div className="workspace-tabbar">
+      <div className="workspace-tabs-viewport" data-overflow={edges || undefined}>
+        <div
+          ref={strip}
+          className="workspace-tabs"
+          role="tablist"
+          aria-label="Documents"
+          onScroll={measure}
+          onWheel={(event) => {
+            if (Math.abs(event.deltaY) > Math.abs(event.deltaX))
+              event.currentTarget.scrollLeft += event.deltaY;
+          }}
+        >
+          {workspace.tabs.map((tab, index) => {
+            const active = tab.id === workspace.activeId;
+            const label = tabLabel(tab);
+            const status =
+              tab.status in connectionStates && tab.status !== 'local'
+                ? connectionStates[tab.status as keyof typeof connectionStates].label
+                : '';
+            const details = [tab.file?.path, status, tab.dirty && 'Unsaved changes'].filter(
+              Boolean,
+            );
+            return (
+              <div
+                key={tab.id}
+                className="workspace-tab"
+                data-active={active}
+                data-dirty={tab.dirty || undefined}
+                // Prevent Windows middle-button autoscroll so middle-click can close the tab.
+                onMouseDown={(event) => {
+                  if (event.button === 1) event.preventDefault();
+                }}
+                onAuxClick={(event) => {
+                  if (event.button !== 1 || onlyHome) return;
+                  event.preventDefault();
+                  void workspace.close(tab);
+                }}
+              >
+                <Tooltip
+                  content={
+                    <span className="workspace-tab-tooltip">
+                      <strong>{label}</strong>
+                      {details.map((detail) => (
+                        <span key={String(detail)}>{detail}</span>
+                      ))}
+                    </span>
+                  }
+                >
+                  <button
+                    id={`tab-${tab.id}`}
+                    role="tab"
+                    type="button"
+                    aria-selected={active}
+                    aria-controls={`panel-${tab.id}`}
+                    aria-disabled={workspace.working || undefined}
+                    tabIndex={active ? 0 : -1}
+                    onClick={() => {
+                      if (!workspace.working) workspace.select(tab);
+                    }}
+                    onKeyDown={(event) => {
+                      const count = workspace.tabs.length;
+                      const next =
+                        event.key === 'ArrowRight'
+                          ? (index + 1) % count
+                          : event.key === 'ArrowLeft'
+                            ? (index - 1 + count) % count
+                            : event.key === 'Home'
+                              ? 0
+                              : event.key === 'End'
+                                ? count - 1
+                                : -1;
+                      if (next < 0 || workspace.working) return;
+                      event.preventDefault();
+                      workspace.select(workspace.tabs[next]);
+                      document.getElementById(`tab-${workspace.tabs[next].id}`)?.focus();
+                    }}
+                  >
+                    <TabIcon tab={tab} />
+                    <span className="workspace-tab-title">{label}</span>
+                    {tab.dirty && <span className="visually-hidden">, unsaved changes</span>}
+                  </button>
+                </Tooltip>
+                {!onlyHome && (
+                  <button
+                    type="button"
+                    className="workspace-tab-close"
+                    tabIndex={-1}
+                    aria-label={`Close ${label}`}
+                    aria-disabled={workspace.working || undefined}
+                    onClick={() => void workspace.close(tab)}
+                  >
+                    <span className="workspace-tab-unsaved" aria-hidden="true" />
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="workspace-new">
+        <IconButton label="New document" shortcut={keybinds.newDocument} onClick={workspace.newTab}>
+          <Plus size={16} aria-hidden="true" />
+        </IconButton>
+        <Menu
+          label="Open or join"
+          align="start"
+          triggerClassName="icon-btn workspace-new-more"
+          trigger={<ChevronDown size={14} aria-hidden="true" />}
+        >
+          <MenuItem
+            icon={<FolderOpen size={16} aria-hidden="true" />}
+            shortcut={keybinds.openDocument}
+            onSelect={() => void workspace.open()}
+          >
+            Open file…
+          </MenuItem>
+          <MenuItem
+            icon={<Link2 size={16} aria-hidden="true" />}
+            shortcut={keybinds.joinDocument}
+            onSelect={() => workspace.joinTab()}
+          >
+            Join with link…
+          </MenuItem>
+        </Menu>
+      </div>
     </div>
   );
 }

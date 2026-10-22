@@ -20,8 +20,13 @@ encoding and size failures, and update gating; execution remains with the user.
    the others. Verify editor undo and selection survive tab switches.
 4. Edit in the overlay while switching tabs, then immediately save or close.
    Verify edits reach their originating document and the overlay follows selection.
-   Check Ctrl+N/O/S/Shift+S/Tab/Shift+Tab/W, strikethrough on Ctrl+Shift+X, and
-   arrow/Home/End navigation in the tab strip.
+   Check Ctrl+N/O/S/Shift+S/Tab/Shift+Tab/W, Ctrl+1–9, strikethrough on
+   Ctrl+Shift+X, and arrow/Home/End navigation in the tab strip.
+   With tabs in the title bar, drag and double-click the empty title bar space,
+   middle-click a tab to close it, and scroll an overflowing tab strip with the
+   mouse wheel. New, Open, or Join from a blank Home tab must replace it. The
+   People, overlay, Share, and ⋯ document menu controls must follow the selected
+   tab; saving must not flicker or disable the tabs.
 5. Exercise tab close, tray Quit, Alt+F4, and window close configured as Quit.
    Check Save / Discard / Cancel across several tabs, failed/cancelled saves,
    remote edits during prompts, and the hosted-session warning. Cancel must keep
@@ -36,7 +41,7 @@ encoding and size failures, and update gating; execution remains with the user.
    unchanged; uninstall must remove only Veil's association. No publication is
    required for this acceptance test.
 8. Updates must remain blocked with any document or background connection open,
-   including after closing the selected tab or selecting Welcome.
+   including after closing the selected tab or selecting Home.
 
 ## Windows startup - 22 October 2026
 

@@ -1,6 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { ChevronDown, Copy, Eye, EyeOff, Link, LogOut, Pencil, Settings, X } from 'lucide-react';
+import {
+  Copy,
+  Eye,
+  EyeOff,
+  Link,
+  LogOut,
+  MoreHorizontal,
+  Pencil,
+  Save,
+  Settings,
+  X,
+} from 'lucide-react';
 import {
   createPeerSession,
   joinShareLink,
@@ -30,7 +42,7 @@ import type { Workspace, WorkspaceTab } from './workspace';
 import { useUpdateAttention } from './Updates';
 import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
-import { DocumentStatus, PeopleButton, TitleBar, type ConnectionState } from './shell/TitleBar';
+import { DocumentStatus, PeopleButton, type ConnectionState } from './shell/TitleBar';
 import { StatusBar } from './shell/StatusBar';
 import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
@@ -45,12 +57,18 @@ export function AutomaticApp({
   active,
   appearanceSettings,
   discord,
+  actionsSlot,
+  toasts,
 }: {
   tab: WorkspaceTab;
   workspace: Workspace;
   active: boolean;
   appearanceSettings: ReturnType<typeof useAppearance>;
   discord: ReturnType<typeof useDiscordPresence>;
+  /** The shared title bar's action area; the selected tab renders its controls there. */
+  actionsSlot: HTMLElement | null;
+  /** Workspace-wide messages, shown in this tab's toast region while it is selected. */
+  toasts?: ReactNode;
 }) {
   const [document, setDocument] = useState<PeerSession | null>(null);
   const mounted = useRef(false);
@@ -439,163 +457,118 @@ export function AutomaticApp({
       <Settings size={18} aria-hidden="true" />
     </IconButton>
   );
+  const fileName = tab.file?.path.split(/[\\/]/).pop();
+  const titlebarActions = document && (
+    <>
+      <PeopleButton
+        ref={peopleButton}
+        participants={participants}
+        waiting={guest ? 0 : pendingGuests.length}
+        expanded={people}
+        onToggle={() => togglePeople()}
+      />
+      <IconButton
+        label={overlayVisible ? 'Hide overlay' : 'Show overlay'}
+        shortcut={overlay.state?.hideShortcutAvailable ? keybinds.toggleOverlay : undefined}
+        aria-pressed={overlayVisible}
+        disabled={!overlay.state || busy}
+        onClick={toggleOverlay}
+      >
+        {overlayVisible ? (
+          <Eye size={18} aria-hidden="true" />
+        ) : (
+          <EyeOff size={18} aria-hidden="true" />
+        )}
+      </IconButton>
+      {!guest &&
+        (link ? (
+          <div className="split-button">
+            <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
+              Share
+            </Button>
+            <IconButton
+              label="Copy invite link"
+              shortcut={keybinds.copyInvite}
+              className="split-button-icon"
+              disabled={busy}
+              onClick={copyInvite}
+            >
+              <Copy size={16} aria-hidden="true" />
+            </IconButton>
+          </div>
+        ) : (
+          <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
+            Share
+          </Button>
+        ))}
+      <Menu
+        label={`Document menu: ${title.trim() || 'Untitled'}`}
+        trigger={<MoreHorizontal size={18} aria-hidden="true" />}
+      >
+        <MenuItem
+          icon={<Save size={16} aria-hidden="true" />}
+          shortcut={keybinds.saveDocument}
+          disabled={busy || workspace.working}
+          onSelect={() =>
+            void workspace.run(async () => {
+              await workspace.save(tab);
+            })
+          }
+        >
+          Save
+        </MenuItem>
+        <MenuItem
+          shortcut={keybinds.saveDocumentAs}
+          disabled={busy || workspace.working}
+          onSelect={() =>
+            void workspace.run(async () => {
+              await workspace.save(tab, true);
+            })
+          }
+        >
+          Save As…
+        </MenuItem>
+        <MenuSeparator />
+        <MenuItem
+          icon={<Pencil size={16} aria-hidden="true" />}
+          onSelect={() => {
+            const input = window.document.querySelector<HTMLInputElement>(
+              `#panel-${tab.id} .doc-title`,
+            );
+            input?.focus();
+            input?.select();
+          }}
+        >
+          Rename
+        </MenuItem>
+        {!guest && link && (
+          <MenuItem
+            icon={<Link size={16} aria-hidden="true" />}
+            shortcut={keybinds.copyInvite}
+            onSelect={copyInvite}
+          >
+            Copy invite link
+          </MenuItem>
+        )}
+        <MenuSeparator />
+        <MenuItem
+          tone="danger"
+          icon={
+            guest ? <LogOut size={16} aria-hidden="true" /> : <X size={16} aria-hidden="true" />
+          }
+          shortcut={keybinds.closeDocument}
+          disabled={busy}
+          onSelect={requestLeave}
+        >
+          {leaveLabel}
+        </MenuItem>
+      </Menu>
+    </>
+  );
   return (
     <div className="desktop-shell">
+      {active && actionsSlot && titlebarActions && createPortal(titlebarActions, actionsSlot)}
       <div className="desktop-content" inert={updating} aria-busy={busy || updating}>
-        {document ? (
-          <TitleBar
-            start={
-              <>
-                <Menu
-                  label={`Document menu: ${title.trim() || 'Untitled'}`}
-                  align="start"
-                  tooltip={false}
-                  triggerClassName="titlebar-title"
-                  trigger={
-                    <>
-                      <span
-                        className="titlebar-title-text"
-                        data-empty={title.trim() ? undefined : ''}
-                      >
-                        {title.trim() || 'Untitled'}
-                      </span>
-                      <ChevronDown size={14} aria-hidden="true" />
-                    </>
-                  }
-                >
-                  <MenuItem
-                    shortcut={keybinds.newDocument}
-                    onSelect={workspace.newTab}
-                    disabled={workspace.working}
-                  >
-                    New document
-                  </MenuItem>
-                  <MenuItem
-                    shortcut={keybinds.openDocument}
-                    onSelect={() => void workspace.open()}
-                    disabled={workspace.working}
-                  >
-                    Open?
-                  </MenuItem>
-                  <MenuItem onSelect={() => workspace.joinTab()} disabled={workspace.working}>
-                    Join session?
-                  </MenuItem>
-                  <MenuSeparator />
-                  <MenuItem
-                    shortcut={keybinds.saveDocument}
-                    disabled={busy || workspace.working}
-                    onSelect={() =>
-                      void workspace.run(async () => {
-                        await workspace.save(tab);
-                      })
-                    }
-                  >
-                    Save
-                  </MenuItem>
-                  <MenuItem
-                    shortcut={keybinds.saveDocumentAs}
-                    disabled={busy || workspace.working}
-                    onSelect={() =>
-                      void workspace.run(async () => {
-                        await workspace.save(tab, true);
-                      })
-                    }
-                  >
-                    Save As?
-                  </MenuItem>
-                  <MenuSeparator />
-                  <MenuItem
-                    icon={<Pencil size={16} aria-hidden="true" />}
-                    onSelect={() => {
-                      const input = window.document.querySelector<HTMLInputElement>(
-                        `#panel-${tab.id} .doc-title`,
-                      );
-                      input?.focus();
-                      input?.select();
-                    }}
-                  >
-                    Rename
-                  </MenuItem>
-                  {!guest && link && (
-                    <MenuItem
-                      icon={<Link size={16} aria-hidden="true" />}
-                      shortcut={keybinds.copyInvite}
-                      onSelect={copyInvite}
-                    >
-                      Copy invite link
-                    </MenuItem>
-                  )}
-                  <MenuSeparator />
-                  <MenuItem
-                    tone="danger"
-                    icon={
-                      guest ? (
-                        <LogOut size={16} aria-hidden="true" />
-                      ) : (
-                        <X size={16} aria-hidden="true" />
-                      )
-                    }
-                    shortcut={keybinds.closeDocument}
-                    disabled={busy}
-                    onSelect={requestLeave}
-                  >
-                    {leaveLabel}
-                  </MenuItem>
-                </Menu>
-                <DocumentStatus state={connection} count={participants.length} />
-              </>
-            }
-            end={
-              <>
-                <PeopleButton
-                  ref={peopleButton}
-                  participants={participants}
-                  waiting={guest ? 0 : pendingGuests.length}
-                  expanded={people}
-                  onToggle={() => togglePeople()}
-                />
-                <IconButton
-                  label={overlayVisible ? 'Hide overlay' : 'Show overlay'}
-                  shortcut={
-                    overlay.state?.hideShortcutAvailable ? keybinds.toggleOverlay : undefined
-                  }
-                  aria-pressed={overlayVisible}
-                  disabled={!overlay.state || busy}
-                  onClick={toggleOverlay}
-                >
-                  {overlayVisible ? (
-                    <Eye size={18} aria-hidden="true" />
-                  ) : (
-                    <EyeOff size={18} aria-hidden="true" />
-                  )}
-                </IconButton>
-                {!guest &&
-                  (link ? (
-                    <div className="split-button">
-                      <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
-                        Share
-                      </Button>
-                      <IconButton
-                        label="Copy invite link"
-                        shortcut={keybinds.copyInvite}
-                        className="split-button-icon"
-                        disabled={busy}
-                        onClick={copyInvite}
-                      >
-                        <Copy size={16} aria-hidden="true" />
-                      </IconButton>
-                    </div>
-                  ) : (
-                    <Button variant="primary" size="sm" disabled={busy} onClick={requestShare}>
-                      Share
-                    </Button>
-                  ))}
-              </>
-            }
-          />
-        ) : (
-          <TitleBar />
-        )}
         <div className="app-banners">
           {document && connection === 'disconnected' && (
             <Banner
@@ -669,25 +642,14 @@ export function AutomaticApp({
           start={
             document ? (
               <>
+                <DocumentStatus state={connection} count={participants.length} />
                 <span className="statusbar-note" title={tab.file?.path}>
-                  {tab.dirty ? 'Unsaved changes' : tab.file ? 'Saved' : 'Not saved to a file'}
+                  {tab.dirty
+                    ? 'Unsaved changes'
+                    : fileName
+                      ? `Saved · ${fileName}`
+                      : 'Not saved to a file'}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={
-                    guest ? (
-                      <LogOut size={14} aria-hidden="true" />
-                    ) : (
-                      <X size={14} aria-hidden="true" />
-                    )
-                  }
-                  disabled={busy}
-                  title={`${leaveLabel} (${keybinds.closeDocument})`}
-                  onClick={requestLeave}
-                >
-                  {leaveLabel}
-                </Button>
               </>
             ) : (
               <span className="statusbar-note">Overlay hidden from compatible screen capture</span>
@@ -696,6 +658,7 @@ export function AutomaticApp({
           end={settingsButton}
         />
         <ToastRegion>
+          {active && toasts}
           {notice && !joinInProgress && (
             <Banner tone="info" className="toast" onDismiss={() => setNotice('')}>
               {notice}
