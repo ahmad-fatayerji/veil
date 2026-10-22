@@ -42,7 +42,7 @@ import {
 import { nativeSignaling } from './networking';
 import type { Workspace, WorkspaceTab } from './workspace';
 import { useUpdateAttention } from './Updates';
-import { readDisplayName, saveDisplayName } from './display-name';
+import { saveDisplayName, useDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
 import { PeopleButton, type ConnectionState } from './shell/TitleBar';
 import { StatusBar } from './shell/StatusBar';
@@ -100,7 +100,7 @@ export function AutomaticApp({
   const [serverTest, setServerTest] = useState('');
   const [testingServer, setTestingServer] = useState(false);
   const [savingServer, setSavingServer] = useState(false);
-  const [name, setName] = useState(readDisplayName);
+  const name = useDisplayName();
   const [invitation, setInvitation] = useState(tab.invitation ?? '');
   const [link, setLink] = useState('');
   const [joinMode, setJoinMode] = useState<JoinMode>('auto');
@@ -155,16 +155,14 @@ export function AutomaticApp({
     },
     [],
   );
-  function updateName(value: string) {
-    saveDisplayName(value);
-    setName(value);
-    const current = documentRef.current;
-    if (current)
-      current.provider.awareness.setLocalStateField('user', {
-        ...current.provider.awareness.getLocalState()?.user,
-        name: value.trim() || 'You',
-      });
-  }
+  // The name may change in another tab, so every open document follows the shared value.
+  useEffect(() => {
+    if (!document) return;
+    const { awareness } = document.provider;
+    const user = awareness.getLocalState()?.user;
+    const shown = name.trim() || 'You';
+    if (user?.name !== shown) awareness.setLocalStateField('user', { ...user, name: shown });
+  }, [document, name]);
   useEffect(() => {
     mounted.current = true;
     let initializing = true;
@@ -659,7 +657,7 @@ export function AutomaticApp({
         ) : !document ? (
           <StartScreen
             name={name}
-            onNameChange={updateName}
+            onNameChange={saveDisplayName}
             invitation={invitation}
             onInvitationChange={setInvitation}
             joinOpen={joinOpen}
@@ -826,7 +824,7 @@ export function AutomaticApp({
           updateAttention={updateAttention}
           onUpdateBusy={onUpdateBusy}
           name={name}
-          onNameChange={updateName}
+          onNameChange={saveDisplayName}
           discord={discord}
           restoreTabs={workspace.restore}
           onRestoreTabsChange={(enabled) => void workspace.configureRestore(enabled)}
@@ -920,7 +918,7 @@ export function AutomaticApp({
           setJoinMode(mode);
         }}
         name={name}
-        onNameChange={updateName}
+        onNameChange={saveDisplayName}
         busy={busy}
         onStart={() => void run(() => share())}
         onCopy={() =>
