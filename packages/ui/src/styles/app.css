@@ -6,8 +6,51 @@
   }
   .desktop-content {
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
     height: 100%;
+  }
+
+  /* Status bar: document lifecycle on the left, Settings in the corner. */
+  .statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-width: 0;
+    height: 40px;
+    /* The frameless window paints its 1px border over the bottom edge; reserve it so the
+       controls sit with whole, equal gaps above and below. */
+    padding: 0 var(--space-2) 1px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .statusbar-start,
+  .statusbar-end {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+  .statusbar-end .icon-btn {
+    width: var(--control-sm);
+    height: var(--control-sm);
+  }
+  .statusbar-start > .statusbar-note:first-child {
+    padding-left: var(--space-2);
+  }
+  .statusbar-note {
+    overflow: hidden;
+    color: var(--fg-muted);
+    font-size: var(--text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .statusbar .btn-ghost {
+    color: var(--fg-muted);
+  }
+  .statusbar .btn-ghost:hover:not(:disabled) {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
   }
 
   /* Title bar ---------------------------------------------------------- */

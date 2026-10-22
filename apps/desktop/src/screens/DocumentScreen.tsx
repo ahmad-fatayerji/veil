@@ -120,7 +120,12 @@ export function DocumentScreen({
                     <span className="people-invite-link" title={link}>
                       {link}
                     </span>
-                    <Button size="sm" disabled={busy} onClick={onCopyLink} aria-label="Copy invite link">
+                    <Button
+                      size="sm"
+                      disabled={busy}
+                      onClick={onCopyLink}
+                      aria-label="Copy invite link"
+                    >
                       Copy
                     </Button>
                   </>

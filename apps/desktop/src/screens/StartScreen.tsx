@@ -178,7 +178,7 @@ export function StartScreen({
               <Textarea
                 ref={invitationInput}
                 id="automatic-invitation"
-                placeholder="veil://join/�"
+                placeholder="veil://join/…"
                 autoComplete="off"
                 rows={2}
                 value={invitation}
@@ -218,7 +218,7 @@ export function StartScreen({
                 loading={busy}
                 disabled={!canJoin}
               >
-                {busy ? 'Connecting�' : 'Join session'}
+                {busy ? 'Connecting…' : 'Join session'}
               </Button>
             </div>
           </form>

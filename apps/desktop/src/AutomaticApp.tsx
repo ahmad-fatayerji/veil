@@ -2,17 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { listen } from '@tauri-apps/api/event';
-import {
-  ChevronDown,
-  Copy,
-  Eye,
-  EyeOff,
-  Link,
-  LogOut,
-  Pencil,
-  Settings,
-  X,
-} from 'lucide-react';
+import { ChevronDown, Copy, Eye, EyeOff, Link, LogOut, Pencil, Settings, X } from 'lucide-react';
 import {
   createPeerSession,
   joinShareLink,
@@ -44,6 +34,7 @@ import { useUpdateAttention } from './Updates';
 import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
 import { DocumentStatus, PeopleButton, TitleBar, type ConnectionState } from './shell/TitleBar';
+import { StatusBar } from './shell/StatusBar';
 import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
@@ -544,12 +535,11 @@ export function AutomaticApp() {
                       Share
                     </Button>
                   ))}
-                {settingsButton}
               </>
             }
           />
         ) : (
-          <TitleBar end={settingsButton} />
+          <TitleBar />
         )}
         <div className="app-banners">
           {document && connection === 'disconnected' && (
@@ -616,6 +606,33 @@ export function AutomaticApp() {
             onShare={requestShare}
           />
         )}
+        <StatusBar
+          start={
+            document ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={
+                    guest ? (
+                      <LogOut size={14} aria-hidden="true" />
+                    ) : (
+                      <X size={14} aria-hidden="true" />
+                    )
+                  }
+                  disabled={busy}
+                  title={`${leaveLabel} (Ctrl+W)`}
+                  onClick={requestLeave}
+                >
+                  {leaveLabel}
+                </Button>
+              </>
+            ) : (
+              <span className="statusbar-note">Overlay hidden from compatible screen capture</span>
+            )
+          }
+          end={settingsButton}
+        />
         <ToastRegion>
           {notice && !joinInProgress && (
             <Banner tone="info" className="toast" onDismiss={() => setNotice('')}>
