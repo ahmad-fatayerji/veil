@@ -20,7 +20,8 @@ Manual acceptance on Windows with Discord activity sharing enabled:
 
 1. Start with fresh preferences and confirm all three switches default on. With
    no document open, confirm "No document open". Create a document, rename it,
-   and confirm its title and solo editing message appear.
+   and confirm "Document: <title>" and "Editing solo" appear. With guests, the
+   second line should say "Editing with 1 other" / "Editing with X others".
 2. Connect one guest and then another. Confirm "1 other" and "2 others", excluding
    yourself. Pending approval requests must not change the count; departures
    must update it. Rename the document from the other client.

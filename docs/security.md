@@ -30,7 +30,7 @@ or durable recovery after quitting.
 
 Discord Rich Presence is enabled by default in the Windows desktop app. When
 Discord is running and activity sharing is allowed in Discord, Veil shares the
-current document title and how many other participants are connected. Solo
+current document title (labeled "Document: ...") and how many other participants are connected. Solo
 documents show a solo editing message; without a document it shows "No document
 open". Pending join requests are excluded from the count.
 

@@ -68,15 +68,15 @@ fn display(preferences: Preferences, activity: &Activity) -> DisplayActivity {
     };
     DisplayActivity {
         details: if preferences.show_document_title {
-            title(document_title)
+            title(&format!("Document: {}", title(document_title)))
         } else {
             "Editing a document".into()
         },
         state: preferences.show_participant_count.then(|| {
             match (preferences.show_document_title, activity.others_count) {
-                (true, 0) => "Editing a document solo".into(),
-                (true, 1) => "Editing a document with 1 other".into(),
-                (true, count) => format!("Editing a document with {count} others"),
+                (true, 0) => "Editing solo".into(),
+                (true, 1) => "Editing with 1 other".into(),
+                (true, count) => format!("Editing with {count} others"),
                 (false, 0) => "Solo".into(),
                 (false, 1) => "With 1 other".into(),
                 (false, count) => format!("With {count} others"),
@@ -333,7 +333,7 @@ mod tests {
                         assert_eq!(
                             rendered.state.as_deref(),
                             Some(if show_document_title {
-                                "Editing a document with 7 others"
+                                "Editing with 7 others"
                             } else {
                                 "With 7 others"
                             })
@@ -350,9 +350,9 @@ mod tests {
     #[test]
     fn participant_wording_and_title_limits() {
         for (count, expected) in [
-            (0, "Editing a document solo"),
-            (1, "Editing a document with 1 other"),
-            (2, "Editing a document with 2 others"),
+            (0, "Editing solo"),
+            (1, "Editing with 1 other"),
+            (2, "Editing with 2 others"),
         ] {
             let rendered = display(
                 Preferences::default(),
@@ -361,7 +361,7 @@ mod tests {
                     others_count: count,
                 },
             );
-            assert_eq!(rendered.details, "Untitled document");
+            assert_eq!(rendered.details, "Document: Untitled document");
             assert_eq!(rendered.state.as_deref(), Some(expected));
         }
         let long = format!("a{}", "📝".repeat(100));
@@ -369,6 +369,24 @@ mod tests {
         assert!(shortened.len() <= 128);
         assert!(long.starts_with(&shortened));
         assert_eq!(title("\n Meeting\t notes \r"), "Meeting notes");
+        let labeled = display(
+            Preferences::default(),
+            &Activity {
+                document_title: Some(long),
+                others_count: 2,
+            },
+        );
+        assert!(labeled.details.starts_with("Document: a"));
+        assert!(labeled.details.len() <= 128);
+        let named = display(
+            Preferences::default(),
+            &Activity {
+                document_title: Some("My notes".into()),
+                others_count: 1,
+            },
+        );
+        assert_eq!(named.details, "Document: My notes");
+        assert_eq!(named.state.as_deref(), Some("Editing with 1 other"));
     }
 
     #[test]
