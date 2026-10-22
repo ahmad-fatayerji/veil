@@ -3,10 +3,12 @@ import { createRoot } from 'react-dom/client';
 import '@veil/ui/styles.css';
 import './overlay/styles.css';
 import { applyAppearance } from '@veil/ui/appearance';
+import { syncThemeIcon } from './theme-icon';
 
 applyAppearance();
 const isOverlay = new URLSearchParams(window.location.search).has('overlay');
 if (isOverlay) document.documentElement.classList.add('overlay-mode');
+else syncThemeIcon();
 
 // Each webview loads its own surface without evaluating the other window's app.
 const App = lazy(() =>
