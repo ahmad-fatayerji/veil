@@ -69,7 +69,7 @@ Open multiple documents in tabs; each tab can host or join its own session. Swit
 
 ### Invite your people
 
-The host needs a [self-hosted Veil server](https://github.com/ahmad-fatayerji/veil-server) with HTTPS and an operator-issued host credential. Configure it under **Settings → Hosting server**, then choose **Share → Copy link** and send the link to your guests.
+The host needs a [self-hosted Veil server](https://github.com/ahmad-fatayerji/veil-server) with HTTPS and an operator-issued host credential. Configure it under **Settings → Sharing → Hosting server**, then choose **Share → Copy link** and send the link to your guests.
 
 Guests install Veil, open the link (or paste it into **Join session**), enter a name, and join. They don't need to configure a server. Keep the host app open for the session to continue.
 

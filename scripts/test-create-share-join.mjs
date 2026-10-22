@@ -283,7 +283,7 @@ try {
   await other.getByRole('textbox', { name: 'Shared document' }).press('Control+End');
   await other.keyboard.insertText(' After sharing stopped.');
   await expect(editor).toContainText('After sharing stopped.');
-  dialog = await settings(host, 'Hosting server');
+  dialog = await settings(host, 'Sharing');
   await dialog.getByLabel('Host access credential').fill('a'.repeat(64));
   await dialog.getByRole('button', { name: 'Save settings', exact: true }).click();
   await expect(dialog.locator('form').getByRole('status')).toContainText(
@@ -310,7 +310,7 @@ try {
   );
   await dialog.getByRole('button', { name: 'Close Settings' }).click();
   await expect(editor).toContainText('After sharing stopped.');
-  dialog = await settings(host, 'Appearance');
+  dialog = await settings(host, 'General');
   await dialog.getByRole('radio', { name: 'Dark', exact: true }).click();
   await dialog.getByRole('button', { name: 'Close Settings' }).click();
   await screenshot(host, 'workspace-dark');

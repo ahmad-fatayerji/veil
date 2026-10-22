@@ -79,9 +79,7 @@
     border-top: 1px solid var(--border);
   }
   .overlay-formatting-row {
-    grid-column: 1 / -1;
     flex-wrap: wrap;
-    border-top: 1px solid var(--border);
   }
   /* Sits on the divider between the two sliders; the solid fill masks the line behind it. */
   .overlay-link-toggle {

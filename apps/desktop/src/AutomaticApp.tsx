@@ -299,7 +299,7 @@ export function AutomaticApp({
     if (!configuredServer) {
       setShareOpen(false);
       setResumeShare(true);
-      openSettings('Hosting server');
+      openSettings('Sharing');
       return;
     }
     if (network.current?.sessionEnded)
@@ -468,7 +468,7 @@ export function AutomaticApp({
       className="desktop-settings-button"
       attention={updateAttention}
       aria-description={updateAttention ? 'Update requires attention' : undefined}
-      onClick={() => openSettings(updateAttention ? 'Updates' : 'General')}
+      onClick={() => openSettings(updateAttention ? 'About & updates' : 'General')}
     >
       <Settings size={18} aria-hidden="true" />
     </IconButton>
@@ -706,7 +706,7 @@ export function AutomaticApp({
               onDismiss={() => setError('')}
               actions={
                 /protocol|update/i.test(error) && (
-                  <Button size="sm" variant="ghost" onClick={() => openSettings('Updates')}>
+                  <Button size="sm" variant="ghost" onClick={() => openSettings('About & updates')}>
                     Open updates
                   </Button>
                 )

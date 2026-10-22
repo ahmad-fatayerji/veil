@@ -232,6 +232,13 @@ export function OverlayControls({ settingsOnly = false }: { settingsOnly?: boole
                   onChange={(event) => range({ fontSize: Number(event.target.value) })}
                 />
               </RangeRow>
+            </div>
+          </section>
+          <section className="overlay-setting-group" aria-labelledby="overlay-editing-heading">
+            <div className="overlay-group-heading">
+              <h4 id="overlay-editing-heading">Editing</h4>
+            </div>
+            <div className="settings-card">
               <div className="setting-row overlay-formatting-row">
                 <span className="setting-row-text">
                   <span className="setting-row-label">Formatting controls</span>

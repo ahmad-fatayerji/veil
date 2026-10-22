@@ -132,7 +132,7 @@ async function launch() {
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page
       .getByRole('navigation', { name: 'Settings sections' })
-      .getByRole('button', { name: 'Updates', exact: true })
+      .getByRole('button', { name: 'About & updates', exact: true })
       .click();
   }
   await page.getByLabel('Update channel').waitFor();
