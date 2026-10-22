@@ -211,7 +211,10 @@ fn apply(
     Ok(())
 }
 
-pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+pub fn setup(
+    app: &mut tauri::App,
+    background_launch: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let directory = app.path().app_config_dir()?;
     // Native acceptance tests isolate preferences from the user's device settings.
     #[cfg(debug_assertions)]
@@ -226,6 +229,10 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             Some("Saved overlay settings could not be read. Defaults were restored.".to_owned()),
         ),
     };
+    // Sign-in launches stay quiet even if the previous run saved a visible overlay.
+    if background_launch {
+        preferences.visible = false;
+    }
     let capabilities = platform::capabilities();
     let model = Arc::new(Mutex::new(Snapshot {
         settings: preferences.clone(),
