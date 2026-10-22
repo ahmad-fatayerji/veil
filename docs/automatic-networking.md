@@ -2,9 +2,9 @@
 
 The approved P2 flow replaces manual offer/answer and LAN/browser choices in the
 normal desktop app. Install Veil on each Windows PC. Until another server is saved,
-Settings > Sharing > Hosting server suggests Veil's public server
-(`https://veil.ahmadfatayerji.com`), which offers bounded public hosting without a
-credential. Settings explains its limits (up to five guests per document, a few
+Settings > Sharing > Hosting server suggests our own public servers
+(`https://veil.ahmadfatayerji.com`), which offer bounded public hosting without a
+credential. Settings explains their limits (up to five guests per document, a few
 sessions per connection, limited relay, no availability guarantee) and recommends
 self-hosting [veil-server](https://github.com/ahmad-fatayerji/veil-server) or using
 another server for reliable or larger sessions. An operator of another server gives
