@@ -279,6 +279,49 @@
   .share-button[data-sharing] {
     color: var(--accent);
   }
+  /* Home status bar: live overlay state, opening its settings on click. */
+  .statusbar-overlay {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    height: 28px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--fg-muted);
+    font: inherit;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+  .statusbar-overlay:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+  .statusbar-overlay-dot {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid var(--fg-muted);
+    border-radius: var(--radius-full);
+  }
+  .statusbar-overlay[data-shown] .statusbar-overlay-dot {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .statusbar-overlay-capture {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .statusbar-overlay[data-problem] .statusbar-overlay-capture {
+    color: var(--danger);
+  }
+  .statusbar-overlay .kbd {
+    height: 18px;
+    margin-left: var(--space-1);
+    background: transparent;
+  }
   /* Connection status reads as plain status-bar text; colour appears only for problems. */
   .statusbar-connection {
     display: inline-flex;

@@ -46,6 +46,7 @@ import { readDisplayName, saveDisplayName } from './display-name';
 import { errorMessage, invoke, useOverlay, type OverlaySnapshot } from './overlay/api';
 import { PeopleButton, type ConnectionState } from './shell/TitleBar';
 import { StatusBar } from './shell/StatusBar';
+import { OverlayStatus } from './shell/OverlayStatus';
 import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
@@ -685,8 +686,8 @@ export function AutomaticApp({
                       : 'Not saved to a file'}
                 </span>
               </>
-            ) : opening ? null : (
-              <span className="statusbar-note">Overlay hidden from compatible screen capture</span>
+            ) : opening || !overlay.state ? null : (
+              <OverlayStatus state={overlay.state} onOpen={() => openSettings('Overlay')} />
             )
           }
           end={settingsButton}
