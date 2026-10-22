@@ -496,6 +496,22 @@ export class AutomaticSession {
     this.output = operation.catch(() => {});
     return operation;
   }
+  /** Sends the guest's join request to the host until the host links back. */
+  private async sendJoinRequest() {
+    if (!this.groupGuestId || this.links.has(this.groupGuestId)) return;
+    await this.bootstrapSend(this.groupGuestId, {
+      kind: 'handshake',
+      clientId: this.session.doc.clientID,
+      name: this.name.trim().slice(0, 80),
+    });
+  }
+  /** Uses a new display name, and resends a join request the host may still be deciding on. */
+  rename(name: string) {
+    if (name === this.name) return;
+    this.name = name;
+    // Hosts already replace a pending guest's name when the request arrives again.
+    if (this.role === 'guest' && this.socketOnline) void this.sendJoinRequest().catch(() => {});
+  }
   private async admitGroup(message: Record<string, unknown>) {
     const id = identity(message.inviteId),
       groupId = identity(message.groupId);
@@ -883,12 +899,7 @@ export class AutomaticSession {
       return;
     }
     if (message.kind === 'ready') {
-      if (this.groupGuestId && !this.links.has(this.groupGuestId))
-        await this.bootstrapSend(this.groupGuestId, {
-          kind: 'handshake',
-          clientId: this.session.doc.clientID,
-          name: this.name.trim().slice(0, 80),
-        });
+      await this.sendJoinRequest();
       if (this.role === 'guest')
         for (const link of this.links.values())
           await this.send(link, { kind: 'request', clientId: this.session.doc.clientID });
@@ -1424,10 +1435,12 @@ export async function joinAutomatic(
   notice: (message: string) => void,
   development = false,
   signal?: AbortSignal,
+  started?: (session: AutomaticSession) => void,
 ) {
   if (signal?.aborted) throw new Error('Joining cancelled.');
   const invite = decodeServerInvitation(code.trim(), development);
   const current = new AutomaticSession('guest', invite.server, name, transport, notice);
+  started?.(current);
   const abort = () => {
     void current.close().catch(() => {});
   };
@@ -1484,9 +1497,11 @@ export async function joinShareLink(
   notice: (message: string) => void,
   development = false,
   signal?: AbortSignal,
+  /** Receives the session before the host admits it, so a rename can reach the request. */
+  started?: (session: AutomaticSession) => void,
 ) {
   if (!code.trim().startsWith('veil://'))
-    return joinAutomatic(code, name, transport, notice, development, signal);
+    return joinAutomatic(code, name, transport, notice, development, signal, started);
   if (signal?.aborted) throw new Error('Joining cancelled.');
   const parsed = parseShareLink(code, development);
   const short = 'code' in parsed;
@@ -1507,6 +1522,7 @@ export async function joinShareLink(
   } else invite = parsed;
   if (signal?.aborted) throw new Error('Joining cancelled.');
   const current = new AutomaticSession('guest', invite.server, name, transport, notice);
+  started?.(current);
   const abort = () => {
     void current.close().catch(() => {});
   };

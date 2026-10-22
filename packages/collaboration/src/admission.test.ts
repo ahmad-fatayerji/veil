@@ -103,11 +103,11 @@ async function fixture() {
           clientId,
           guestPublic: exchange.publicKey,
         }),
-      hello: async () =>
+      hello: async (name = 'Alex') =>
         receive({
           kind: 'signal',
           envelope: {
-            ...(await cipher.seal('guest', 0, { kind: 'handshake', clientId, name: 'Alex' })),
+            ...(await cipher.seal('guest', 0, { kind: 'handshake', clientId, name })),
             bootstrap: true,
           },
         }),
@@ -162,6 +162,18 @@ it('withholds the signed handshake until approval and preserves pending decision
   await verifyHandshake(f.group, handshake!.handshake, handshake!.signature);
   expect(f.host.pendingGuests).toEqual([]);
   expect(f.host.sharedLink).toBe(f.originalLink);
+});
+it('shows the latest name when a waiting guest resends the join request', async () => {
+  const f = await fixture();
+  f.host.setJoinMode('approval');
+  const id = '9'.repeat(32);
+  const guest = await f.guest(id);
+  await guest.hello();
+  await vi.waitFor(() => expect(f.host.pendingGuests[0].name).toBe('Alex'));
+  await guest.hello('Sam');
+  await vi.waitFor(() => expect(f.host.pendingGuests[0].name).toBe('Sam'));
+  expect(f.host.pendingGuests).toHaveLength(1);
+  expect(f.decisions).toEqual([]);
 });
 it('automatically approves new requests in auto mode without creating a peer before the guest handshake', async () => {
   const f = await fixture();
