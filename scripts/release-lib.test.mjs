@@ -4,9 +4,11 @@ import {
   assertBranchPolicy,
   assertGate,
   assertPublication,
+  feedOnlyDrift,
   nextBeta,
   proposeVersion,
   releaseNotes,
+  requestedVersion,
   shouldAdvanceFeed,
 } from './release-lib.mjs';
 
@@ -93,4 +95,20 @@ test('publication rejects arbitrary branches and mismatched provenance', () => {
     branch: 'release/0.2.0',
     candidate: { ...input.candidate, branch: 'release/0.2.0' },
   });
+});
+
+test('an explicit release version must be stable, newer and fit the release type', () => {
+  assert.equal(requestedVersion('1.0.0', '0.7.2'), '1.0.0');
+  assert.equal(requestedVersion('0.7.3', '0.7.2', true), '0.7.3');
+  assert.throws(() => requestedVersion('1.0.0-beta.1', '0.7.2'), /stable version/);
+  assert.throws(() => requestedVersion('v1.0.0', '0.7.2'), /stable version/);
+  assert.throws(() => requestedVersion('0.7.2', '0.7.2'), /newer/);
+  assert.throws(() => requestedVersion('0.8.0', '0.7.2', true), /next patch/);
+});
+
+test('only update-feed commits on main may skip the pre-release back-merge', () => {
+  assert.equal(feedOnlyDrift(['updates/beta.json']), true);
+  assert.equal(feedOnlyDrift(['updates/beta.json', 'updates/stable.json', '']), true);
+  assert.equal(feedOnlyDrift(['updates/beta.json', '.release/baseline.json']), false);
+  assert.equal(feedOnlyDrift(['']), false);
 });

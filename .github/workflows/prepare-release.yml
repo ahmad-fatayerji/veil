@@ -7,6 +7,16 @@ on:
         default: develop
         required: true
         type: string
+      version:
+        description: Optional stable version to release instead of the proposal, e.g. 1.0.0
+        default: ''
+        required: false
+        type: string
+      retire:
+        description: Close an open release candidate instead of failing, then prepare a new one
+        default: false
+        required: false
+        type: boolean
 permissions:
   contents: write
   pull-requests: write
@@ -35,6 +45,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE: ${{ inputs.source }}
+          TARGET_VERSION: ${{ inputs.version }}
+          RETIRE_EXISTING: ${{ inputs.retire }}
         run: node scripts/gitflow.mjs prepare "$SOURCE"
       - name: Explicitly dispatch validation
         env:
