@@ -26,6 +26,7 @@ import { KeybindSettings } from './KeybindSettings';
 import { OverlayControls } from '../overlay/Controls';
 import { Updates } from '../Updates';
 import type { useDiscordPresence } from '../discord';
+import { useWindowsStartup } from '../startup';
 
 export type Section =
   'General' | 'Appearance' | 'Hosting server' | 'Overlay' | 'Keybinds' | 'Updates' | 'About';
@@ -97,6 +98,7 @@ export function SettingsDialog({
   error: string;
   onOpenUrl: (url: string) => void;
 }) {
+  const startup = useWindowsStartup(open);
   return (
     <Dialog
       open={open}
@@ -148,6 +150,21 @@ export function SettingsDialog({
                   onChange={(event) => onNameChange(event.target.value)}
                 />
               </SettingRow>
+              {startup.status?.supported && (
+                <SettingRow
+                  label="Start Veil with Windows"
+                  htmlFor="windows-startup"
+                  description="Launch quietly in the system tray when you sign in."
+                >
+                  <Switch
+                    id="windows-startup"
+                    checked={startup.status.enabled}
+                    disabled={startup.loading || startup.saving || updating}
+                    aria-describedby={startup.error ? 'windows-startup-error' : undefined}
+                    onChange={(event) => void startup.configure(event.target.checked)}
+                  />
+                </SettingRow>
+              )}
               <SettingRow
                 label="When closing the main window"
                 htmlFor="close-behavior"
@@ -164,6 +181,11 @@ export function SettingsDialog({
                 </Select>
               </SettingRow>
             </div>
+            {startup.error && (
+              <p id="windows-startup-error" className="error" role="alert">
+                {startup.error}
+              </p>
+            )}
             <p>You can also reopen Veil, show or hide the overlay, or quit from the tray menu.</p>
             <div className="settings-card">
               <SettingRow

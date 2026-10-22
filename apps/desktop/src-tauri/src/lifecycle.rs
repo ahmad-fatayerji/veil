@@ -37,7 +37,7 @@ pub fn quit_immediately(app: &AppHandle) {
     });
 }
 
-fn show_main(app: &AppHandle) -> tauri::Result<()> {
+pub(crate) fn show_main(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window("main") {
         window.show()?;
         window.unminimize()?;
