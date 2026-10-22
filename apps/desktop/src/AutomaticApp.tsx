@@ -39,6 +39,7 @@ import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
 import { ShareDialog } from './dialogs/ShareDialog';
+import { defaultKeybinds, matchesShortcut } from './keybinds';
 import { useDiscordPresence } from './discord';
 
 export function AutomaticApp() {
@@ -78,11 +79,13 @@ export function AutomaticApp() {
   const [resumeShare, setResumeShare] = useState(false);
   const [pendingLink, setPendingLink] = useState('');
   const [confirmExit, setConfirmExit] = useState(false);
+  const [startAfterLeave, setStartAfterLeave] = useState<'new' | 'join' | null>(null);
   const [updating, setUpdating] = useState(false);
   const [connected, setConnected] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
   const { appearance, setAppearance } = useAppearance();
   const overlay = useOverlay();
+  const keybinds = overlay.state?.settings.keybinds ?? defaultKeybinds;
   const participants = useParticipants(document);
   const title = useDocumentTitle(document?.doc);
   const discord = useDiscordPresence(
@@ -362,7 +365,25 @@ export function AutomaticApp() {
       setPeople(false);
     }
   }
+  async function openStartAction(action: 'new' | 'join') {
+    if (documentRef.current) await leave();
+    setStartAfterLeave(null);
+    if (action === 'new') await create();
+    else setJoinOpen(true);
+  }
+  function requestStartAction(action: 'new' | 'join') {
+    if (document) {
+      // Switching documents must never silently discard temporary content or peers.
+      setStartAfterLeave(action);
+      setConfirmExit(true);
+    } else void run(() => openStartAction(action));
+  }
+  function cancelLeave() {
+    setStartAfterLeave(null);
+    setConfirmExit(false);
+  }
   function requestLeave() {
+    setStartAfterLeave(null);
     if (document && hasDocumentContent(document)) setConfirmExit(true);
     else void run(leave);
   }
@@ -393,20 +414,39 @@ export function AutomaticApp() {
     });
   }
   useEffect(() => {
-    if (!document || busy || updating) return;
+    if (
+      busy ||
+      updating ||
+      settings ||
+      shareOpen ||
+      confirmExit ||
+      compatibilityPrompt ||
+      pendingLink
+    )
+      return;
     const onKey = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-      const key = event.key.toLowerCase();
-      if (key === 'w' && !event.shiftKey) {
+      if (window.document.querySelector('dialog[open]')) return;
+      if (matchesShortcut(event, keybinds.newDocument)) {
         event.preventDefault();
+        event.stopPropagation();
+        requestStartAction('new');
+      } else if (matchesShortcut(event, keybinds.joinDocument)) {
+        event.preventDefault();
+        event.stopPropagation();
+        requestStartAction('join');
+      } else if (document && matchesShortcut(event, keybinds.closeDocument)) {
+        event.preventDefault();
+        event.stopPropagation();
         requestLeave();
-      } else if (key === 'c' && event.shiftKey && !guest && link) {
+      } else if (document && matchesShortcut(event, keybinds.copyInvite) && !guest && link) {
         event.preventDefault();
+        event.stopPropagation();
         copyInvite();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // App bindings take priority over editor shortcuts, which can consume bubbling events.
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   });
   const connection: ConnectionState = !session
     ? 'local'
@@ -471,7 +511,7 @@ export function AutomaticApp() {
                   {!guest && link && (
                     <MenuItem
                       icon={<Link size={16} aria-hidden="true" />}
-                      shortcut="Ctrl+Shift+C"
+                      shortcut={keybinds.copyInvite}
                       onSelect={copyInvite}
                     >
                       Copy invite link
@@ -487,7 +527,7 @@ export function AutomaticApp() {
                         <X size={16} aria-hidden="true" />
                       )
                     }
-                    shortcut="Ctrl+W"
+                    shortcut={keybinds.closeDocument}
                     disabled={busy}
                     onSelect={requestLeave}
                   >
@@ -508,7 +548,9 @@ export function AutomaticApp() {
                 />
                 <IconButton
                   label={overlayVisible ? 'Hide overlay' : 'Show overlay'}
-                  shortcut={overlay.state?.hideShortcutAvailable ? 'Ctrl+Alt+Shift+V' : undefined}
+                  shortcut={
+                    overlay.state?.hideShortcutAvailable ? keybinds.toggleOverlay : undefined
+                  }
                   aria-pressed={overlayVisible}
                   disabled={!overlay.state || busy}
                   onClick={toggleOverlay}
@@ -527,7 +569,7 @@ export function AutomaticApp() {
                       </Button>
                       <IconButton
                         label="Copy invite link"
-                        shortcut="Ctrl+Shift+C"
+                        shortcut={keybinds.copyInvite}
                         className="split-button-icon"
                         disabled={busy}
                         onClick={copyInvite}
@@ -571,6 +613,8 @@ export function AutomaticApp() {
         </div>
         {!document ? (
           <StartScreen
+            keybinds={keybinds}
+            shortcutsDisabled={settings || updating || !!compatibilityPrompt || !!pendingLink}
             name={name}
             onNameChange={updateName}
             invitation={invitation}
@@ -626,7 +670,7 @@ export function AutomaticApp() {
                     )
                   }
                   disabled={busy}
-                  title={`${leaveLabel} (Ctrl+W)`}
+                  title={`${leaveLabel} (${keybinds.closeDocument})`}
                   onClick={requestLeave}
                 >
                   {leaveLabel}
@@ -799,18 +843,34 @@ export function AutomaticApp() {
       />
       <Dialog
         open={confirmExit}
-        title={`${leaveLabel}?`}
+        title={
+          startAfterLeave === 'join'
+            ? 'Join another document?'
+            : startAfterLeave === 'new'
+              ? 'Start a new document?'
+              : `${leaveLabel}?`
+        }
         dismissOnBackdrop
-        onClose={() => setConfirmExit(false)}
+        onClose={cancelLeave}
       >
         <p>
           This document is temporary. Copy any text you want to keep before{' '}
           {guest ? 'leaving' : 'closing'}. {!guest && session && 'Everyone will be disconnected.'}
         </p>
         <div className="dialog-actions">
-          <Button onClick={() => setConfirmExit(false)}>Cancel</Button>
-          <Button variant="danger" disabled={busy} onClick={() => void run(leave)}>
-            {leaveLabel}
+          <Button onClick={cancelLeave}>Cancel</Button>
+          <Button
+            variant="danger"
+            disabled={busy}
+            onClick={() =>
+              void run(() => (startAfterLeave ? openStartAction(startAfterLeave) : leave()))
+            }
+          >
+            {startAfterLeave === 'join'
+              ? `${leaveLabel} and open join form`
+              : startAfterLeave === 'new'
+                ? `${leaveLabel} and create new`
+                : leaveLabel}
           </Button>
         </div>
       </Dialog>

@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app_icon;
+#[cfg(windows)]
+mod browser_shortcuts;
 mod discord;
 mod hosting;
 mod lifecycle;
@@ -13,6 +15,10 @@ use tauri::Manager;
 fn main() {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let mut builder = tauri::Builder::default();
+    #[cfg(windows)]
+    {
+        builder = builder.plugin(browser_shortcuts::init());
+    }
     // Acceptance runs intentionally use independent app profiles. Production is
     // one instance, so invitations cannot silently create a second document.
     if !(cfg!(debug_assertions)
