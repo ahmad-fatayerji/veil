@@ -12,6 +12,8 @@ import {
   SegmentedControl,
   Select,
   Switch,
+  accents,
+  type Accent,
   type Appearance,
 } from '@veil/ui';
 import { SettingRow, SettingsGroup } from './SettingRow';
@@ -31,6 +33,52 @@ const sections: { id: Section; icon: typeof Monitor }[] = [
   { id: 'About & updates', icon: Info },
 ];
 const updatesSection: Section = 'About & updates';
+
+const accentNames: Record<Accent, string> = {
+  blue: 'Blue',
+  purple: 'Purple',
+  pink: 'Pink',
+  orange: 'Orange',
+  green: 'Green',
+  teal: 'Teal',
+  graphite: 'Graphite',
+};
+
+/** Color swatches with radio semantics; each previews its accent through the shared tokens. */
+function AccentPicker({ value, onChange }: { value: Accent; onChange: (value: Accent) => void }) {
+  const group = useRef<HTMLDivElement>(null);
+  return (
+    <div
+      ref={group}
+      className="accent-picker"
+      role="radiogroup"
+      aria-label="Accent color"
+      onKeyDown={(event) => {
+        const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        const next = (accents.indexOf(value) + step + accents.length) % accents.length;
+        onChange(accents[next]);
+        group.current?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
+      }}
+    >
+      {accents.map((accent) => (
+        <button
+          key={accent}
+          type="button"
+          role="radio"
+          className="accent-swatch"
+          data-accent={accent}
+          aria-checked={accent === value}
+          aria-label={accentNames[accent]}
+          title={accentNames[accent]}
+          tabIndex={accent === value ? 0 : -1}
+          onClick={() => onChange(accent)}
+        />
+      ))}
+    </div>
+  );
+}
 
 export type HostingForm = {
   server: string;
@@ -67,6 +115,8 @@ export function SettingsDialog({
   onCloseBehaviorChange,
   appearance,
   onAppearanceChange,
+  accent,
+  onAccentChange,
   hosting,
   notice,
   error,
@@ -91,6 +141,8 @@ export function SettingsDialog({
   onCloseBehaviorChange: (value: string) => void;
   appearance: Appearance;
   onAppearanceChange: (value: Appearance) => void;
+  accent: Accent;
+  onAccentChange: (value: Accent) => void;
   hosting: HostingForm;
   notice: string;
   error: string;
@@ -172,6 +224,12 @@ export function SettingsDialog({
                       { value: 'dark', label: 'Dark' },
                     ]}
                   />
+                </SettingRow>
+                <SettingRow
+                  label="Accent color"
+                  description="Used for buttons, highlights and selections in both windows."
+                >
+                  <AccentPicker value={accent} onChange={onAccentChange} />
                 </SettingRow>
               </div>
             </SettingsGroup>

@@ -118,7 +118,7 @@ export function AutomaticApp({
   const [updating, setUpdating] = useState(false);
   const [connected, setConnected] = useState(false);
   const [serviceOnline, setServiceOnline] = useState(false);
-  const { appearance, setAppearance } = appearanceSettings;
+  const { appearance, setAppearance, accent, setAccent } = appearanceSettings;
   const overlay = useOverlay();
   const keybinds = overlay.state?.settings.keybinds ?? defaultKeybinds;
   const participants = useParticipants(document);
@@ -763,6 +763,8 @@ export function AutomaticApp({
           }
           appearance={appearance}
           onAppearanceChange={setAppearance}
+          accent={accent}
+          onAccentChange={setAccent}
           hosting={{
             server,
             credential,
