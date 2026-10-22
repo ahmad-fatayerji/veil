@@ -7,6 +7,8 @@ import { invoke } from './overlay/api';
 import { Workspace } from './workspace';
 
 vi.mock('./AutomaticApp', () => ({ AutomaticApp: () => null }));
+// The UI package reads `window` on import; these tests exercise only the Workspace model.
+vi.mock('@veil/ui', () => ({}));
 vi.mock('./overlay/session', () => ({
   SessionBridge: () => null,
   flushOverlay: vi.fn(async () => {}),

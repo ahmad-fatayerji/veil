@@ -157,6 +157,12 @@
   .document-editor strong {
     font-weight: var(--weight-semibold);
   }
+  /* Segoe UI Variable has no italic face and the app disables font synthesis, so emphasis
+     must opt back in to a synthesized slant or it renders upright. */
+  .document-editor em {
+    font-style: italic;
+    font-synthesis-style: auto;
+  }
   .document-editor :is(ul, ol) {
     padding-left: 1.5em;
   }

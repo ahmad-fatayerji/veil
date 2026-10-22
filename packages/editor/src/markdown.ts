@@ -40,6 +40,12 @@ const deeperHeadings = Extension.create({
       helpers.parseInline(token.tokens || []),
     );
   },
+  // The serializer resolves a node's renderer through the first handler registered for its
+  // token name, which is this override; without a renderer every heading would save empty.
+  renderMarkdown(node, helpers) {
+    if (!node.content) return '';
+    return `${'#'.repeat(Number(node.attrs?.level) || 1)} ${helpers.renderChildren(node.content)}`;
+  },
 });
 const inlineHtml = Extension.create({
   name: 'literalInlineHtml',
