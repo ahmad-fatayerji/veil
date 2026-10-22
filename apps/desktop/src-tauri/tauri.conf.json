@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Veil",
-  "version": "0.7.2",
+  "version": "1.0.0",
   "identifier": "veil",
   "build": {
     "beforeDevCommand": "pnpm --filter @veil/web build && pnpm dev",

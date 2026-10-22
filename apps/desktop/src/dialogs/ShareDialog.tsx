@@ -1,6 +1,7 @@
 import { Copy, RefreshCw } from 'lucide-react';
 import type { JoinMode } from '@veil/collaboration';
 import { Banner, Button, Dialog, Field, Input, SegmentedControl } from '@veil/ui';
+import { HostingChoice, type HostingForm } from './HostingChoice';
 
 export function ShareDialog({
   open,
@@ -12,6 +13,11 @@ export function ShareDialog({
   name,
   onNameChange,
   busy,
+  hosting,
+  chooseHosting,
+  hostingSummary,
+  onChangeHosting,
+  onSelfHosting,
   onStart,
   onCopy,
   onReset,
@@ -30,6 +36,12 @@ export function ShareDialog({
   name: string;
   onNameChange: (value: string) => void;
   busy: boolean;
+  hosting: HostingForm;
+  /** Ask where to host before the first invitation, instead of naming the saved server. */
+  chooseHosting: boolean;
+  hostingSummary: string;
+  onChangeHosting: () => void;
+  onSelfHosting: () => void;
   onStart: () => void;
   onCopy: () => void;
   onReset: () => void;
@@ -68,9 +80,33 @@ export function ShareDialog({
               onChange={(event) => onNameChange(event.target.value)}
             />
           </Field>
+          {chooseHosting ? (
+            <div className="field">
+              <span className="field-label">Where to host</span>
+              <HostingChoice
+                id="share"
+                hosting={hosting}
+                busy={busy}
+                onSelfHosting={onSelfHosting}
+              />
+              <p className="field-hint">You can change this anytime in Settings.</p>
+            </div>
+          ) : (
+            <p className="share-hosting">
+              Hosted on <strong>{hostingSummary}</strong>
+              <button type="button" className="text-link" disabled={busy} onClick={onChangeHosting}>
+                Change
+              </button>
+            </p>
+          )}
           <div className="dialog-actions">
             <Button onClick={onClose}>Cancel</Button>
-            <Button type="submit" variant="primary" loading={busy} disabled={!name.trim()}>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={busy}
+              disabled={!name.trim() || (chooseHosting && !hosting.server.trim())}
+            >
               Create invite link
             </Button>
           </div>

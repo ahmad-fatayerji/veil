@@ -1,6 +1,6 @@
 {
   "name": "veil",
-  "version": "0.7.2",
+  "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@10.30.1",
   "engines": {
@@ -10,6 +10,7 @@
     "dev:host": "cargo run -p veil-host",
     "dev:web": "pnpm --filter @veil/web dev",
     "dev:desktop": "pnpm --filter @veil/desktop tauri dev",
+    "dev:multi": "node scripts/dev-multi.mjs",
     "build": "pnpm --filter @veil/web build && pnpm --filter @veil/desktop build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

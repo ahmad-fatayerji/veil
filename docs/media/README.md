@@ -1,33 +1,51 @@
-# README media
+﻿# README media
 
-These images and GIFs were captured on Windows on 11 October 2026 from real
-Veil desktop WebView2 windows, using disposable demo profiles and documents.
-Alex and Sam are demo participant names. Two native instances joined the same
-session through a local, loopback-only Veil server; guest edits were verified
-in the host document before capture.
+These screenshots and GIFs were captured on Windows with WebView2 on 22 October
+2026 from the **Veil 1.0.0 candidate (`1.0.0-beta.1`)**, release source
+`cda58af6624883d3e5a2b42b51719310d03ed374` (`release/1.0.0`). This is candidate
+media, not a claim that final 1.0.0 has been published.
 
-The capture used the migration acceptance debug executable. Its desktop,
-editor, and shared UI source matches public `develop` at `9e84315`; the older
-debug package version is not shown in the media. The installed user app was
-left running and its documents and preferences were not used.
+The native debug executable was built from an archive of that exact commit in
+this task's ignored capture directory. Its frontend was served from the same
+archived candidate source. Both the native version and the About version label
+were checked and reported `1.0.0-beta.1`. No app interface or participant state
+was mocked.
 
-| Asset                  | Content                                                           |
-| ---------------------- | ----------------------------------------------------------------- |
-| `welcome.png`          | Create document / Join session welcome screen, dark theme.        |
-| `workspace.png`        | Shared checklist with two connected participants.                 |
-| `write-together.gif`   | Host writing, followed by a guest edit reaching the host.         |
-| `overlay.png`          | The same document in the overlay, with participant activity.      |
-| `live-overlay.gif`     | Overlay font-size changes applied by the native settings command. |
-| `overlay-settings.png` | A focused capture of the actual overlay controls.                 |
+Alex and Sam are fictional participants using disposable profiles and demo
+Markdown documents. Two actual native instances joined through a loopback-only
+Veil server; guest edits were observed at the host, and the host's reply was
+observed at the guest. This demonstrates local collaboration, not internet or
+TURN connectivity. The installed user app, files, and preferences were not used.
+Discord activity was disabled in the disposable profiles. Demo recovery shortcuts
+use F11/F12 combinations to avoid taking the installed app's global shortcuts;
+these are not the product defaults.
 
-GIFs encode sequential app screenshots with a pause at the end; playback is
-condensed. They show the app's window contents, not a full desktop recording
-or evidence of capture exclusion, transparency, or shortcut registration.
-The installed app retains the global shortcuts, so the separate demo instance
-cannot register them. No private documents, invitations, or host credentials
-are included in the published media.
+| Asset                  | Content                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `welcome.png`          | Current welcome screen with New document, Open document, and Join with a link.  |
+| `workspace.png`        | Dark workspace, two tabs, shared launch checklist, and People panel.            |
+| `workspace-light.png`  | Shared launch notes in the light theme.                                         |
+| `markdown.png`         | Meeting notes in the Markdown source editor.                                    |
+| `markdown-editing.gif` | Switching views, adding Markdown next steps, and checking an item in rich text. |
+| `write-together.gif`   | Sam's live edits, Alex checking a shared task, and Alex's reply.                |
+| `overlay.png`          | Editable Meeting notes overlay with the compact formatting toolbar.             |
+| `live-overlay.gif`     | Native font-size changes and the overlay following document tab switches.       |
+| `overlay-settings.png` | Independent opacity sliders, font size, and formatting controls.                |
+| `hosting-settings.png` | Public hosting choice and its resource limits.                                  |
 
-To refresh these assets, use an isolated native debug profile with the existing
-Windows/WebView2 acceptance harness described in [testing](../testing.md).
-Use fictional content, verify both peers receive edits, inspect every image,
-and keep the encoded GIFs small enough to load comfortably in a README.
+Screenshots capture actual app window contents. Settings images crop to the actual
+settings dialog. Live invitation text is masked with a solid gray rectangle;
+no usable links or credentials are published. The demo sessions were ended after
+capture. No document content or controls were added through image editing.
+
+GIFs encode sequential screenshots from real interactions, using a shared palette,
+a condensed timeline, and longer first/last frames. They show UI behavior, not a
+desktop recording or evidence of capture exclusion, desktop transparency, or
+shortcut registration. Each GIF is below 350 KiB. The PNGs and representative
+decoded GIF frames were visually inspected before publication.
+
+To refresh, use candidate/release source and isolated debug profiles following
+the Windows/WebView2 harness in [testing](../testing.md). Check the native and UI
+version labels, use fictional content, verify edits reach both peers, mask every
+invitation, and inspect the resulting images and GIF frames. Do not use the
+installed app's documents, credentials, or preferences.
