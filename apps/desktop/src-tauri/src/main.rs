@@ -16,6 +16,10 @@ use tauri::Manager;
 fn main() {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let mut builder = tauri::Builder::default();
+    #[cfg(windows)]
+    {
+        builder = builder.plugin(browser_shortcuts::init());
+    }
     let background_launch = startup::is_background_launch(&std::env::args().collect::<Vec<_>>());
     // Acceptance runs intentionally use independent app profiles. Production is
     // one instance, so invitations cannot silently create a second document.
