@@ -569,13 +569,14 @@ export function AutomaticApp({
   useEffect(() => {
     workspace.update(tab, {
       close: leave,
-      busy: busy || updating,
+      // Waiting for approval can take minutes; it must not block closing the tab or quitting.
+      busy: (busy && !joinInProgress) || updating,
       status: connection,
       hosted: !guest,
       sharing: !!session,
     });
     // The tab controller always uses the latest closures without resetting its document.
-  }, [workspace, tab, busy, updating, connection, guest, session, leave]);
+  }, [workspace, tab, busy, joinInProgress, updating, connection, guest, session, leave]);
   const settingsButton = (
     <IconButton
       label="Settings"

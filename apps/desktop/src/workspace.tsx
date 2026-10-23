@@ -97,6 +97,8 @@ export class Workspace {
   private pending: Promise<unknown> = Promise.resolve();
   private pathsWaiting = false;
   private linksWaiting: string[] = [];
+  private quitWaiting = false;
+  private quitting = false;
   private exiting = false;
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -229,7 +231,10 @@ export class Workspace {
       this.working = false;
       for (const invitation of this.linksWaiting.splice(0)) this.joinTab(invitation);
       this.changed();
-      if (this.pathsWaiting) {
+      if (this.quitWaiting) {
+        this.quitWaiting = false;
+        void this.quit();
+      } else if (this.pathsWaiting) {
         this.pathsWaiting = false;
         void this.receivePaths();
       }
@@ -396,8 +401,15 @@ export class Workspace {
       this.changed();
       await this.persist();
     });
-  quit = () =>
-    this.run(async () => {
+  quit = () => {
+    if (this.quitting) return Promise.resolve();
+    // The native close was already prevented, so a dropped request leaves Veil open with no feedback.
+    if (this.working || !this.ready) {
+      this.quitWaiting = true;
+      return Promise.resolve();
+    }
+    this.quitting = true;
+    return this.run(async () => {
       const selected = this.activeId;
       await flushOverlay();
       // Collect every decision before closing any connection, so Cancel preserves the workspace.
@@ -430,7 +442,10 @@ export class Workspace {
         this.exiting = false;
         throw cause;
       }
+    }).finally(() => {
+      this.quitting = false;
     });
+  };
   configureRestore = (enabled: boolean) =>
     this.run(async () => {
       // Persist the choice first; failed writes must not claim recovery is enabled.
@@ -550,6 +565,10 @@ export class Workspace {
     // Do not overwrite recovery until tab engines have attached their restored documents.
     this.version++;
     this.listeners.forEach((listener) => listener());
+    if (this.quitWaiting) {
+      this.quitWaiting = false;
+      void this.quit();
+    }
   }
 }
 
@@ -586,8 +605,9 @@ export function DocumentWorkspace() {
     const paths = listen('files-pending', () => {
       if (initialized) void workspace.receivePaths();
     });
+    // The workspace defers a quit requested during startup until recovery has loaded.
     const quitting = listen('app-quit-requested', () => {
-      if (initialized) void workspace.quit();
+      if (active) void workspace.quit();
     });
     const receiveLinks = (urls: string[]) => {
       if (!active) return;

@@ -76,6 +76,30 @@ encoding and size failures, and update gating; execution remains with the user.
 8. Updates must remain blocked with any document or background connection open,
    including after closing the selected tab or selecting Home.
 
+## Reliable closing and quitting - 23 October 2026
+
+Quitting with two or more unsaved tabs no longer stops after the first **Discard**.
+The control panel's native dialog close event arrived after the next prompt opened and
+answered it with Cancel; the shared dialog now ignores close events it caused itself.
+Quit requests that arrive while another workspace action runs, or during startup, now
+run when the workspace is free instead of being dropped, and a repeated request during
+a quit does not ask again after Cancel. A guest waiting for host approval no longer
+blocks quitting. Quitting no longer waits behind a hosting start, because hosting
+status checks under the update gate never wait for the hosting lock.
+
+`pnpm test:closing` (`scripts/test-closing.mjs`) drives the real Windows/WebView2 app
+through 22 cases: tray quit, window close in tray and Quit modes, one to three unsaved
+tabs, Cancel/Escape/dialog close and retry, saving an opened file, simultaneous and
+startup quit requests, quitting from a tab-close prompt, visible and long-hidden
+overlay, host Discard/End session/Cancel chains, a connected guest, a guest awaiting
+approval, and restore after restart. It starts its own `veil-server` from
+`VEIL_SERVER_SOURCE` (default `../Veil-server`) and accepts
+`VEIL_CLOSING_DESKTOP_BINARY`; pass a case-name filter as its argument. All 22 cases
+passed against the debug executable and a local server, alongside 86 TypeScript tests,
+37 desktop Rust tests, TypeScript, ESLint, Prettier, clippy and rustfmt. Physical
+tray-icon clicks, non-Windows platforms and long idle tray sessions remain unverified.
+This change does not alter any server or peer protocol contract.
+
 ## Windows startup - 22 October 2026
 
 Added **Start Veil with Windows** in Settings > General, off by default. Sign-in
