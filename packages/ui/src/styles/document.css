@@ -309,23 +309,40 @@
   /* Presence ------------------------------------------------------------ */
   .collaboration-carets__caret {
     position: relative;
+    z-index: 1;
+    display: inline-block;
+    height: 1em;
     margin-inline: -1px;
-    border-left: 2px solid;
+    border-left: 2px solid var(--collaboration-color);
+    vertical-align: -0.12em;
     pointer-events: none;
     word-break: normal;
+    user-select: none;
   }
   .collaboration-carets__label {
     position: absolute;
     left: -2px;
-    bottom: 100%;
+    bottom: calc(100% + 2px);
+    width: max-content;
+    max-width: 160px;
+    overflow: hidden;
     padding: 1px 6px;
+    border: 1px solid color-mix(in srgb, var(--collaboration-color) 45%, var(--border-strong));
+    border-left: 2px solid var(--collaboration-color);
     border-radius: var(--radius-sm) var(--radius-sm) var(--radius-sm) 0;
-    color: #ffffff;
+    background: var(--surface-raised);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+    color: var(--fg);
     font-family: var(--font-ui);
     font-size: 11px;
     font-style: normal;
-    font-weight: var(--weight-semibold);
+    font-weight: var(--weight-medium);
     line-height: 16px;
+    letter-spacing: normal;
+    text-align: start;
+    text-indent: 0;
+    text-transform: none;
+    text-overflow: ellipsis;
     white-space: nowrap;
     user-select: none;
   }

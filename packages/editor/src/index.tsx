@@ -89,13 +89,12 @@ export function SharedEditor({
           render: (user) => {
             const caret = document.createElement('span');
             caret.className = 'collaboration-carets__caret';
-            caret.style.borderColor = participantColor(user.color);
+            caret.style.setProperty('--collaboration-color', participantColor(user.color));
             caret.setAttribute('aria-hidden', 'true');
             const label = document.createElement('span');
             label.className = 'collaboration-carets__label';
             // CSS renders the name, keeping presence labels out of document text and copies.
             label.dataset.name = participantName(user.name);
-            label.style.backgroundColor = participantColor(user.color);
             caret.append(label);
             return caret;
           },
