@@ -513,7 +513,9 @@ for (const { name, run } of cases.filter((c) => !filter || c.name.includes(filte
     console.log(`PASS  ${name} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
   } catch (error) {
     results.push(['FAIL', name, error.message.split('\n')[0]]);
-    console.log(`FAIL  ${name}\n      ${error.message.split('\n').slice(0, 3).join('\n      ')}`);
+    // eslint-disable-next-line no-control-regex
+    const message = error.message.replace(/\x1b\[[0-9;]*m/g, '').split('\n');
+    console.log(`FAIL  ${name}\n      ${message.slice(0, 12).join('\n      ')}`);
     await evidence(name);
   } finally {
     apps.length = 0;
