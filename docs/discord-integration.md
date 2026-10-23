@@ -34,6 +34,13 @@ asking for explicit Join. It does not bypass host approval, compatibility checks
 guest names or existing admission errors. Repeated launch callbacks cannot silently
 open duplicate tabs for the same invitation.
 
+SDK invite-created events are filtered against the authenticated sender, validity,
+join action and current party. SDK 1.10.19337's `ActivityInvite` has no recipient
+field. Opaque party fingerprints correlate message and activity-join events; a
+reviewed invitation cannot create a second generic notice. All workspace hosted
+and opened invitation links suppress notices for those sessions, independent of
+host/guest role. Invitations to other sessions remain available.
+
 Link reset, stop, close/session end, loss of connection, account disconnect and quit
 clear consent and invalidate queued sends. Consent is never persisted in Markdown,
 settings or recovery. Turning direct invites off removes joinable presence and
