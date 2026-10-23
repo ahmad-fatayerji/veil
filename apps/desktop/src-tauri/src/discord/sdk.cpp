@@ -64,9 +64,15 @@ struct Bridge {
         });
         client->SetActivityInviteCreatedCallback([this, guard](discordpp::ActivityInvite invite) {
             if (!*guard || invite.ApplicationId() != AppId) return;
+            auto current = client->GetCurrentUserV2();
+            // ActivityInvite has no recipient field in SDK 1.10.19337. The
+            // current authenticated user is the reliable direction boundary.
+            if (!current || invite.SenderId() == current->Id() || !invite.IsValid() || invite.Type() != discordpp::ActivityActionTypes::Join) return;
+            if (!party.empty() && invite.PartyId() == party) return;
             auto key = invite.MessageId();
             if (invitations.size() >= 32) return;
             invitations.insert_or_assign(key, invite);
+            emit(16, key, 0, 0, invite.PartyId());
             if (auto person = client->GetUser(invite.SenderId())) user(10, *person, key);
             else emit(10, key, invite.SenderId(), 0, "Discord friend", "");
         });

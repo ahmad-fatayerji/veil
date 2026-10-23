@@ -636,6 +636,17 @@ export function DocumentWorkspace() {
         }
       : null,
   });
+  const discordKnownLinks = JSON.stringify(
+    workspace.tabs.flatMap((tab) =>
+      [tab.sharingLink, tab.invitation].filter((link): link is string => !!link),
+    ),
+  );
+  useEffect(() => {
+    if (!discord.social.available) return;
+    void invoke('discord_known_links', { links: JSON.parse(discordKnownLinks) }).catch(
+      workspace.fail,
+    );
+  }, [workspace, discord.social.available, discordKnownLinks]);
   useEffect(() => {
     if (!discord.social.available) return;
     void invoke('discord_select_document', JSON.parse(discordSelectionKey)).catch(workspace.fail);
@@ -900,7 +911,9 @@ function DiscordIncomingInvitation({
       }
     >
       {error ||
-        `${invitation.person.displayName} invited you to collaborate. Review the server and join settings before joining.`}
+        (invitation.person.id === '0'
+          ? 'A Discord invitation is ready. Review the server and join settings before joining.'
+          : `${invitation.person.displayName} invited you to collaborate. Review the server and join settings before joining.`)}
     </Banner>
   );
 }

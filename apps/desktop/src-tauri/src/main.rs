@@ -96,6 +96,7 @@ fn main() {
             discord::social::discord_cancel_connection,
             discord::social::discord_disconnect,
             discord::social::discord_refresh_friends,
+            discord::social::discord_known_links,
             discord::social::discord_select_document,
             discord::social::discord_send_invite,
             discord::social::discord_review_invite,

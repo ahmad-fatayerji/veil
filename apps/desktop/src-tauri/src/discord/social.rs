@@ -71,6 +71,7 @@ enum Command {
     Cancel,
     Disconnect,
     Friends,
+    KnownLinks(Vec<String>),
     Selection(String, u64, Option<Selection>),
     Send(String, String, u64, String, Reply),
     Review(String, Reply),
@@ -84,6 +85,39 @@ struct ConsentGuard {
     owner: String,
     revision: u64,
     retired: VecDeque<String>,
+}
+
+// Correlate SDK message invites and activity-join callbacks without depending on
+// host/guest role. Party IDs are opaque fingerprints, never the bearer link.
+fn invitation_party(link: &str) -> String {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in link.bytes() {
+        hash = (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3);
+    }
+    format!("veil:{hash:016x}")
+}
+#[derive(Default)]
+struct InvitationRouting {
+    known: Vec<String>,
+    consumed: VecDeque<String>,
+    parties: HashMap<String, String>,
+}
+impl InvitationRouting {
+    fn blocked_party(&self, party: &str) -> bool {
+        self.known
+            .iter()
+            .any(|link| invitation_party(link) == party)
+            || self.consumed.iter().any(|item| item == party)
+    }
+    fn consume(&mut self, link: &str) {
+        let party = invitation_party(link);
+        if !self.consumed.contains(&party) {
+            self.consumed.push_back(party);
+            if self.consumed.len() > 128 {
+                self.consumed.pop_front();
+            }
+        }
+    }
 }
 impl ConsentGuard {
     fn accept(&mut self, owner: String, revision: u64) -> bool {
@@ -199,6 +233,19 @@ pub fn discord_refresh_friends(
 ) -> Result<(), String> {
     authorize(&caller)?;
     enqueue(&state, Command::Friends)
+}
+#[tauri::command]
+pub fn discord_known_links(
+    caller: WebviewWindow,
+    state: State<'_, Social>,
+    links: Vec<String>,
+) -> Result<(), String> {
+    authorize(&caller)?;
+    let links = links
+        .into_iter()
+        .filter(|link| validate_link(link).is_ok())
+        .collect();
+    enqueue(&state, Command::KnownLinks(links))
 }
 #[tauri::command]
 pub fn discord_select_document(
@@ -441,6 +488,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
     let mut pending: HashMap<u64, (Instant, Reply)> = HashMap::new();
     let mut review_ids: HashMap<u64, String> = HashMap::new();
     let mut links: HashMap<String, String> = HashMap::new();
+    let mut routing = InvitationRouting::default();
     let mut recent = VecDeque::<(Instant, String)>::new();
     let mut disconnect_at = None;
     let mut refresh_retry = None;
@@ -552,6 +600,26 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                     view.snapshot.version += 1;
                 }
                 Command::Friends => sdk.friends(),
+                Command::KnownLinks(known) => {
+                    routing.known = known;
+                    let mut view = worker.view.lock().unwrap();
+                    let previous = view.snapshot.invitations.len();
+                    view.snapshot.invitations.retain(|item| {
+                        !routing
+                            .parties
+                            .get(&item.id)
+                            .is_some_and(|party| routing.blocked_party(party))
+                            && !links
+                                .get(&item.id)
+                                .is_some_and(|link| routing.blocked_party(&invitation_party(link)))
+                    });
+                    if previous != view.snapshot.invitations.len() {
+                        view.snapshot.version += 1;
+                    }
+                    links.retain(|id, _| {
+                        view.snapshot.invitations.iter().any(|item| item.id == *id)
+                    });
+                }
                 Command::Selection(owner, revision, next) => {
                     if !consent.accept(owner, revision) {
                         continue;
@@ -592,6 +660,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                         continue;
                     }
                     if let Some(link) = links.remove(&id) {
+                        routing.consume(&link);
                         let _ = reply.send(Ok(link));
                         let mut view = worker.view.lock().unwrap();
                         view.snapshot.invitations.retain(|item| item.id != id);
@@ -677,7 +746,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
             activity_key = key;
             let party = selection
                 .as_ref()
-                .map(|s| format!("veil:{}:{}", s.document_id, s.generation))
+                .map(|s| invitation_party(&s.link))
                 .unwrap_or_default();
             sdk.activity(
                 revision,
@@ -716,6 +785,15 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                     if disconnect_at.is_some() || auth.tokens().is_none() {
                         continue;
                     }
+                    if event.kind == 10
+                        && routing
+                            .parties
+                            .get(&event.request.to_string())
+                            .is_some_and(|party| routing.blocked_party(party))
+                    {
+                        sdk.dismiss(event.request);
+                        continue;
+                    }
                     let person = Person {
                         id: event.id.to_string(),
                         display_name: super::title(&event.a),
@@ -741,6 +819,29 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                         friend_batch.push(person);
                     } else if view.snapshot.invitations.len() < 32 {
                         let id = event.request.to_string();
+                        if view
+                            .snapshot
+                            .person
+                            .as_ref()
+                            .is_some_and(|person| person.id == event.id.to_string())
+                        {
+                            continue;
+                        }
+                        // A Discord-side accept can arrive before its message event.
+                        if let Some(party) = routing.parties.get(&id) {
+                            if let Some(existing) =
+                                view.snapshot.invitations.iter_mut().find(|item| {
+                                    links
+                                        .get(&item.id)
+                                        .is_some_and(|link| invitation_party(link) == *party)
+                                })
+                            {
+                                existing.person = person;
+                                view.snapshot.version += 1;
+                                sdk.dismiss(event.request);
+                                continue;
+                            }
+                        }
                         if !view.snapshot.invitations.iter().any(|i| i.id == id) {
                             view.snapshot.invitations.push(Invitation { id, person });
                         }
@@ -883,10 +984,24 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                 }
                 11 => {
                     if validate_link(&event.a).is_ok()
+                        && !routing.blocked_party(&invitation_party(&event.a))
                         && !recent.iter().any(|(time, link)| {
                             time.elapsed() < Duration::from_secs(10) && *link == event.a
                         })
                     {
+                        let party = invitation_party(&event.a);
+                        let existing = {
+                            let view = worker.view.lock().unwrap();
+                            view.snapshot
+                                .invitations
+                                .iter()
+                                .find(|item| routing.parties.get(&item.id) == Some(&party))
+                                .map(|item| item.id.clone())
+                        };
+                        if let Some(id) = existing {
+                            links.insert(id, event.a);
+                            continue;
+                        }
                         sequence += 1;
                         let id = format!("join-{sequence}");
                         recent.push_back((Instant::now(), event.a.clone()));
@@ -937,6 +1052,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                     if let Some((_, reply)) = pending.remove(&event.request) {
                         let result = if event.value != 0 {
                             validate_link(&event.a).map(|_| {
+                                routing.consume(&event.a);
                                 let duplicates: Vec<_> = links
                                     .iter()
                                     .filter(|(_, link)| **link == event.a)
@@ -949,6 +1065,8 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                                 view.snapshot.invitations.retain(|item| {
                                     !duplicates.contains(&item.id)
                                         && Some(&item.id) != review_id.as_ref()
+                                        && routing.parties.get(&item.id)
+                                            != Some(&invitation_party(&event.a))
                                 });
                                 view.snapshot.version += 1;
                                 recent.push_back((Instant::now(), event.a.clone()));
@@ -963,6 +1081,9 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                         let _ = reply.send(result);
                     }
                 }
+                16 if routing.parties.len() < 64 => {
+                    routing.parties.insert(event.request.to_string(), event.a);
+                }
                 _ => {}
             }
         }
@@ -970,6 +1091,16 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
             !reply.is_closed() && started.elapsed() < Duration::from_secs(19)
         });
         review_ids.retain(|request, _| pending.contains_key(request));
+        routing.parties.retain(|id, _| {
+            worker
+                .view
+                .lock()
+                .unwrap()
+                .snapshot
+                .invitations
+                .iter()
+                .any(|item| item.id == *id)
+        });
         if refresh_retry.is_some_and(|time| Instant::now() >= time)
             && attempt.is_none()
             && auth.tokens().is_some()
@@ -1005,7 +1136,32 @@ fn now() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::ConsentGuard;
+    use super::{invitation_party, ConsentGuard, InvitationRouting};
+
+    #[test]
+    fn own_or_joined_sessions_are_suppressed_without_hiding_other_invites() {
+        let mut routing = InvitationRouting {
+            known: vec!["hosted-session".into(), "joined-session".into()],
+            ..Default::default()
+        };
+        assert!(routing.blocked_party(&invitation_party("hosted-session")));
+        assert!(routing.blocked_party(&invitation_party("joined-session")));
+        assert!(!routing.blocked_party(&invitation_party("different-session")));
+        routing.known.clear();
+        assert!(!routing.blocked_party(&invitation_party("hosted-session")));
+    }
+
+    #[test]
+    fn reviewed_invite_cannot_resurface_as_generic_activity_join() {
+        let mut routing = InvitationRouting::default();
+        routing
+            .parties
+            .insert("message-42".into(), invitation_party("session"));
+        routing.consume("session");
+        assert!(routing.blocked_party(&invitation_party("session")));
+        assert!(routing.blocked_party(&routing.parties["message-42"]));
+        assert!(!routing.blocked_party(&invitation_party("other-session")));
+    }
 
     #[test]
     fn clear_and_connection_loss_reject_delayed_selection() {
