@@ -100,6 +100,20 @@ export class Workspace {
   private quitWaiting = false;
   private quitting = false;
   private exiting = false;
+  // Reserve before admission, including while another tab is still waiting to join.
+  private sessions = new Map<string, { server: string; sessionId: string }>();
+  claimSession(tab: WorkspaceTab, server: string, sessionId: string) {
+    const owner = [...this.sessions].find(
+      ([id, session]) =>
+        id !== tab.id && session.server === server && session.sessionId === sessionId,
+    );
+    if (owner)
+      throw new Error('This session is already open in another tab. Switch to that tab to use it.');
+    this.sessions.set(tab.id, { server, sessionId });
+  }
+  releaseSession(tab: WorkspaceTab) {
+    this.sessions.delete(tab.id);
+  }
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => {

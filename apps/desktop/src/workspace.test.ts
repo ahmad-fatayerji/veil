@@ -33,6 +33,39 @@ function documentTab(workspace: Workspace, title: string) {
 }
 
 describe('document workspace lifecycle', () => {
+  it('blocks joining a hosted or pending session twice, even with different links', () => {
+    const workspace = new Workspace();
+    const host = workspace.add('new');
+    const guest = workspace.add('join');
+    workspace.claimSession(host, 'https://share.example.com', 'session');
+    expect(() => workspace.claimSession(guest, 'https://share.example.com', 'session')).toThrow(
+      'already open in another tab',
+    );
+    // A failed duplicate attempt cannot remove the original tab's reservation.
+    workspace.releaseSession(guest);
+    expect(() => workspace.claimSession(guest, 'https://share.example.com', 'session')).toThrow();
+    workspace.releaseSession(host);
+    workspace.claimSession(guest, 'https://share.example.com', 'session');
+    const concurrent = workspace.add('join');
+    expect(() =>
+      workspace.claimSession(concurrent, 'https://share.example.com', 'session'),
+    ).toThrow();
+    workspace.releaseSession(guest);
+    expect(() =>
+      workspace.claimSession(concurrent, 'https://share.example.com', 'session'),
+    ).not.toThrow();
+  });
+
+  it('allows independent sessions and the same session ID on another server', () => {
+    const workspace = new Workspace();
+    const first = workspace.add('new');
+    const second = workspace.add('join');
+    const third = workspace.add('join');
+    workspace.claimSession(first, 'https://one.example.com', 'session');
+    expect(() => workspace.claimSession(second, 'https://one.example.com', 'other')).not.toThrow();
+    expect(() => workspace.claimSession(third, 'https://two.example.com', 'session')).not.toThrow();
+  });
+
   it('recovers a draft locally and requires confirmation if its file changed while closed', async () => {
     vi.useFakeTimers();
     const workspace = new Workspace();
