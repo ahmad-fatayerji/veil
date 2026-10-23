@@ -1474,9 +1474,11 @@ export async function joinAutomatic(
   development = false,
   signal?: AbortSignal,
   started?: (session: AutomaticSession) => void,
+  beforeJoin?: (invitation: ServerInvitation | ShareInvitation) => void,
 ) {
   if (signal?.aborted) throw new Error('Joining cancelled.');
   const invite = decodeServerInvitation(code.trim(), development);
+  beforeJoin?.(invite);
   const current = new AutomaticSession('guest', invite.server, name, transport, notice);
   started?.(current);
   const abort = () => {
@@ -1537,9 +1539,11 @@ export async function joinShareLink(
   signal?: AbortSignal,
   /** Receives the session before the host admits it, so a rename can reach the request. */
   started?: (session: AutomaticSession) => void,
+  /** Checks/reserves the resolved session locally before compatibility or admission requests. */
+  beforeJoin?: (invitation: ServerInvitation | ShareInvitation) => void,
 ) {
   if (!code.trim().startsWith('veil://'))
-    return joinAutomatic(code, name, transport, notice, development, signal, started);
+    return joinAutomatic(code, name, transport, notice, development, signal, started, beforeJoin);
   if (signal?.aborted) throw new Error('Joining cancelled.');
   const parsed = parseShareLink(code, development);
   const short = 'code' in parsed;
@@ -1559,6 +1563,7 @@ export async function joinShareLink(
     invite = await decryptShortInvitation(parsed, encrypted, development);
   } else invite = parsed;
   if (signal?.aborted) throw new Error('Joining cancelled.');
+  beforeJoin?.(invite);
   const current = new AutomaticSession('guest', invite.server, name, transport, notice);
   started?.(current);
   const abort = () => {

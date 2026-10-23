@@ -221,6 +221,12 @@ Never declare unsupported generations or infer compatibility from equal versions
 
 ## Short links and guest approval
 
+Within one desktop workspace, a session can be open in only one tab. Joining
+checks the decrypted invitation's server and session identity before requesting
+admission, including while another tab is still joining. This also blocks the
+host from joining its own document through another tab or a reset invitation.
+Closing the session or cancelling a join releases that tab's reservation.
+
 The server address remains readable; the 22-character unpadded Base64url code
 contains 128 random bits. It is a secret: share privately and redact the entire
 link from reports. Opening or pasting only validates the link locally. Lookup and

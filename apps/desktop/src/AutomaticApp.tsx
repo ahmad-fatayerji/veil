@@ -184,10 +184,11 @@ export function AutomaticApp({
     return () => {
       initializing = false;
       mounted.current = false;
+      workspace.releaseSession(tab);
       void network.current?.close();
       if (!network.current) documentRef.current?.destroy();
     };
-  }, [tab.mode]);
+  }, [tab, workspace]);
   useEffect(() => {
     if (!active) return;
     void invoke<{ server: string; official: string; credential: boolean; development: boolean }>(
@@ -303,6 +304,7 @@ export function AutomaticApp({
         (started) => {
           admitting.current = started;
         },
+        (invite) => workspace.claimSession(tab, invite.server, invite.sessionId),
       );
       network.current = joined;
       setSession(joined);
@@ -310,6 +312,7 @@ export function AutomaticApp({
       setInvitation('');
       setJoinOpen(false);
     } catch (e) {
+      workspace.releaseSession(tab);
       if (opened) await invoke('document_closed', { documentId: tab.id });
       setNotice('');
       throw e;
@@ -355,6 +358,7 @@ export function AutomaticApp({
         return;
       }
       network.current = started;
+      workspace.claimSession(tab, started.server, started.session.provider.sessionId!);
       setSession(started);
       setJoinMode(started.joinMode);
     }
@@ -454,6 +458,7 @@ export function AutomaticApp({
       if (current) await current.close();
       else documentRef.current?.destroy();
     } finally {
+      workspace.releaseSession(tab);
       await invoke('document_closed', { documentId: tab.id });
       documentRef.current = null;
       setDocument(null);
@@ -468,7 +473,7 @@ export function AutomaticApp({
       setShareOpen(false);
       setPeople(false);
     }
-  }, [tab.id]);
+  }, [tab, workspace]);
   function requestLeave() {
     void workspace.close(tab);
   }

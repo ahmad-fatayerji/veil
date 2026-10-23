@@ -11,6 +11,8 @@ import {
   decodeShortLink,
   decryptShortInvitation,
   encryptShortInvitation,
+  encodeServerInvitation,
+  encodeShareLink,
   invitationKeys,
   linkInvitation,
   SignalCipher,
@@ -189,6 +191,27 @@ it('automatically approves new requests in auto mode without creating a peer bef
   };
   await verifyHandshake(f.group, payload.handshake, payload.signature);
 });
+it('resends authenticated handshakes without an approval prompt for duplicate auto-join requests', async () => {
+  const f = await fixture();
+  const guest = await f.guest('8'.repeat(32));
+  await guest.hello();
+  await vi.waitFor(() => expect(f.sent).toHaveLength(1));
+  guest.admitted();
+  await guest.hello();
+  await vi.waitFor(() => expect(f.sent).toHaveLength(2));
+  for (const envelope of f.sent) {
+    const payload = (await guest.cipher.open(envelope, 'host')) as {
+      handshake: ShareHandshake;
+      signature: string;
+      status?: AdmissionStatus;
+    };
+    expect(payload.status).toBeUndefined();
+    await verifyHandshake(f.group, payload.handshake, payload.signature);
+  }
+  expect(f.host.joinMode).toBe('auto');
+  expect(f.host.pendingGuests).toEqual([]);
+  expect(f.decisions).toHaveLength(1);
+});
 it('rejects pending guests with signed status and cancels the queue on reset and stop', async () => {
   const f = await fixture();
   f.host.setJoinMode('approval');
@@ -234,6 +257,61 @@ it('does not resolve or admit a cancelled short-link join', async () => {
     joinShareLink(f.originalLink, 'Guest', f.transport, () => {}, false, controller.signal),
   ).rejects.toThrow('cancelled');
   expect(request).not.toHaveBeenCalled();
+});
+
+it('checks the resolved short-link session before requesting admission or opening a guest socket', async () => {
+  const f = await fixture();
+  const encrypted = await encryptShortInvitation(f.group, decodeShortLink(f.originalLink).code);
+  const paths: string[] = [];
+  f.transport.request = async (_server, path) => {
+    paths.push(path);
+    if (path === '/v2/capabilities') return { shortInvitations: 1 };
+    if (path === '/v3/invitations/resolve') return encrypted.record;
+    throw new Error('Unexpected request');
+  };
+  const connect = vi.spyOn(f.transport, 'connect');
+  const started = vi.fn();
+  const beforeJoin = vi.fn((invite: { server: string; sessionId: string }) => {
+    expect(invite.sessionId).toBe(f.group.sessionId);
+    expect(invite.server).toBe(f.group.server);
+    throw new Error('Session already open');
+  });
+  await expect(
+    joinShareLink(
+      f.originalLink,
+      'Guest',
+      f.transport,
+      () => {},
+      false,
+      undefined,
+      started,
+      beforeJoin,
+    ),
+  ).rejects.toThrow('Session already open');
+  expect(paths).toEqual(['/v2/capabilities', '/v3/invitations/resolve']);
+  expect(beforeJoin).toHaveBeenCalledOnce();
+  expect(started).not.toHaveBeenCalled();
+  expect(connect).not.toHaveBeenCalled();
+});
+
+it('checks retained long and legacy invitations before any server request', async () => {
+  const f = await fixture();
+  const request = vi.spyOn(f.transport, 'request');
+  const connect = vi.spyOn(f.transport, 'connect');
+  for (const code of [
+    encodeShareLink(f.group),
+    encodeServerInvitation(linkInvitation(f.group, '7'.repeat(32))),
+  ]) {
+    const beforeJoin = vi.fn(() => {
+      throw new Error('Session already open');
+    });
+    await expect(
+      joinShareLink(code, 'Guest', f.transport, () => {}, false, undefined, undefined, beforeJoin),
+    ).rejects.toThrow('Session already open');
+    expect(beforeJoin).toHaveBeenCalledOnce();
+  }
+  expect(request).not.toHaveBeenCalled();
+  expect(connect).not.toHaveBeenCalled();
 });
 
 it('cleans up a ticket returned after cancellation during admission without opening a socket', async () => {
