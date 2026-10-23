@@ -177,8 +177,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       console.log(`CI_FULL_VALIDATION=${process.env.FULL_VALIDATION === 'true'}`);
     }
   } else if (process.argv[2] === 'reuse') {
-    const head = process.env.PR_HEAD_SHA;
-    const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
+    const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+    // Merge Gitflow PR dispatches the release, so there is no PR event; a release merge
+    // commit's second parent is the release PR head whose gate validated this tree.
+    let head = process.env.PR_HEAD_SHA;
+    if (!head) {
+      try {
+        head = git('rev-parse', '--verify', 'HEAD^2');
+      } catch {
+        /* not a merge commit: nothing to reuse */
+      }
+    }
+    const tree = git('rev-parse', 'HEAD^{tree}');
     const reuse = /^[a-f0-9]{40}$/.test(head ?? '') && (await priorFullValidation(head, tree));
     appendFileSync(process.env.GITHUB_OUTPUT, `reuse=${reuse}\n`);
     console.log(
