@@ -112,6 +112,14 @@ cold-launch join window is 180 seconds.
 Callback registration happens early; actual startup/expired-auth/first-link timing
 still needs native acceptance.
 
+Windows debug and release executables both use the GUI subsystem. A Discord cold
+launch targets the executable directly, without a terminal wrapper or console
+attachment; closing a console therefore cannot terminate a cold-launched Veil.
+Development launchers can still capture inherited standard output/error streams.
+`dev:multi` deliberately owns the processes it launches and stops them on Ctrl+C;
+that explicit cleanup is separate from Discord cold launch. Old running clients
+must be closed and `pnpm dev:multi` rerun to use a rebuilt executable.
+
 ## Independent development accounts
 
 `pnpm dev:multi` starts every client disconnected. Each process keeps its own OAuth
