@@ -1,0 +1,38 @@
+{
+  "name": "veil-promo",
+  "version": "1.0.0",
+  "description": "Veil promo video (Remotion), built from real captures of the app",
+  "license": "MIT",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.538",
+    "@remotion/media": "4.0.538",
+    "@remotion/transitions": "4.0.538",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.538"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "playwright-core": "^1.64.0",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "predev": "node scripts/setup.mjs",
+    "dev": "remotion studio",
+    "prerender": "node scripts/setup.mjs",
+    "render": "remotion render VeilPromo out/veil-promo.mp4",
+    "typecheck": "tsc",
+    "capture": "node capture/capture.mjs",
+    "capture:exclusion": "node capture/exclusion.mjs",
+    "music": "node music/compose.mjs"
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}

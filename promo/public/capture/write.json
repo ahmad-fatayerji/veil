@@ -1,0 +1,91 @@
+{
+  "width": 1280,
+  "height": 800,
+  "scale": 2,
+  "duration": 12.914999961853027,
+  "events": [
+    {
+      "t": 0.733,
+      "type": "move",
+      "x": 476,
+      "y": 356.671875
+    },
+    {
+      "t": 1.056,
+      "type": "click",
+      "x": 476,
+      "y": 356.671875
+    },
+    {
+      "t": 1.702,
+      "type": "move",
+      "x": 640,
+      "y": 134.5
+    },
+    {
+      "t": 1.977,
+      "type": "click",
+      "x": 640,
+      "y": 134.5
+    },
+    {
+      "t": 1.98,
+      "type": "type-start",
+      "text": "Launch day"
+    },
+    {
+      "t": 2.699,
+      "type": "type-end"
+    },
+    {
+      "t": 2.7,
+      "type": "key",
+      "key": "Enter"
+    },
+    {
+      "t": 2.709,
+      "type": "type-start",
+      "text": "## Before we go live\n"
+    },
+    {
+      "t": 3.683,
+      "type": "type-end"
+    },
+    {
+      "t": 3.683,
+      "type": "type-start",
+      "text": "A calm place for the notes that keep the conversation moving.\n"
+    },
+    {
+      "t": 5.525,
+      "type": "type-end"
+    },
+    {
+      "t": 5.525,
+      "type": "type-start",
+      "text": "[ ] Check the demo and audio\nOpen the release notes\nLeave time for questions\n\n"
+    },
+    {
+      "t": 8.543,
+      "type": "type-end"
+    },
+    {
+      "t": 8.543,
+      "type": "type-start",
+      "text": "## Talking points\n"
+    },
+    {
+      "t": 9.349,
+      "type": "type-end"
+    },
+    {
+      "t": 9.349,
+      "type": "type-start",
+      "text": "- Keep it close: a floating, editable overlay.\nBring people in: one link, shared notes.\n\n"
+    },
+    {
+      "t": 12.012,
+      "type": "type-end"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+node_modules
+out
+
+# Prepared by `npm run setup` (copied, generated or downloaded)
+public/product
+public/music
+public/sfx
+
+# Disposable capture profiles, credentials and raw frames
+capture/run

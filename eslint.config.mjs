@@ -11,12 +11,14 @@ export default ts.config(
       '**/node_modules/**',
       'test-results/**',
       'playwright-report/**',
+      'promo/out/**',
+      'promo/capture/run/**',
     ],
   },
   js.configs.recommended,
   ...ts.configs.recommended,
   {
-    files: ['scripts/*.mjs'],
+    files: ['scripts/*.mjs', 'promo/**/*.mjs'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   {

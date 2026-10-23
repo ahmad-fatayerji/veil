@@ -1,0 +1,46 @@
+{
+  "width": 1280,
+  "height": 800,
+  "scale": 2,
+  "duration": 9.875,
+  "events": [
+    {
+      "t": 3.714,
+      "type": "mark",
+      "label": "priya-checks"
+    },
+    {
+      "t": 4.426,
+      "type": "move",
+      "x": 58.390625,
+      "y": 280.734375
+    },
+    {
+      "t": 4.752,
+      "type": "click",
+      "x": 58.390625,
+      "y": 280.734375
+    },
+    {
+      "t": 5.283,
+      "type": "move",
+      "x": 496,
+      "y": 501.8359375
+    },
+    {
+      "t": 5.589,
+      "type": "click",
+      "x": 496,
+      "y": 501.8359375
+    },
+    {
+      "t": 5.636,
+      "type": "type-start",
+      "text": "Alex: Great, starting in five."
+    },
+    {
+      "t": 7.464,
+      "type": "type-end"
+    }
+  ]
+}

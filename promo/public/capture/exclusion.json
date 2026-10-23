@@ -1,0 +1,18 @@
+{
+  "rect": {
+    "x": 80,
+    "y": 80,
+    "width": 520,
+    "height": 320,
+    "dpr": 1
+  },
+  "region": {
+    "x": 20,
+    "y": 20,
+    "width": 640,
+    "height": 440
+  },
+  "pad": 60,
+  "stillDiff": 0.00605932,
+  "lastDiff": 0.00605932
+}

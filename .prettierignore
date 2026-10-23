@@ -7,3 +7,7 @@ dist/
 test-results/
 playwright-report/
 apps/desktop/src-tauri/gen/
+promo/package-lock.json
+promo/public/
+promo/out/
+promo/capture/run/
