@@ -969,6 +969,11 @@ export function AutomaticApp({
             setNotice('Link copied.');
           })
         }
+        discordCapabilities={discord.capabilities}
+        onCopyForDiscord={async () => {
+          if (!link) throw new Error('Sharing is off.');
+          await navigator.clipboard.writeText(link);
+        }}
         onReset={() =>
           void run(async () => {
             setLink(await network.current!.enableSharing(true));

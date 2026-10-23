@@ -86,9 +86,31 @@ fn display(preferences: Preferences, activity: &Activity) -> DisplayActivity {
 }
 
 #[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Capabilities {
+    account_linking: bool,
+    activity_invites: bool,
+    unavailable_reason: &'static str,
+}
+
+impl Default for Capabilities {
+    fn default() -> Self {
+        // The existing IPC publisher does not authenticate users or expose the
+        // Social SDK's friends/invitation APIs. Installing Discord alone does not
+        // enable these capabilities. Do not infer availability from presence.
+        Self {
+            account_linking: false,
+            activity_invites: false,
+            unavailable_reason: "Connecting an account and sending direct Discord invites are not available in this build. You can still copy a Veil invite link into Discord.",
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
 pub struct Snapshot {
     preferences: Preferences,
     warning: Option<String>,
+    capabilities: Capabilities,
 }
 
 struct Model {
@@ -153,6 +175,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             snapshot: Snapshot {
                 preferences,
                 warning,
+                capabilities: Capabilities::default(),
             },
             activity: Activity::default(),
             active: false,

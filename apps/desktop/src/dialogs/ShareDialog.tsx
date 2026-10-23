@@ -1,7 +1,10 @@
+import { useId } from 'react';
 import { Copy, RefreshCw } from 'lucide-react';
 import type { JoinMode } from '@veil/collaboration';
 import { Banner, Button, Dialog, Field, Input, SegmentedControl } from '@veil/ui';
 import { HostingChoice, type HostingForm } from './HostingChoice';
+import { DiscordShareSection } from './DiscordShareSection';
+import type { DiscordCapabilities } from '../discord';
 
 export function ShareDialog({
   open,
@@ -20,6 +23,8 @@ export function ShareDialog({
   onSelfHosting,
   onStart,
   onCopy,
+  onCopyForDiscord,
+  discordCapabilities,
   onReset,
   onStop,
   onEnable,
@@ -44,12 +49,15 @@ export function ShareDialog({
   onSelfHosting: () => void;
   onStart: () => void;
   onCopy: () => void;
+  onCopyForDiscord: () => Promise<void>;
+  discordCapabilities: DiscordCapabilities | null;
   onReset: () => void;
   onStop: () => void;
   onEnable: () => void;
   notice: string;
   error: string;
 }) {
+  const discordId = useId();
   return (
     <Dialog
       open={open}
@@ -159,6 +167,14 @@ export function ShareDialog({
               Changing this keeps the link and current guests.
             </p>
           </div>
+          <DiscordShareSection
+            key={`${link}:${open}`}
+            id={discordId}
+            link={link}
+            capabilities={discordCapabilities}
+            busy={busy}
+            onCopy={onCopyForDiscord}
+          />
           <div className="share-footer">
             <Button
               variant="ghost"

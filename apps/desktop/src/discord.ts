@@ -7,9 +7,16 @@ export interface DiscordPreferences {
   showParticipantCount: boolean;
 }
 
+export interface DiscordCapabilities {
+  accountLinking: boolean;
+  activityInvites: boolean;
+  unavailableReason: string;
+}
+
 interface Snapshot {
   preferences: DiscordPreferences;
   warning: string | null;
+  capabilities: DiscordCapabilities;
 }
 
 interface Activity {
@@ -80,6 +87,7 @@ export function useDiscordPresence(documentTitle: string | null, othersCount: nu
 
   return {
     preferences: snapshot?.preferences ?? null,
+    capabilities: snapshot?.capabilities ?? null,
     saving,
     error: error || snapshot?.warning || '',
     configure,
