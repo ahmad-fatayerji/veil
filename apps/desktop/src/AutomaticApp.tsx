@@ -448,6 +448,7 @@ export function AutomaticApp({
     return saved.server;
   }
   const leave = useCallback(async () => {
+    workspace.clearDiscordInvites(tab.id);
     const current = network.current;
     network.current = null;
     try {
@@ -468,7 +469,7 @@ export function AutomaticApp({
       setShareOpen(false);
       setPeople(false);
     }
-  }, [tab.id]);
+  }, [tab.id, workspace]);
   function requestLeave() {
     void workspace.close(tab);
   }
@@ -574,9 +575,10 @@ export function AutomaticApp({
       status: connection,
       hosted: !guest,
       sharing: !!session,
+      sharingLink: link,
     });
     // The tab controller always uses the latest closures without resetting its document.
-  }, [workspace, tab, busy, joinInProgress, updating, connection, guest, session, leave]);
+  }, [workspace, tab, busy, joinInProgress, updating, connection, guest, session, leave, link]);
   const settingsButton = (
     <IconButton
       label="Settings"
@@ -969,14 +971,36 @@ export function AutomaticApp({
             setNotice('Link copied.');
           })
         }
+        discordCapabilities={discord.capabilities}
+        discord={discord}
+        discordSelection={workspace.discordInvites.current}
+        discordDocumentId={tab.id}
+        onDiscordConsent={(enabled) => {
+          try {
+            if (enabled) workspace.allowDiscordInvites(tab);
+            else workspace.clearDiscordInvites(tab.id);
+          } catch (cause) {
+            setError(errorMessage(cause));
+          }
+        }}
+        onDiscordSettings={() => {
+          closeShare();
+          openSettings('Sharing');
+        }}
+        onCopyForDiscord={async () => {
+          if (!link) throw new Error('Sharing is off.');
+          await navigator.clipboard.writeText(link);
+        }}
         onReset={() =>
           void run(async () => {
+            workspace.clearDiscordInvites(tab.id);
             setLink(await network.current!.enableSharing(true));
             setNotice('New link ready. The previous link no longer accepts new people.');
           })
         }
         onStop={() =>
           void run(async () => {
+            workspace.clearDiscordInvites(tab.id);
             await network.current!.stopSharing();
             setLink('');
             setNotice('Sharing stopped. Existing collaborators stay connected.');

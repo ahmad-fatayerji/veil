@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod accent;
 mod app_icon;
@@ -91,6 +91,17 @@ fn main() {
             discord::discord_preferences,
             discord::discord_configure,
             discord::discord_update,
+            discord::social::discord_social_snapshot,
+            discord::social::discord_connect,
+            discord::social::discord_cancel_connection,
+            discord::social::discord_disconnect,
+            discord::social::discord_refresh_friends,
+            discord::social::discord_known_links,
+            discord::social::discord_select_document,
+            discord::social::discord_send_invite,
+            discord::social::discord_review_invite,
+            discord::social::discord_dismiss_invite,
+            discord::social::discord_avatar,
             overlay::overlay_snapshot,
             overlay::overlay_update,
             overlay::overlay_capture_check,

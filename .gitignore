@@ -9,3 +9,4 @@ playwright-report/
 password.txt
 *.log
 apps/desktop/src-tauri/gen/
+/.local/

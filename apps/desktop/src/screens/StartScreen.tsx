@@ -68,6 +68,18 @@ export function StartScreen({
   };
   const error = invitationTouched ? invitationError(invitation, development) : '';
   const canJoin = !!name.trim() && !!invitation.trim() && !invitationError(invitation, development);
+  let invitationServer = '';
+  if (canJoin || (invitation.trim() && !invitationError(invitation, development))) {
+    try {
+      invitationServer = new URL(
+        invitation.trim().startsWith('veil://')
+          ? parseShareLink(invitation.trim(), development).server
+          : decodeServerInvitation(invitation.trim(), development).server,
+      ).host;
+    } catch {
+      /* The field's validation explains invalid input. */
+    }
+  }
 
   // Move focus to the first thing still needed whenever the join form opens.
   useEffect(() => {
@@ -207,6 +219,11 @@ export function StartScreen({
                 onBlur={() => setInvitationTouched(true)}
               />
             </Field>
+            {invitationServer && (
+              <p className="field-hint">
+                Server: <strong>{invitationServer}</strong>. Join only if you trust this invitation.
+              </p>
+            )}
             <Field
               label="Your name"
               htmlFor={`${formId}-automatic-name`}

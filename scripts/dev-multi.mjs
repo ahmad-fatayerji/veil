@@ -84,6 +84,10 @@ async function main() {
 
     console.log(`Opening ${count} test instances. Profiles: ${profiles}`);
     console.log('Share in one window; paste the link into Join session in another.');
+    console.log('Discord starts disconnected in each client; tokens stay in that process.');
+    console.log(
+      'Connect clients one at a time, choosing the intended Discord account before each authorization.',
+    );
     console.log('No dev server is needed. Rerun this command after changing source.');
     console.log('Ctrl+C stops all these instances immediately; save any notes first.');
     const clients = [];
@@ -94,6 +98,7 @@ async function main() {
       const env = {
         ...process.env,
         VEIL_TEST_SETTINGS_DIR: profile,
+        VEIL_DISCORD_EPHEMERAL: '1',
         WEBVIEW2_USER_DATA_FOLDER: resolve(profile, 'webview'),
       };
       delete env.VEIL_TEST_SINGLE_INSTANCE;

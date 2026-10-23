@@ -23,6 +23,7 @@ import type { useDiscordPresence } from '../discord';
 import { useWindowsStartup } from '../startup';
 import { SELF_HOSTING_URL } from '../capacity';
 import { HostingChoice, type HostingForm } from './HostingChoice';
+import { DiscordConnectionCard } from './DiscordConnectionCard';
 
 // Pages group settings by purpose; each page is split into titled groups.
 export type Section = 'General' | 'Sharing' | 'Overlay' | 'Keybinds' | 'About & updates';
@@ -378,6 +379,8 @@ export function SettingsDialog({
               <p>Changes apply when you start sharing a new document.</p>
             </SettingsGroup>
             <SettingsGroup title="Discord">
+              <DiscordConnectionCard connection={discord.connection} />
+              {discord.social.warning && <Banner tone="warning">{discord.social.warning}</Banner>}
               <div className="settings-card">
                 <SettingRow
                   label="Discord Rich Presence"
