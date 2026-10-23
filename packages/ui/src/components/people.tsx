@@ -15,13 +15,15 @@ export function initial(name: string) {
 export function Avatar({
   person,
   size = 'md',
+  variant = 'soft',
 }: {
   person: Pick<Participant, 'name' | 'color'>;
   size?: 'sm' | 'md';
+  variant?: 'soft' | 'solid';
 }) {
   return (
     <span
-      className={`avatar ${size === 'sm' ? 'avatar-sm' : ''}`}
+      className={`avatar ${size === 'sm' ? 'avatar-sm' : ''} ${variant === 'solid' ? 'avatar-solid' : ''}`}
       style={{ '--person-color': person.color } as CSSProperties}
       aria-hidden="true"
     >
