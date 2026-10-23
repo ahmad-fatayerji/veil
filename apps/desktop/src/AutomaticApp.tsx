@@ -928,7 +928,7 @@ export function AutomaticApp({
           }}
         >
           <p role="status">{notice || 'Connecting to host...'}</p>
-          <p className="muted">Approval requests expire after two minutes.</p>
+          <p className="muted">Keep the host's Veil app open while connecting.</p>
           <div className="dialog-actions">
             <Button
               onClick={() => {

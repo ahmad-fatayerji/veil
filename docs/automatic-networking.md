@@ -236,6 +236,12 @@ exchange and document transport until it approves.
 
 Changing mode keeps the same link and affects new requests. Existing waiting
 requests still require a decision, and connected collaborators remain connected.
+Guests retry the encrypted initial handshake every two seconds until the host
+authenticates or the join deadline expires (two minutes for short links, thirty
+seconds for retained long links). Cancellation stops retries. This recovers a
+handshake dropped while the host's signaling socket is offline without bypassing
+host approval. After host signaling reconnects, stalled peers resume negotiation;
+healthy and already negotiating connections keep their transports.
 Reset link and Stop sharing cancel pending requests, without disconnecting existing
 collaborators. Reset retains the session's chosen join mode. A rejected registration
 preserves the prior link; a lost response after server commit can leave registration
