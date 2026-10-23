@@ -409,6 +409,32 @@
     background: var(--surface-sunken);
     color: var(--fg-muted);
   }
+  .avatar-solid {
+    background: var(--person-color);
+    color: #ffffff;
+  }
+  /* What a participant is doing, as a small dot next to or on their avatar. */
+  .presence-dot {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--success);
+  }
+  .presence-dot[data-activity='typing'] {
+    background: var(--accent);
+    animation: presence-typing 1.2s ease-in-out infinite;
+  }
+  .presence-dot[data-activity='away'] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--fg-muted);
+  }
+  @keyframes presence-typing {
+    50% {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+    }
+  }
 
   /* Status ------------------------------------------------------------- */
   .status-indicator {

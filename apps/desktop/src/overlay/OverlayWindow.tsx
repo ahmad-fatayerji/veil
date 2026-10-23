@@ -1,21 +1,25 @@
 import { defaultKeybinds } from '../keybinds';
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import {
   Check,
   ChevronDown,
   FileCode,
+  FileText,
+  Moon,
   Move,
   MoveDiagonal,
   MoveDiagonal2,
   MoveHorizontal,
   MoveVertical,
+  PencilLine,
+  TextSelect,
   X,
   type LucideIcon,
 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { Participant } from '@veil/collaboration';
 import { invoke, useOverlay, errorMessage } from './api';
-import { Avatar, Menu, MenuItem, Tooltip, activityLabels, useAppearance } from '@veil/ui';
+import { Avatar, Menu, MenuItem, activityLabels, useAppearance } from '@veil/ui';
 import { SharedEditor, useDocumentTitle, type EditorMode } from '@veil/editor';
 import { connectionStates } from '../shell/TitleBar';
 import { useOverlayDocument } from './session';
@@ -186,8 +190,12 @@ export function OverlayWindow() {
         </div>
         <div className="overlay-header-actions">
           {hint && <OverlayHint handle={hint} />}
-          {document.connection && !state?.captureTest && (
-            <OverlayPeople people={document.participants} />
+          {document.connection && status !== 'local' && !state?.captureTest && (
+            <OverlayPeople
+              people={document.participants}
+              interactive={interactive}
+              onPointerDown={keepGesture}
+            />
           )}
           {document.connection && !state?.captureTest && interactive && (
             <button
@@ -284,32 +292,121 @@ export function OverlayWindow() {
   );
 }
 
-/** Participant avatars; hovering one shows the name and what they are doing. */
-function OverlayPeople({ people }: { people: Participant[] }) {
-  const shown = people.slice(0, 4);
-  const extra = people.length - shown.length;
-  return (
-    <ul className="overlay-people" aria-label="Participants">
-      {shown.map((person) => {
-        const label = `${person.name}${person.local ? ' (you)' : ''} · ${activityLabels[person.activity]}`;
-        return (
-          <li key={person.id} data-participant-name={person.name} data-activity={person.activity}>
-            <Tooltip content={label}>
-              <span className="overlay-person">
-                <Avatar person={person} size="sm" />
-                <span className="visually-hidden">{label}</span>
-              </span>
-            </Tooltip>
-          </li>
-        );
-      })}
-      {extra > 0 && (
-        <li className="overlay-people-more">
-          +{extra}
-          <span className="visually-hidden"> more participants</span>
-        </li>
+const presenceIcons: Record<Participant['activity'], LucideIcon> = {
+  typing: PencilLine,
+  selecting: TextSelect,
+  document: FileText,
+  away: Moon,
+};
+
+/** Quiet at rest; names and readable activity are available in a disclosure. */
+function OverlayPeople({
+  people,
+  interactive,
+  onPointerDown,
+}: {
+  people: Participant[];
+  interactive: boolean;
+  onPointerDown: (event: PointerEvent) => void;
+}) {
+  const panelId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const others = people.filter((person) => !person.local);
+  if (others.length === 0) return null;
+
+  const typing = others.filter((person) => person.activity === 'typing').length;
+  const selecting = others.filter((person) => person.activity === 'selecting').length;
+  const summary =
+    others.length === 1
+      ? others[0].name
+      : typing > 0
+        ? `${typing} typing`
+        : selecting > 0
+          ? `${selecting} selecting`
+          : `${others.length} others`;
+  const describe = (person: Participant) =>
+    `${person.name}${person.local ? ' (you)' : ''} · ${activityLabels[person.activity]}`;
+  const description = others.map(describe).join('; ');
+  const preview = (
+    <>
+      <span className="overlay-presence-stack" aria-hidden="true">
+        {others.slice(0, 2).map((person) => (
+          <Avatar key={person.id} person={person} size="sm" />
+        ))}
+      </span>
+      <span className="overlay-presence-summary">{summary}</span>
+      {others.length === 1 && (
+        <span className="overlay-presence-activity" data-activity={others[0].activity}>
+          {activityLabels[others[0].activity]}
+        </span>
       )}
-    </ul>
+    </>
+  );
+  return (
+    <div className="overlay-presence" onPointerDown={onPointerDown}>
+      {interactive ? (
+        <>
+          <button
+            ref={triggerRef}
+            type="button"
+            className="overlay-presence-trigger"
+            popoverTarget={panelId}
+            aria-haspopup="dialog"
+            aria-label={`People in this document. ${description}`}
+            title={description}
+            onClick={() => {
+              const panel = window.document.getElementById(panelId);
+              const bounds = triggerRef.current?.getBoundingClientRect();
+              if (panel && bounds) panel.style.top = `${bounds.bottom + 8}px`;
+            }}
+          >
+            {preview}
+            <ChevronDown size={12} aria-hidden="true" />
+          </button>
+          {/* A people list is informational, so use a popover rather than an action menu.
+              The top layer avoids clipping; native dismissal handles Escape/outside clicks. */}
+          <div
+            id={panelId}
+            className="presence-panel"
+            popover="auto"
+            role="dialog"
+            aria-label="People in this document"
+            tabIndex={-1}
+            onToggle={(event) => {
+              if (event.currentTarget.matches(':popover-open'))
+                event.currentTarget.focus({ preventScroll: true });
+            }}
+          >
+            <div className="presence-list-heading">
+              <span>In this document</span>
+              <span className="presence-list-count">{people.length}</span>
+            </div>
+            <ul className="presence-list" aria-label="Participants">
+              {[...others, ...people.filter((person) => person.local)].map((person) => {
+                const ActivityIcon = presenceIcons[person.activity];
+                return (
+                  <li key={person.id} className="presence-list-row" data-activity={person.activity}>
+                    <Avatar person={person} />
+                    <span className="presence-list-person">
+                      <span className="presence-list-name">{person.name}</span>
+                      <span className="presence-list-activity" data-activity={person.activity}>
+                        <ActivityIcon size={12} aria-hidden="true" />
+                        {activityLabels[person.activity]}
+                      </span>
+                    </span>
+                    {person.local && <span className="presence-list-you">You</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </>
+      ) : (
+        <span className="overlay-presence-static" role="group" aria-label={description}>
+          {preview}
+        </span>
+      )}
+    </div>
   );
 }
 
