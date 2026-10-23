@@ -1,13 +1,20 @@
 //! Device-local preferences and a single background Discord connection.
+#[cfg(any(veil_discord_sdk, test))]
+#[cfg_attr(not(veil_discord_sdk), allow(dead_code))]
+pub mod auth;
+#[cfg(veil_discord_sdk)]
+mod sdk;
+pub mod social;
 mod transport;
 
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 use std::{
     io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
     thread::JoinHandle,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 
@@ -86,9 +93,35 @@ fn display(preferences: Preferences, activity: &Activity) -> DisplayActivity {
 }
 
 #[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Capabilities {
+    account_linking: bool,
+    activity_invites: bool,
+    unavailable_reason: &'static str,
+}
+
+impl Default for Capabilities {
+    fn default() -> Self {
+        // The existing IPC publisher does not authenticate users or expose the
+        // Social SDK's friends/invitation APIs. Installing Discord alone does not
+        // enable these capabilities. Do not infer availability from presence.
+        Self {
+            account_linking: cfg!(veil_discord_sdk),
+            activity_invites: cfg!(veil_discord_sdk),
+            unavailable_reason: if cfg!(veil_discord_sdk) {
+                ""
+            } else {
+                "Connecting an account and sending direct Discord invites are not available in this build. You can still copy a Veil invite link into Discord."
+            },
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
 pub struct Snapshot {
     preferences: Preferences,
     warning: Option<String>,
+    capabilities: Capabilities,
 }
 
 struct Model {
@@ -153,6 +186,7 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             snapshot: Snapshot {
                 preferences,
                 warning,
+                capabilities: Capabilities::default(),
             },
             activity: Activity::default(),
             active: false,
@@ -162,9 +196,18 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         Condvar::new(),
     ));
     let worker_shared = shared.clone();
+    let social_worker = social::setup(app);
     let worker = std::thread::Builder::new()
         .name("veil-discord".into())
-        .spawn(move || run(worker_shared))?;
+        .spawn(move || {
+            #[cfg(veil_discord_sdk)]
+            social::run(worker_shared, social_worker);
+            #[cfg(not(veil_discord_sdk))]
+            {
+                drop(social_worker);
+                run(worker_shared);
+            }
+        })?;
     app.manage(Discord {
         shared,
         path,
@@ -175,6 +218,17 @@ pub fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 
 // The mutex serializes preference changes with bounded IPC transactions. Once a
 // privacy command returns, an older queued activity cannot overwrite its result.
+fn isolated_development() -> bool {
+    cfg!(debug_assertions)
+        && (std::env::var_os("VEIL_TEST_SETTINGS_DIR").is_some()
+            || std::env::var("VEIL_DISCORD_EPHEMERAL").is_ok_and(|value| value == "1"))
+}
+
+fn unlinked_presence_allowed() -> bool {
+    !isolated_development()
+        || std::env::var("VEIL_DISCORD_ALLOW_UNLINKED_PRESENCE").is_ok_and(|value| value == "1")
+}
+
 fn run(shared: Shared) {
     let mut client = transport::Client::new();
     let mut connected = false;
@@ -185,7 +239,11 @@ fn run(shared: Shared) {
     loop {
         let (lock, wake) = &*shared;
         let mut model = lock.lock().unwrap();
-        if model.stop || !model.active || !model.snapshot.preferences.enabled {
+        if model.stop
+            || !model.active
+            || !model.snapshot.preferences.enabled
+            || !unlinked_presence_allowed()
+        {
             if connected {
                 let _ = client.clear();
                 client.disconnect();

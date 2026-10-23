@@ -1054,6 +1054,135 @@
   }
 
   /* Responsive ----------------------------------------------------------- */
+  .discord-connection-card,
+  .discord-share-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .discord-share-section {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
+  }
+  .discord-card-heading,
+  .discord-share-heading,
+  .discord-invite-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .discord-card-icon {
+    display: grid;
+    flex: 0 0 var(--control-lg);
+    height: var(--control-lg);
+    place-items: center;
+    border-radius: var(--radius-md);
+    background: var(--surface-sunken);
+    color: var(--fg-muted);
+  }
+  .discord-card-copy {
+    flex: 1;
+    min-width: 0;
+  }
+  .discord-avatar {
+    display: grid;
+    flex: 0 0 var(--control-lg);
+    width: var(--control-lg);
+    height: var(--control-lg);
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--surface-sunken);
+    color: var(--fg);
+    font-weight: var(--weight-semibold);
+  }
+  .discord-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .discord-search {
+    position: relative;
+  }
+  .discord-search > svg {
+    position: absolute;
+    top: 50%;
+    left: var(--space-3);
+    transform: translateY(-50%);
+    color: var(--fg-muted);
+    pointer-events: none;
+  }
+  .discord-search .input {
+    padding-left: var(--space-7);
+  }
+  .discord-friend-picker {
+    display: grid;
+    gap: var(--space-3);
+  }
+  .discord-friends {
+    display: grid;
+    gap: var(--space-2);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 260px;
+    overflow: auto;
+    scroll-padding: var(--space-2);
+  }
+  .discord-friend-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+  }
+  .discord-friend-row .discord-card-copy {
+    overflow-wrap: anywhere;
+  }
+  .discord-friend-row strong {
+    font-weight: var(--weight-medium);
+  }
+  .discord-friend-row > .btn {
+    flex-shrink: 0;
+  }
+  .discord-card-copy h4,
+  .discord-share-heading h3 {
+    margin: 0;
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+  }
+  .discord-card-copy p,
+  .discord-card-footer p {
+    margin: var(--space-1) 0 0;
+    color: var(--fg-muted);
+    font-size: var(--text-sm);
+  }
+  .discord-invite-option {
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+  .discord-invite-option label {
+    font-weight: var(--weight-medium);
+  }
+  .discord-invite-option .switch {
+    flex-shrink: 0;
+  }
+  .discord-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .discord-card-footer p {
+    flex: 1 1 240px;
+  }
+  .discord-copy-status {
+    margin: 0;
+    color: var(--fg);
+    font-size: var(--text-sm);
+  }
+
   @media (max-width: 900px) {
     .doc-main.with-people {
       grid-template-columns: minmax(0, 1fr);
