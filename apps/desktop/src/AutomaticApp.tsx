@@ -951,11 +951,20 @@ export function AutomaticApp({
         onClose={closeShare}
         started={!!session}
         link={link}
-        joinMode={joinMode}
-        onJoinModeChange={(mode) => {
-          network.current?.setJoinMode(mode);
-          setJoinMode(mode);
-        }}
+        joinMode={session?.joinMode ?? joinMode}
+        onJoinModeChange={(mode) =>
+          void run(async () => {
+            const current = network.current;
+            if (!current) return;
+            const changed = current.setJoinMode(mode);
+            setJoinMode(current.joinMode);
+            try {
+              await changed;
+            } finally {
+              setPendingGuests(current.pendingGuests);
+            }
+          })
+        }
         name={name}
         onNameChange={saveDisplayName}
         busy={busy}

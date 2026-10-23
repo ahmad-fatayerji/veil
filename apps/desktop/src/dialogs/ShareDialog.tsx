@@ -1,4 +1,5 @@
 import { Copy, RefreshCw } from 'lucide-react';
+import { useId } from 'react';
 import type { JoinMode } from '@veil/collaboration';
 import { Banner, Button, Dialog, Field, Input, SegmentedControl } from '@veil/ui';
 import { HostingChoice, type HostingForm } from './HostingChoice';
@@ -50,6 +51,9 @@ export function ShareDialog({
   notice: string;
   error: string;
 }) {
+  const id = useId();
+  const nameId = `${id}-share-name`;
+  const linkId = `${id}-share-link`;
   return (
     <Dialog
       open={open}
@@ -67,16 +71,16 @@ export function ShareDialog({
           }}
         >
           <p>Invite people you trust. Everyone who joins can read and edit this document.</p>
-          <Field label="Your name" htmlFor="share-name" hint="Shown to people who join.">
+          <Field label="Your name" htmlFor={nameId} hint="Shown to people who join.">
             <Input
-              id="share-name"
+              id={nameId}
               value={name}
               maxLength={40}
               placeholder="e.g. Alex"
               autoComplete="nickname"
               data-autofocus
               disabled={busy}
-              aria-describedby="share-name-hint"
+              aria-describedby={`${nameId}-hint`}
               onChange={(event) => onNameChange(event.target.value)}
             />
           </Field>
@@ -84,7 +88,7 @@ export function ShareDialog({
             <div className="field">
               <span className="field-label">Where to host</span>
               <HostingChoice
-                id="share"
+                id={`${id}-share`}
                 hosting={hosting}
                 busy={busy}
                 onSelfHosting={onSelfHosting}
@@ -115,16 +119,16 @@ export function ShareDialog({
         <>
           <Field
             label="Invite link"
-            htmlFor="share-link"
+            htmlFor={linkId}
             hint="Works until sharing stops or this host session ends. Guests need Veil installed."
           >
             <div className="input-group">
               <Input
-                id="share-link"
+                id={linkId}
                 value={link}
                 readOnly
                 autoComplete="off"
-                aria-describedby="share-link-hint"
+                aria-describedby={`${linkId}-hint`}
                 onFocus={(event) => event.target.select()}
               />
               <Button
@@ -139,7 +143,7 @@ export function ShareDialog({
             </div>
           </Field>
           <div className="field">
-            <span className="field-label" id="share-join-mode-label">
+            <span className="field-label" id={`${id}-share-join-mode-label`}>
               Who can join
             </span>
             <SegmentedControl

@@ -33,7 +33,8 @@ requires a server advertising short-link support; guests need an updated Veil.
 Existing long links remain accepted. In Share document, choose Auto join or
 Require approval. Approve or Reject waiting guests under People. Names are supplied
 by guests, not verified identities. Guests can cancel; requests expire after two
-minutes. Changing mode keeps the link and existing pending decisions. Reset/Stop
+minutes. Selecting Auto join also admits waiting guests after their encrypted
+handshakes are validated. Changing mode keeps the link and connected guests. Reset/Stop
 cancel pending requests while connected guests continue editing.
 
 Test both join modes, a rejected request followed by a fresh retry, cancellation,

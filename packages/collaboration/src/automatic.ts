@@ -72,6 +72,7 @@ interface PendingAdmission {
   name: string;
   deadline: number;
   requiresApproval: boolean;
+  requested: boolean;
   timer: ReturnType<typeof setTimeout>;
 }
 interface RelayServer extends RTCIceServer {
@@ -169,10 +170,21 @@ export class AutomaticSession {
       .filter(([, p]) => p.requiresApproval)
       .map(([id, p]) => ({ id, name: p.name, deadline: p.deadline }));
   }
-  setJoinMode(mode: JoinMode) {
+  async setJoinMode(mode: JoinMode) {
     if (this.role !== 'host' || !['auto', 'approval'].includes(mode))
       throw new Error('Invalid host join mode.');
     this.mode = mode;
+    if (mode !== 'auto') return;
+    const ready: string[] = [];
+    for (const [id, pending] of this.pending) {
+      pending.requiresApproval = false;
+      // A server registration alone is insufficient: first validate the guest's
+      // encrypted handshake. Unseen guests will auto-join when it arrives.
+      if (pending.requested) ready.push(id);
+    }
+    const results = await Promise.allSettled(ready.map((id) => this.approveGuest(id)));
+    const failure = results.find((result) => result.status === 'rejected');
+    if (failure?.status === 'rejected') throw failure.reason;
   }
   private groupGuestId?: string;
   get sharedLink() {
@@ -573,7 +585,6 @@ export class AutomaticSession {
       });
       return;
     }
-    const requiresApproval = this.mode === 'approval';
     const exchange = await createExchange();
     const invite = linkInvitation(group.invite, id);
     this.bootstraps.set(id, {
@@ -590,11 +601,13 @@ export class AutomaticSession {
     const timer = setTimeout(() => {
       void this.rejectGuest(id).catch(() => {});
     }, 120_000);
+    const requiresApproval = this.mode === 'approval';
     this.pending.set(id, {
       message,
       name: 'Guest',
       deadline,
       requiresApproval,
+      requested: false,
       timer,
     });
     if (requiresApproval) await this.sendPendingStatus(id, 'waiting');
@@ -779,6 +792,7 @@ export class AutomaticSession {
         throw new Error('Invalid handshake request.');
       const pending = this.pending.get(envelope.inviteId);
       if (pending) {
+        pending.requested = true;
         if (typeof payload.name === 'string')
           pending.name = payload.name.trim().slice(0, 80) || 'Guest';
         if (!pending.requiresApproval) await this.approveGuest(envelope.inviteId);

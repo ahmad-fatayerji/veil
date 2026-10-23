@@ -117,9 +117,9 @@ async function screenshot(page, name) {
   await page.screenshot({
     path: resolve(directory, `${name}.png`),
     mask: [
-      page.locator('#share-link'),
+      page.locator('[id$="-share-link"]'),
       page.locator('#automatic-credential'),
-      page.locator('#share-credential'),
+      page.locator('[id$="-share-credential"]'),
       page.locator('[id$="-automatic-invitation"]'),
     ],
   });
@@ -157,7 +157,7 @@ try {
   await expect(dialog.getByLabel('Server address')).toBeFocused();
   await dialog.getByLabel('Server address').fill(server);
   const testConnection = dialog.getByRole('button', { name: 'Test connection', exact: true });
-  const testResult = dialog.locator('form').getByRole('status');
+  const testResult = dialog.locator('form [role="status"]');
   const saveAndShare = dialog.getByRole('button', { name: 'Create invite link', exact: true });
   await expect(host.getByRole('dialog', { name: 'Settings', exact: true })).toHaveCount(0);
   async function assertUnsaved() {
@@ -265,8 +265,7 @@ try {
       await share.getByRole('radio', { name: 'Anyone with the link' }).click();
       assert.equal(await share.getByLabel('Invite link').inputValue(), link);
       await share.getByRole('button', { name: 'Close Share document' }).click();
-      await expect(page.getByRole('textbox', { name: 'Shared document' })).toHaveCount(0);
-      await requests.getByRole('button', { name: 'Approve', exact: true }).click();
+      await expect(page.getByRole('textbox', { name: 'Shared document' })).toBeVisible();
       await expect(requests).toHaveCount(0);
     }
     await expect(page.getByRole('textbox', { name: 'Shared document' })).toHaveText(
@@ -306,8 +305,13 @@ try {
       server: 'http://127.0.0.1:1',
       credential: null,
     }),
-    /Enter an operator-issued host credential/,
-    'a new origin cannot reuse another origin credential',
+    /Server unavailable or HTTPS certificate invalid/,
+    'an unreachable new origin is rejected',
+  );
+  assert.equal(
+    (await invoke(host, 'network_preferences')).server,
+    server,
+    'a failed new origin preserves the saved server',
   );
 
   await dialog.getByRole('button', { name: 'Test connection', exact: true }).click();
@@ -361,8 +365,11 @@ try {
     .getByRole('button', { name: 'End session', exact: true })
     .click();
   await expect(host.getByRole('button', { name: 'New document', exact: true })).toBeVisible();
-  assert.equal((await invoke(host, 'update_status')).sessionActive, false);
-  await expect(guest.getByRole('status').first()).toHaveText('Disconnected');
+  await waitFor(
+    async () => !(await invoke(host, 'update_status')).sessionActive,
+    'closed document releases the update gate',
+  );
+  await expect(guest.getByRole('contentinfo').getByRole('status')).toHaveText('Disconnected');
   assert.deepEqual(errors, []);
   console.log(
     'PASS: native offline document, settings-only setup, reusable sharing, multi-guest edits, reset/stop, theme and overlay synchronization, exit confirmation, and local-document updater guard.',

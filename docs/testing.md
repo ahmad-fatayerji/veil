@@ -1,5 +1,47 @@
 # Verification record
 
+## Duplicate sessions and admission policy - 24 October 2026
+
+An isolated Windows/WebView2 probe reproduced duplicate participation in an
+unpatched 1.0.1 debug executable: a second tab could join its own host session.
+Fresh automatic joins succeeded both in that tab and in a separate client.
+The probe also reproduced an approval mismatch: a guest registered during
+approval mode continued receiving signed waiting statuses after the host selected
+Anyone with the link, while fresh guests joined automatically. The original
+report of a waiting status with automatic mode selected from the start remains
+unreproduced.
+
+With the revised frontend served by Vite and the existing 1.0.1 debug native
+executable, isolated clients were exercised against both a loopback server and
+the public Veil server. The same-client join was blocked before admission, a
+separate guest connected in default automatic mode, an approval-mode guest waited,
+and selecting Anyone with the link released that guest without manual approval.
+A fresh guest then connected, and resetting the link preserved the connected
+guests. The public test session used an empty document and was explicitly deleted;
+no page errors were recorded. This was a focused probe, not installer or
+unrelated-network/relay acceptance.
+
+The current server admission and socket handlers were reviewed alongside both
+compatibility-generation declarations. Short-link tickets begin pending in both
+modes; the host controls automatic approval through the existing admission-decision
+endpoint. Unit coverage includes a server decision failure, another guest still
+being admitted, retry after recovery, and a mode change during key preparation.
+No server wire change or deployment is required for these client fixes.
+
+The multi-tab run also exposed duplicate Share dialog field IDs: labels in a
+visible dialog could target a hidden tab's input. Share dialogs now use per-instance
+IDs, including their hosting fields and hint references. The native sharing harness
+uses the corresponding invitation/credential screenshot masks and expects waiting
+guests to be admitted when Auto join is selected.
+
+Validation passed: all 100 TypeScript tests, TypeScript compilation, ESLint on
+changed code, Prettier, the desktop frontend production build, and the full
+`scripts/test-create-share-join.mjs` native acceptance run using the revised Vite
+frontend with the existing debug executable. The harness's stale unreachable-server
+expectation, hidden empty-status selector, and asynchronous close/status checks
+were corrected during this run. Cargo checks and a rebuilt/installed native package
+were not exercised; native Rust source was unchanged.
+
 ## Launch multiple desktop clients for manual testing
 
 On Windows, install the normal development prerequisites and run

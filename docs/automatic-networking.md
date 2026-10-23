@@ -240,8 +240,10 @@ cancel and requests expire after two minutes. Pending tickets cannot request rel
 credentials or exchange established signaling. The host withholds its signed key
 exchange and document transport until it approves.
 
-Changing mode keeps the same link and affects new requests. Existing waiting
-requests still require a decision, and connected collaborators remain connected.
+Changing mode keeps the same link. Selecting Auto join also admits existing
+waiting requests once their encrypted guest handshakes have been validated.
+Selecting Require approval affects new requests; already admitted collaborators
+remain connected.
 Guests retry the encrypted initial handshake every two seconds until the host
 authenticates or the join deadline expires (two minutes for short links, thirty
 seconds for retained long links). Cancellation stops retries. This recovers a
