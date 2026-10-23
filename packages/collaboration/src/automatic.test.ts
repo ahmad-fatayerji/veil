@@ -61,8 +61,40 @@ async function fixture() {
     receive({ kind: 'left', inviteId: invite.inviteId });
     await vi.waitFor(() => expect(close).toHaveBeenCalled(), { interval: 0 });
   };
-  return { request, send, notice, callbacks, offer, start, leave };
+  return { request, send, notice, callbacks, offer, start, leave, transport, receive };
 }
+
+it('resumes a stalled host peer when signaling returns after its retry fired offline', async () => {
+  const f = await fixture();
+  await f.start();
+  await vi.advanceTimersByTimeAsync(6_000);
+  await vi.waitFor(() => expect(f.notice).toHaveBeenCalledWith('Invalid relay configuration.'));
+  f.transport.connect = async () => {
+    throw new Error('Offline');
+  };
+  f.receive({ kind: 'disconnected' });
+  await vi.waitFor(() =>
+    expect(f.notice).toHaveBeenCalledWith(
+      'Signaling disconnected. Healthy peer connections continue; reconnecting automatically.',
+    ),
+  );
+  await vi.advanceTimersByTimeAsync(3_000);
+  expect(f.offer).toHaveBeenCalledTimes(1);
+  f.transport.connect = async (_server, _sessionId, _ticket, receive) => {
+    receive({ kind: 'ready' });
+  };
+  await vi.advanceTimersByTimeAsync(4_000);
+  await vi.waitFor(() => expect(f.offer).toHaveBeenCalledTimes(2));
+});
+
+it('keeps a healthy peer transport when host signaling reconnects', async () => {
+  const f = await fixture();
+  await f.start();
+  f.callbacks[0].synced();
+  f.receive({ kind: 'ready' });
+  await vi.advanceTimersByTimeAsync(1_000);
+  expect(f.offer).toHaveBeenCalledTimes(1);
+});
 
 it('does not negotiate or request relay for an unused invitation', async () => {
   const f = await fixture();

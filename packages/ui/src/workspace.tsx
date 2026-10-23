@@ -37,13 +37,19 @@ export function Dialog({
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
   const backdropPointer = useRef<number | null>(null);
+  const closedByProp = useRef(false);
   useEffect(() => {
     const dialog = ref.current;
     if (open && !dialog?.open) {
       dialog?.showModal();
       // Native dialogs focus their first control (the close button); prefer a marked one.
       dialog?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
-    } else if (!open && dialog?.open) dialog.close();
+    } else if (!open && dialog?.open) {
+      // The native close event fires later, possibly after the next prompt has opened;
+      // reporting it would dismiss that prompt.
+      closedByProp.current = true;
+      dialog.close();
+    }
   }, [open]);
   return (
     <dialog
@@ -88,7 +94,10 @@ export function Dialog({
       onPointerCancel={() => {
         backdropPointer.current = null;
       }}
-      onClose={onClose}
+      onClose={() => {
+        if (closedByProp.current) closedByProp.current = false;
+        else onClose();
+      }}
     >
       <div className="dialog-heading">
         <h2 id={id}>{title}</h2>

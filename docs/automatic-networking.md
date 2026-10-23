@@ -1,28 +1,31 @@
 # Automatic connections and selective relay
 
 The approved P2 flow replaces manual offer/answer and LAN/browser choices in the
-normal desktop app. Install Veil on each Windows PC. Until another server is saved,
-Settings > Sharing > Hosting server suggests our own public servers
-(`https://veil.ahmadfatayerji.com`), which offer bounded public hosting without a
-credential. Settings explains their limits (up to five guests per document, a few
+normal desktop app. Install Veil on each Windows PC. Until a server is saved, the
+first Share asks where to host, with **Veil public servers**
+(`https://veil.ahmadfatayerji.com`) preselected next to **My own server**. The public
+servers offer bounded public hosting without a credential. Share and Settings explain
+their limits (up to five guests per document, a few
 sessions per connection, limited relay, no availability guarantee) and recommends
 self-hosting [veil-server](https://github.com/ahmad-fatayerji/veil-server) or using
 another server for reliable or larger sessions. An operator of another server gives
 the host an HTTPS address and, unless that server offers public hosting, an
-individual host credential. Enter these once in Settings > Sharing > Hosting server.
-The credential stays in Windows Credential Manager, scoped to the canonical server
-origin; the server address is saved separately. The first share still opens Hosting
-settings so the user sees and confirms the server before anything is shared.
+individual host credential. Enter these once, in the first Share or in Settings >
+Sharing > Hosting server. The credential stays in Windows Credential Manager, scoped
+to the canonical server origin; the server address is saved separately. The user sees
+and confirms the server before anything is shared; **Create invite link** saves the
+choice and shares in one step, and later shares name the saved server with a link to
+change it in Settings.
 
 When session creation fails because the server is full (`PUBLIC_CAPACITY_FULL` or
 `CAPACITY_FULL`) or this connection reached its public limit (`PUBLIC_LIMIT_REACHED`),
-Share shows a prompt instead of an error: **Configure your own server** opens Hosting
-settings with an empty address, **Try again** retries, and **Cancel** keeps the
+Share shows a prompt instead of an error: **Configure your own server** reopens Share
+with **My own server** selected and an empty address, **Try again** retries, and **Cancel** keeps the
 document local. Guests joining a public session that is full see the guest-limit message.
 
 Create document opens a local editor before any server request. Share attaches to
-that same document and uses saved configuration. Missing setup opens Hosting
-settings and resumes after saving. Setup/activation failure leaves edits available
+that same document and uses saved configuration. Missing setup asks where to host
+inside Share and shares after saving. Setup/activation failure leaves edits available
 for retry. Copy link shares one reusable `veil://join/<server>/<code>` invitation with a
 22-character random code;
 friends open or paste it, enter their name, and explicitly Join session. The Windows
@@ -45,7 +48,7 @@ empty field reuses a credential already stored for that exact origin without ano
 online test. Without a stored credential, saving requires the server to advertise
 `publicHosting: 1`; otherwise it asks for an operator-issued host credential.
 
-Hosting server settings also include **Test connection**. It checks the entered server
+**My own server** also offers **Test connection**. It checks the entered server
 and credential before saving; an empty credential field uses the credential already
 stored for that exact server origin. Changing either field clears the previous result.
 The native test checks reusable-sharing support, creates a temporary authenticated
@@ -233,6 +236,12 @@ exchange and document transport until it approves.
 
 Changing mode keeps the same link and affects new requests. Existing waiting
 requests still require a decision, and connected collaborators remain connected.
+Guests retry the encrypted initial handshake every two seconds until the host
+authenticates or the join deadline expires (two minutes for short links, thirty
+seconds for retained long links). Cancellation stops retries. This recovers a
+handshake dropped while the host's signaling socket is offline without bypassing
+host approval. After host signaling reconnects, stalled peers resume negotiation;
+healthy and already negotiating connections keep their transports.
 Reset link and Stop sharing cancel pending requests, without disconnecting existing
 collaborators. Reset retains the session's chosen join mode. A rejected registration
 preserves the prior link; a lost response after server commit can leave registration

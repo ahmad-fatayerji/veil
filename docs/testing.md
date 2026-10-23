@@ -1,5 +1,30 @@
 # Verification record
 
+## Launch multiple desktop clients for manual testing
+
+On Windows, install the normal development prerequisites and run
+`pnpm install --frozen-lockfile`, then use one command from the repository root:
+
+```powershell
+pnpm dev:multi
+```
+
+This builds a debug app with the frontend included and opens two clients with
+fresh, separate settings and WebView2 storage. Use `pnpm dev:multi 3` for three
+clients. The first build can take a while; later runs reuse the build cache.
+No dev server or environment-variable setup is needed. Rerun after source changes.
+
+Create and share a document in one client, then paste its invitation into
+**Join session** in another. The usual sharing-server requirements still apply.
+Save any notes before pressing **Ctrl+C**, which immediately stops all clients
+started by the command, including any hidden in the tray. Closing a window may
+only hide it; use **Quit Veil** to exit an individual client.
+
+Each invocation creates new profiles under `target/multi-instance/run-*` and leaves
+them there for inspection. Debug build output is isolated under
+`target/multi-instance/build`. Installed release builds still use one instance.
+The launcher does not run automated tests or start a sharing server.
+
 ## Save, Open, tabs, and recovery acceptance
 
 The following cases require user testing on Windows 10/11 with WebView2. They are
@@ -50,6 +75,30 @@ encoding and size failures, and update gating; execution remains with the user.
    required for this acceptance test.
 8. Updates must remain blocked with any document or background connection open,
    including after closing the selected tab or selecting Home.
+
+## Reliable closing and quitting - 23 October 2026
+
+Quitting with two or more unsaved tabs no longer stops after the first **Discard**.
+The control panel's native dialog close event arrived after the next prompt opened and
+answered it with Cancel; the shared dialog now ignores close events it caused itself.
+Quit requests that arrive while another workspace action runs, or during startup, now
+run when the workspace is free instead of being dropped, and a repeated request during
+a quit does not ask again after Cancel. A guest waiting for host approval no longer
+blocks quitting. Quitting no longer waits behind a hosting start, because hosting
+status checks under the update gate never wait for the hosting lock.
+
+`pnpm test:closing` (`scripts/test-closing.mjs`) drives the real Windows/WebView2 app
+through 22 cases: tray quit, window close in tray and Quit modes, one to three unsaved
+tabs, Cancel/Escape/dialog close and retry, saving an opened file, simultaneous and
+startup quit requests, quitting from a tab-close prompt, visible and long-hidden
+overlay, host Discard/End session/Cancel chains, a connected guest, a guest awaiting
+approval, and restore after restart. It starts its own `veil-server` from
+`VEIL_SERVER_SOURCE` (default `../Veil-server`) and accepts
+`VEIL_CLOSING_DESKTOP_BINARY`; pass a case-name filter as its argument. All 22 cases
+passed against the debug executable and a local server, alongside 86 TypeScript tests,
+37 desktop Rust tests, TypeScript, ESLint, Prettier, clippy and rustfmt. Physical
+tray-icon clicks, non-Windows platforms and long idle tray sessions remain unverified.
+This change does not alter any server or peer protocol contract.
 
 ## Windows startup - 22 October 2026
 

@@ -190,6 +190,8 @@ export class AutomaticSession {
   private approvedWarning = '';
   private authentication?: { resolve: () => void; reject: (error: Error) => void };
   private authenticationTimer?: ReturnType<typeof setTimeout>;
+  private joinRetryTimer?: ReturnType<typeof setTimeout>;
+  private joinRetryDeadline = 0;
   private ticket = '';
   private sessionId = '';
   private discovery: RTCIceServer[] = [];
@@ -462,6 +464,7 @@ export class AutomaticSession {
       this.expectedHost = host;
     }
     if (this.stopped) throw new Error('Joining cancelled.');
+    this.joinRetryDeadline = Date.now() + (short ? 120_000 : 30_000);
     if (!this.client && !short) {
       await this.openSocket();
       return;
@@ -482,6 +485,7 @@ export class AutomaticSession {
       void this.openSocket().catch(reject);
     }).finally(() => {
       clearTimeout(this.authenticationTimer);
+      this.stopJoinRetries();
       this.authentication = undefined;
     });
   }
@@ -495,6 +499,46 @@ export class AutomaticSession {
     });
     this.output = operation.catch(() => {});
     return operation;
+  }
+  private stopJoinRetries() {
+    clearTimeout(this.joinRetryTimer);
+    this.joinRetryDeadline = 0;
+  }
+  /** Re-send fresh encrypted handshakes: the server drops signals to offline hosts. */
+  private async sendJoinRequest() {
+    clearTimeout(this.joinRetryTimer);
+    if (
+      !this.groupGuestId ||
+      this.stopped ||
+      this.ended ||
+      this.links.has(this.groupGuestId) ||
+      Date.now() >= this.joinRetryDeadline
+    )
+      return;
+    try {
+      if (this.socketOnline)
+        await this.bootstrapSend(this.groupGuestId, {
+          kind: 'handshake',
+          clientId: this.session.doc.clientID,
+          name: this.name.trim().slice(0, 80),
+        });
+    } catch {
+      // A transient send failure must not abort admission; retry within its deadline.
+    } finally {
+      if (!this.stopped && !this.ended && Date.now() < this.joinRetryDeadline) {
+        clearTimeout(this.joinRetryTimer);
+        this.joinRetryTimer = setTimeout(() => {
+          void this.sendJoinRequest();
+        }, 2_000);
+      }
+    }
+  }
+  /** Uses a new display name, and resends a join request the host may still be deciding on. */
+  rename(name: string) {
+    if (name === this.name) return;
+    this.name = name;
+    // Hosts already replace a pending guest's name when the request arrives again.
+    if (this.role === 'guest' && this.socketOnline) void this.sendJoinRequest().catch(() => {});
   }
   private async admitGroup(message: Record<string, unknown>) {
     const id = identity(message.inviteId),
@@ -795,6 +839,7 @@ export class AutomaticSession {
       hostExchange: received.hostExchange,
     };
     await verifyHandshake(bootstrap.group, handshake, payload.signature);
+    this.stopJoinRetries();
     if (this.client) {
       let host: ClientCompatibility | null = null;
       if (payload.hostCompatibility !== undefined) {
@@ -883,15 +928,18 @@ export class AutomaticSession {
       return;
     }
     if (message.kind === 'ready') {
-      if (this.groupGuestId && !this.links.has(this.groupGuestId))
-        await this.bootstrapSend(this.groupGuestId, {
-          kind: 'handshake',
-          clientId: this.session.doc.clientID,
-          name: this.name.trim().slice(0, 80),
-        });
+      await this.sendJoinRequest();
       if (this.role === 'guest')
         for (const link of this.links.values())
           await this.send(link, { kind: 'request', clientId: this.session.doc.clientID });
+      if (this.role === 'host')
+        for (const link of this.links.values()) {
+          // Restart only stalled links; healthy and in-flight peers keep their transports.
+          if (!link.ready && !link.connectionId) {
+            link.retryCount = 0;
+            void this.begin(link, 'direct');
+          }
+        }
       return;
     }
     if (message.kind === 'replaced') return;
@@ -1325,6 +1373,7 @@ export class AutomaticSession {
     }
   }
   private stopTimers() {
+    this.stopJoinRetries();
     for (const id of this.pending.keys()) this.forgetPending(id);
     clearTimeout(this.authenticationTimer);
     clearInterval(this.telemetry);
@@ -1424,10 +1473,12 @@ export async function joinAutomatic(
   notice: (message: string) => void,
   development = false,
   signal?: AbortSignal,
+  started?: (session: AutomaticSession) => void,
 ) {
   if (signal?.aborted) throw new Error('Joining cancelled.');
   const invite = decodeServerInvitation(code.trim(), development);
   const current = new AutomaticSession('guest', invite.server, name, transport, notice);
+  started?.(current);
   const abort = () => {
     void current.close().catch(() => {});
   };
@@ -1484,9 +1535,11 @@ export async function joinShareLink(
   notice: (message: string) => void,
   development = false,
   signal?: AbortSignal,
+  /** Receives the session before the host admits it, so a rename can reach the request. */
+  started?: (session: AutomaticSession) => void,
 ) {
   if (!code.trim().startsWith('veil://'))
-    return joinAutomatic(code, name, transport, notice, development, signal);
+    return joinAutomatic(code, name, transport, notice, development, signal, started);
   if (signal?.aborted) throw new Error('Joining cancelled.');
   const parsed = parseShareLink(code, development);
   const short = 'code' in parsed;
@@ -1507,6 +1560,7 @@ export async function joinShareLink(
   } else invite = parsed;
   if (signal?.aborted) throw new Error('Joining cancelled.');
   const current = new AutomaticSession('guest', invite.server, name, transport, notice);
+  started?.(current);
   const abort = () => {
     void current.close().catch(() => {});
   };

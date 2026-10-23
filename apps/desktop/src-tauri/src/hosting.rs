@@ -6,8 +6,10 @@ use veil_host::{HostConfig, HostInfo, HostedSession};
 pub struct Hosting(Mutex<Option<HostedSession>>);
 
 impl Hosting {
-    pub async fn is_active(&self) -> bool {
-        self.0.lock().await.is_some()
+    /// Callers hold the update gate, which quitting also needs, so never wait here.
+    /// A held lock means a host is starting or stopping, which counts as active.
+    pub fn is_active(&self) -> bool {
+        self.0.try_lock().map_or(true, |session| session.is_some())
     }
 }
 
@@ -33,6 +35,8 @@ pub async fn host_start(
     if session.is_some() {
         return Err("A session is already running.".into());
     }
+    // The held session lock keeps installs out; release the gate so quitting is not blocked.
+    drop(gate);
     let running = veil_host::start_host(config).await?;
     let info = running.info.clone();
     *session = Some(running);

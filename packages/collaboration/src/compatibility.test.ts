@@ -20,7 +20,7 @@ beforeEach(() => {
   vi.stubGlobal('navigator', {});
 });
 afterEach(() => vi.unstubAllGlobals());
-async function fixture() {
+async function fixture(dropHandshakes = 0) {
   const signing = await createShareIdentity();
   const group: ShareInvitation = {
     version: 4,
@@ -67,6 +67,7 @@ async function fixture() {
     send: async (envelope) => {
       sends.push(envelope);
       if (!envelope.bootstrap) return;
+      if (dropHandshakes-- > 0) return;
       const exchange = await createExchange();
       const handshake: ShareHandshake = {
         version: 1,
@@ -104,6 +105,74 @@ async function fixture() {
     },
   };
 }
+it('retries a lost guest handshake and stops retrying after authenticating the host', async () => {
+  vi.useFakeTimers();
+  const f = await fixture(1);
+  let session: Awaited<ReturnType<typeof joinShareLink>> | undefined;
+  const joining = joinShareLink(
+    f.code,
+    'Guest',
+    f.transport,
+    () => {},
+    false,
+    undefined,
+    (value) => {
+      session = value;
+    },
+  );
+  try {
+    await vi.waitFor(() => expect(f.sends.filter((e) => e.bootstrap)).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(2_000);
+    await joining;
+    expect(f.sends.filter((e) => e.bootstrap)).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(f.sends.filter((e) => e.bootstrap)).toHaveLength(2);
+  } finally {
+    await session?.close();
+    await joining.catch(() => {});
+    vi.useRealTimers();
+  }
+});
+
+it('bounds lost-handshake retries by the authentication deadline', async () => {
+  vi.useFakeTimers();
+  const f = await fixture(Infinity);
+  const joining = joinShareLink(f.code, 'Guest', f.transport, () => {});
+  const rejected = expect(joining).rejects.toThrow('Host authentication timed out');
+  try {
+    await vi.waitFor(() => expect(f.sends.filter((e) => e.bootstrap)).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.waitFor(() => expect(f.sends.filter((e) => e.bootstrap)).toHaveLength(2));
+    await vi.advanceTimersByTimeAsync(28_000);
+    await rejected;
+    const count = f.sends.length;
+    expect(count).toBeGreaterThan(1);
+    expect(count).toBeLessThanOrEqual(15);
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(f.sends).toHaveLength(count);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('stops handshake retries when the guest cancels joining', async () => {
+  vi.useFakeTimers();
+  const f = await fixture(Infinity);
+  const controller = new AbortController();
+  const joining = joinShareLink(f.code, 'Guest', f.transport, () => {}, false, controller.signal);
+  const rejected = expect(joining).rejects.toThrow('cancelled');
+  try {
+    await vi.waitFor(() => expect(f.sends.filter((e) => e.bootstrap)).toHaveLength(1));
+    controller.abort();
+    await rejected;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(f.sends.filter((e) => e.bootstrap)).toHaveLength(1);
+  } finally {
+    controller.abort();
+    vi.useRealTimers();
+  }
+});
+
 it('cancels unknown compatibility before admission without sending extension fields to old servers', async () => {
   const f = await fixture();
   f.transport.request = async (_server, path) => {

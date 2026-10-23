@@ -97,6 +97,7 @@ describe('document workspace lifecycle', () => {
 
   it('does not close or disconnect any tab when quitting is cancelled', async () => {
     const workspace = new Workspace();
+    workspace.ready = true;
     const first = documentTab(workspace, 'First');
     const second = documentTab(workspace, 'Second');
     vi.spyOn(workspace, 'ask').mockResolvedValueOnce('discard').mockResolvedValueOnce('cancel');
@@ -107,6 +108,52 @@ describe('document workspace lifecycle', () => {
     expect(workspace.tabs).toHaveLength(2);
     first.document!.doc.destroy();
     second.document!.doc.destroy();
+  });
+
+  it('quits after an action that was running when quitting was requested', async () => {
+    const workspace = new Workspace();
+    workspace.ready = true;
+    let finish!: () => void;
+    const running = workspace.run(() => new Promise<void>((done) => (finish = done)));
+    void workspace.quit();
+    expect(invoke).not.toHaveBeenCalledWith('app_complete_quit');
+    finish();
+    await running;
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('app_complete_quit'));
+  });
+
+  it('does not ask again when quitting is requested twice and then cancelled', async () => {
+    const workspace = new Workspace();
+    workspace.ready = true;
+    const tab = documentTab(workspace, 'First');
+    let answer!: (choice: 'cancel') => void;
+    const ask = vi
+      .spyOn(workspace, 'ask')
+      .mockImplementation(() => new Promise((done) => (answer = done)));
+    const quitting = workspace.quit();
+    await vi.waitFor(() => expect(ask).toHaveBeenCalledOnce());
+    void workspace.quit();
+    answer('cancel');
+    await quitting;
+    await Promise.resolve();
+    expect(ask).toHaveBeenCalledOnce();
+    expect(invoke).not.toHaveBeenCalledWith('app_complete_quit');
+    tab.document!.doc.destroy();
+  });
+
+  it('quits once the workspace is ready when quitting was requested during startup', async () => {
+    const workspace = new Workspace();
+    let load!: (value: unknown) => void;
+    vi.mocked(invoke).mockImplementation((command) =>
+      command === 'workspace_load'
+        ? new Promise((done) => (load = done))
+        : Promise.resolve(undefined),
+    );
+    const initializing = workspace.initialize();
+    void workspace.quit();
+    load({ enabled: false, workspace: null, warning: null });
+    await initializing;
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('app_complete_quit'));
   });
 
   it('closes only the selected tab and preserves other sessions', async () => {

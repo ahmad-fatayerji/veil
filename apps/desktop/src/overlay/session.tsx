@@ -57,7 +57,17 @@ export function DesktopEditor({
       updated: number[];
       removed: number[];
     }) => {
-      const ids = [...added, ...updated, ...removed].filter((id) => id !== network.clientID);
+      const changed = [...added, ...updated, ...removed];
+      // Renames update the network presence. Copy the name here too, or the next cursor
+      // move publishes the name this editor opened with.
+      const user = network.getLocalState()?.user;
+      if (
+        changed.includes(network.clientID) &&
+        user &&
+        JSON.stringify(user) !== JSON.stringify(awareness.getLocalState()?.user)
+      )
+        awareness.setLocalStateField('user', user);
+      const ids = changed.filter((id) => id !== network.clientID);
       if (ids.length)
         applyAwarenessUpdate(awareness, encodeAwarenessUpdate(network, ids), relayOrigin);
     };
