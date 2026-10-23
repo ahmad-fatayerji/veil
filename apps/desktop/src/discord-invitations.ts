@@ -37,6 +37,7 @@ export interface DiscordInvitationDocument {
 }
 
 export interface DiscordInvitationSelection {
+  owner: string;
   documentId: string;
   link: string;
   generation: number;
@@ -44,10 +45,14 @@ export interface DiscordInvitationSelection {
 
 /** Session-only consent, deliberately separate from presence preferences and
  * document/recovery data. This policy does not publish a link or call Discord.
- * A future SDK adapter must recheck the selection before every queued send. */
+ * The native SDK adapter rechecks the selection before every queued send. */
 export class DiscordInvitationPolicy {
+  readonly ownerId = crypto.randomUUID();
   private selection: DiscordInvitationSelection | null = null;
   private generation = 0;
+  get revision() {
+    return this.generation;
+  }
 
   get current(): Readonly<DiscordInvitationSelection> | null {
     return this.selection ? { ...this.selection } : null;
@@ -58,6 +63,7 @@ export class DiscordInvitationPolicy {
     const payload = discordJoinPayload(document.link);
     if (!payload.ok) throw new Error(payload.message);
     this.selection = {
+      owner: this.ownerId,
       documentId: document.id,
       link: payload.value,
       generation: ++this.generation,
@@ -81,6 +87,7 @@ export class DiscordInvitationPolicy {
   isCurrent(selection: Readonly<DiscordInvitationSelection>) {
     return (
       this.selection?.documentId === selection.documentId &&
+      this.selection.owner === selection.owner &&
       this.selection.link === selection.link &&
       this.selection.generation === selection.generation
     );

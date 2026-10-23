@@ -24,6 +24,9 @@ Each invocation creates new profiles under `target/multi-instance/run-*` and lea
 them there for inspection. Debug build output is isolated under
 `target/multi-instance/build`. Installed release builds still use one instance.
 The launcher does not run automated tests or start a sharing server.
+Discord also starts disconnected in every client, with tokens held only in that
+process. Connect clients sequentially using the intended Discord account for each;
+see [Discord development account isolation](discord-integration.md#independent-development-accounts).
 
 ## Save, Open, tabs, and recovery acceptance
 

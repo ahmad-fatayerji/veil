@@ -24,6 +24,7 @@ import {
   useParticipants,
 } from '@veil/ui';
 import { useDiscordPresence } from './discord';
+import { DiscordInvitationPolicy } from './discord-invitations';
 import { AutomaticApp } from './AutomaticApp';
 import { SessionBridge, flushOverlay } from './overlay/session';
 import { errorMessage, invoke, useOverlay } from './overlay/api';
@@ -72,6 +73,7 @@ export interface WorkspaceTab {
   busy: boolean;
   hosted: boolean;
   sharing: boolean;
+  sharingLink?: string;
   baseline: string;
   close?: () => Promise<void>;
   unsubscribe?: () => void;
@@ -81,6 +83,7 @@ const emptyFingerprint = JSON.stringify(['', []]);
 const id = () => crypto.randomUUID();
 
 export class Workspace {
+  readonly discordInvites = new DiscordInvitationPolicy();
   tabs: WorkspaceTab[] = [];
   activeId = '';
   restore = false;
@@ -140,6 +143,19 @@ export class Workspace {
     this.activeId = tab.id;
     this.changed();
   };
+  clearDiscordInvites = (documentId?: string) => {
+    const before = this.discordInvites.current;
+    this.discordInvites.disable(documentId);
+    if (before && !this.discordInvites.current) this.changed();
+  };
+  allowDiscordInvites = (tab: WorkspaceTab) => {
+    this.discordInvites.enable({
+      id: tab.id,
+      host: tab.hosted && !!tab.document,
+      link: tab.sharingLink ?? '',
+    });
+    this.changed();
+  };
   add(mode: WorkspaceTab['mode'], seed: Partial<WorkspaceTab> = {}) {
     const tab: WorkspaceTab = {
       id: id(),
@@ -183,11 +199,21 @@ export class Workspace {
         return;
       }
     }
+    const existing = invitation && this.tabs.find((tab) => tab.invitation === invitation);
+    if (existing) {
+      this.select(existing);
+      return;
+    }
     if (this.working) this.linksWaiting.push(invitation);
     else this.add('join', { invitation });
   };
   update(tab: WorkspaceTab, patch: Partial<WorkspaceTab>) {
     Object.assign(tab, patch);
+    this.discordInvites.reconcile({
+      id: tab.id,
+      host: tab.hosted && !!tab.document,
+      link: tab.sharingLink ?? '',
+    });
     this.changed();
   }
   attach(tab: WorkspaceTab, document: PeerSession | null) {
@@ -390,6 +416,7 @@ export class Workspace {
     this.run(async () => {
       await flushOverlay();
       if (!(await this.resolveChanges(tab))) return;
+      this.clearDiscordInvites(tab.id);
       await tab.close?.();
       tab.unsubscribe?.();
       if (tab.file) await invoke('file_release', { fileId: tab.file.id });
@@ -436,6 +463,7 @@ export class Workspace {
       };
       await this.persist(workspace);
       this.exiting = true;
+      this.clearDiscordInvites();
       try {
         await invoke('app_complete_quit');
       } catch (cause) {
@@ -578,13 +606,40 @@ export function DocumentWorkspace() {
   const overlay = useOverlay();
   const keybinds = overlay.state?.settings.keybinds ?? defaultKeybinds;
   const activeId = workspace.activeId;
-  const selectedDocument = workspace.active()?.document ?? null;
+  const invitationSelection = workspace.discordInvites.current;
+  const presenceTab = invitationSelection
+    ? workspace.tabs.find((tab) => tab.id === invitationSelection.documentId)
+    : workspace.active();
+  const selectedDocument = presenceTab?.document ?? null;
   const selectedTitle = useDocumentTitle(selectedDocument?.doc);
   const participants = useParticipants(selectedDocument);
   const discord = useDiscordPresence(
     selectedDocument ? selectedTitle : null,
     participants.filter((person) => !person.local).length,
+    workspace.clearDiscordInvites,
   );
+  useEffect(() => {
+    if (
+      invitationSelection &&
+      (!discord.preferences?.enabled || !discord.preferences.showParticipantCount)
+    )
+      workspace.clearDiscordInvites();
+  }, [workspace, invitationSelection, discord.preferences]);
+  const discordSelectionKey = JSON.stringify({
+    owner: workspace.discordInvites.ownerId,
+    revision: workspace.discordInvites.revision,
+    selection: invitationSelection
+      ? {
+          ...invitationSelection,
+          documentTitle: selectedTitle,
+          participantCount: Math.max(1, participants.length),
+        }
+      : null,
+  });
+  useEffect(() => {
+    if (!discord.social.available) return;
+    void invoke('discord_select_document', JSON.parse(discordSelectionKey)).catch(workspace.fail);
+  }, [workspace, discord.social.available, discordSelectionKey]);
   const appearanceSettings = useAppearance();
   const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -705,6 +760,14 @@ export function DocumentWorkspace() {
     );
   const toasts = (
     <>
+      {discord.social.invitations.map((invitation) => (
+        <DiscordIncomingInvitation
+          key={invitation.id}
+          invitation={invitation}
+          discord={discord}
+          workspace={workspace}
+        />
+      ))}
       {workspace.notice && (
         <Banner tone="info" role="status" className="toast" onDismiss={workspace.dismissNotice}>
           {workspace.notice}
@@ -789,6 +852,56 @@ export function DocumentWorkspace() {
         </div>
       </Dialog>
     </div>
+  );
+}
+
+function DiscordIncomingInvitation({
+  invitation,
+  discord,
+  workspace,
+}: {
+  invitation: ReturnType<typeof useDiscordPresence>['social']['invitations'][number];
+  discord: ReturnType<typeof useDiscordPresence>;
+  workspace: Workspace;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <Banner
+      className="toast"
+      tone={error ? 'danger' : 'info'}
+      role={error ? 'alert' : 'status'}
+      actions={
+        <>
+          <Button
+            size="sm"
+            loading={busy}
+            onClick={() => {
+              setBusy(true);
+              setError('');
+              void discord.social
+                .review(invitation.id)
+                .then((link) => workspace.joinTab(link))
+                .catch((cause: unknown) => setError(errorMessage(cause)))
+                .finally(() => setBusy(false));
+            }}
+          >
+            Review
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void discord.social.dismiss(invitation.id).catch(workspace.fail)}
+          >
+            Dismiss
+          </Button>
+        </>
+      }
+    >
+      {error ||
+        `${invitation.person.displayName} invited you to collaborate. Review the server and join settings before joining.`}
+    </Banner>
   );
 }
 

@@ -4,7 +4,8 @@ import type { JoinMode } from '@veil/collaboration';
 import { Banner, Button, Dialog, Field, Input, SegmentedControl } from '@veil/ui';
 import { HostingChoice, type HostingForm } from './HostingChoice';
 import { DiscordShareSection } from './DiscordShareSection';
-import type { DiscordCapabilities } from '../discord';
+import type { DiscordCapabilities, useDiscordPresence } from '../discord';
+import type { DiscordInvitationSelection } from '../discord-invitations';
 
 export function ShareDialog({
   open,
@@ -25,6 +26,11 @@ export function ShareDialog({
   onCopy,
   onCopyForDiscord,
   discordCapabilities,
+  discord,
+  discordSelection,
+  discordDocumentId,
+  onDiscordConsent,
+  onDiscordSettings,
   onReset,
   onStop,
   onEnable,
@@ -51,6 +57,11 @@ export function ShareDialog({
   onCopy: () => void;
   onCopyForDiscord: () => Promise<void>;
   discordCapabilities: DiscordCapabilities | null;
+  discord: ReturnType<typeof useDiscordPresence>;
+  discordSelection: Readonly<DiscordInvitationSelection> | null;
+  discordDocumentId: string;
+  onDiscordConsent: (enabled: boolean) => void;
+  onDiscordSettings: () => void;
   onReset: () => void;
   onStop: () => void;
   onEnable: () => void;
@@ -172,6 +183,11 @@ export function ShareDialog({
             id={discordId}
             link={link}
             capabilities={discordCapabilities}
+            discord={discord}
+            selection={discordSelection}
+            documentId={discordDocumentId}
+            onConsent={onDiscordConsent}
+            onSettings={onDiscordSettings}
             busy={busy}
             onCopy={onCopyForDiscord}
           />

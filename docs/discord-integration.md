@@ -1,153 +1,180 @@
 # Optional Discord connection and invites
 
-## Current implementation status
+## Behavior
 
-**This is preparation for the Social SDK integration, not a working Discord
-account-linking release.** The desktop still uses its existing text-only local IPC
-Rich Presence publisher. It does not authenticate Discord accounts, read friends,
-send Discord messages or activity invites, or receive SDK join callbacks.
+Veil can connect directly to Discord on Windows x64 using the Discord Social SDK.
+There are no Veil accounts, provisional accounts, identity backend, bot, or hosted
+OAuth redirect. Ordinary local documents, copy-link sharing and self-hosting do not
+require Discord. Linking never starts sharing or publishes an invitation.
 
-The native preferences snapshot now explicitly reports account linking and activity
-invites as unavailable. Settings displays this status separately from the existing
-Rich Presence controls. Share offers a real **Copy link for Discord** action with
-copying, copied and failure states; it never claims that a message was sent.
-The direct-invites control stays off and disabled. No mock friend list or connected
-profile is included in the production UI.
+Settings > Sharing > Discord offers connection, cancel, connected identity,
+reconnect and disconnect states. Existing Rich Presence title/count preferences
+remain separate. An unlinked user keeps the existing text-only presence path;
+the worker stops that publisher before the SDK takes over publication.
 
-`apps/desktop/src/discord-invitations.ts` contains a pure invitation payload check
-and session-only consent policy for the next slice. The policy has no transport
-and is deliberately **not wired into the presence publisher** while SDK support is
-unavailable. Merely constructing or reconciling the policy cannot enable sharing.
-Its regression cases cover host-only consent, one selected document, invalidating
-queued work after reset/stop/disconnect and the SDK payload boundary.
+Each host document's Share dialog has **Allow direct Discord invites for this
+document**, off by default. It selects one joinable document for the running app;
+switching tabs does not change it. Sharing another document through Discord needs
+an explicit switch. The selected document supplies presence title/count and its
+existing reusable link. Direct invitations require enabled Rich Presence and
+visible participant count; the UI explains these requirements without silently
+changing privacy preferences. Long self-hosted links retain the copy-link path.
 
-No OAuth command, provisional account, Veil identity service, token persistence,
-SDK binaries, SDK headers, or speculative C++ bindings are added in this slice.
+The friend picker searches actual Discord friends by name/username. Per-person
+states cover preparing, sending, accepted send, retry and explicit resend. Sent
+means Discord accepted the request, not delivered/read/joined. There is no chat or
+friend-management interface. Friend data, profiles and bounded avatar caches stay
+in memory and are cleared on disconnect. Avatar requests are native, constrained to
+SDK-provided Discord CDN URLs, size/time/concurrency bounded and returned as raster
+data; the WebView CSP is unchanged.
 
-## Dependency that blocks the native integration
+Incoming invitations offer Review/Dismiss. Review obtains and validates the join
+payload, then opens the normal join form in a new tab, showing the server and
+asking for explicit Join. It does not bypass host approval, compatibility checks,
+guest names or existing admission errors. Repeated launch callbacks cannot silently
+open duplicate tabs for the same invitation.
 
-No authorized Discord Social SDK archive, `discordpp.h`/`cdiscord.h`, import library,
-or `discord_partner_sdk.dll` was present in the workspace or the local Downloads
-folder inspected during this task. There was no enabled browser session with which
-to inspect the application's Developer Portal configuration. The documented C++
-download is under the application's **Discord Social SDK > Downloads** page;
-third-party mirrors are not a substitute for an authorized vendor download.
+Link reset, stop, close/session end, loss of connection, account disconnect and quit
+clear consent and invalidate queued sends. Consent is never persisted in Markdown,
+settings or recovery. Turning direct invites off removes joinable presence and
+blocks new sends. **Already delivered links remain usable until the existing link
+is reset, sharing stops, or the host session ends.** Already connected guests keep
+their authenticated connections under Veil's established semantics.
 
-Before implementing or advertising native connection and direct invitations:
+## Native boundary
 
-1. Confirm Social SDK eligibility for Veil's non-game desktop application. The
-   existing Rich Presence application ID is `1562757675970863135`; confirm that
-   application's SDK access rather than assuming its IPC activity proves access.
-2. Obtain the official Windows x64 C++ SDK through the Developer Portal and record
-   its version. Confirm how its headers, import libraries, runtime and notices may
-   be handled in this public MIT repository, CI and installer. Keep vendor files
-   outside Git until this is resolved.
-3. Confirm the Discord application's **Public Client** configuration and desktop
-   callback. The guide documents `http://127.0.0.1/callback` and SDK-owned redirect
-   handling. Do not add a hosted redirect, client secret, or Veil account service.
-4. Demonstrate local authorization using PKCE and only
-   `openid sdk.social_layer_presence`, secure token storage, renewal and revocation.
-5. With two real Discord accounts, prove an empty-message activity invite can be
-   sent, accepted and round-tripped with these scopes. The guide's general
-   prerequisite refers to communication scopes, but its detailed send section
-   explicitly says presence-only invitations work with empty message content.
-6. Prove activity invites remain joinable with `ActivityParty.MaxSize(0)`. The API
-   documents zero as hiding the maximum; do not turn a Discord display requirement
-   into an artificial Veil participant limit.
+`src-tauri/src/discord/sdk.cpp` is a Veil-owned C++20 bridge against Discord's
+supplied public wrapper. The single Discord worker owns the SDK and callback pump;
+SDK callbacks are registered before any connection. Native commands are limited
+to the main window and explicit connection, document selection, friends, avatars
+and invite operations. Queues, outstanding operations, snapshots, retries, images
+and retained incoming invitations are bounded.
 
-## Next app-side slice
+Authorization uses the SDK's PKCE verifier/challenge and public-client
+`Authorize`/`GetToken` flow with only `openid sdk.social_layer_presence`. Outgoing
+activity invites have empty message content, avoiding communication scopes. The
+SDK handles its loopback callback and OAuth state validation. No client secret,
+OAuth code, verifier, access token or refresh token reaches frontend JavaScript.
 
-Implement one Windows-native SDK owner and callback pump, isolated under
-`apps/desktop/src-tauri/src/discord/`. Replace neither the existing publisher nor
-its privacy behavior until the native spike succeeds; coordinate the two through
-one publishing owner to avoid competing activities. Keep builds without the SDK
-usable, with capabilities reporting unavailable.
+`auth.rs` stores rotated token pairs together in Windows Credential Manager under
+`dev.veil.desktop.discord` / application ID. It has no token Debug formatting and
+no Tauri command returning tokens. Token renewal is serialized; stale callbacks
+after cancel/disconnect are rejected. Transient renewal failures retry within
+bounds. Invalid authorization requires reconnect, with no provisional fallback.
+If a rotated pair cannot be saved, native memory retains the newly issued pair
+and the UI reports persistence failure. Disconnect clears local memory and the
+vault, then production builds attempt Discord revocation; deletion or revocation failure is reported
+instead of claiming all saved/remote authorization was removed.
 
-Use the SDK's public-client `Authorize`, code-verifier, `GetToken`, `RefreshToken`
-and `RevokeToken` paths. Keep codes/verifiers in native memory and tokens in a
-separate Windows Credential Manager entry. Never return raw tokens to JavaScript
-or store them in document, preferences or recovery data. On invalid authorization,
-clear the connection and request reconnect; do not create provisional accounts.
-Limit native commands to the main window and to explicit connection/invite
-operations, with bounded queues, timeouts and sanitized error messages.
+Rich Presence updates are serialized/coalesced. New join secrets are not usable for
+send until the SDK acknowledges publication. Every send rechecks document consent
+and generation, current connection, publication, friendship and cooldown. Party
+current size reflects participants; maximum is zero, which the SDK documents as
+hiding a fixed maximum. Veil imposes no participant cap.
 
-Replace the unavailable Settings card with cancelable authorization, connected
-avatar/name/username, reconnect and disconnect states. Linking alone must never
-start a session, adopt a guest name, publish an invitation or send anything.
+## Local SDK setup and builds
 
-Use `DiscordInvitationPolicy` as the session-only consent boundary after extending
-the workspace controller with a host document's current sharing link. Opt-in
-selects one joinable document. Switching tabs must not change that selection.
-Reset/stop, session end, tab close, disconnect/account change and quit must clear
-consent and invalidate queued sends; restarting/recovery must not restore it.
-Before every send, check the selected generation, current session and connection.
+The owner supplied `DiscordSocialSdk-1.10.19337.zip` and confirmed via portal
+screenshots that application `1562757675970863135` has Social SDK access, Public
+Client enabled/saved, and `http://127.0.0.1/callback` registered. These prerequisites
+are resolved; they are not continuing blockers.
 
-Extend Share with the real SDK friend picker: searchable existing friends,
-avatar fallback, clear identity, loading/empty/error states, per-person
-Sending/Sent/Retry, and duplicate in-flight protection. Sent means accepted by
-Discord, not delivered, read or joined. Clear the in-memory social graph on
-disconnect; full chat/friend management is outside this feature's scope.
+From the task checkout, stage only the required Windows x64 assets:
 
-Register SDK join callbacks before `Connect`. The guide documents a 180-second
-cold-launch pending-join window. Queue validated invitations until the workspace
-is ready, deduplicate duplicate callbacks, and show Review/Dismiss before opening
-the normal join flow in a new tab. Display the server and ask for explicit Join.
-Preserve compatibility confirmation, host approval, cancellation and existing
-admission errors. Test first-time/unlinked and expired-auth cold launches rather
-than promising the SDK can deliver them without authorization.
+```powershell
+./scripts/install-discord-sdk.ps1 -Archive 'path/to/DiscordSocialSdk-1.10.19337.zip'
+```
 
-Use existing components, light/dark semantic tokens, visible keyboard focus,
-screen-reader status announcements, responsive layout, reduced motion and proper
-focus restoration. Do not fetch remote avatars by broadly weakening the WebView
-CSP; use bounded native retrieval or the appropriate narrowly scoped asset path.
+The script extracts the two headers, release import library/runtime and supplied
+`License-Notices.txt` into ignored `.local/discord-social-sdk/`. Alternatively set
+`VEIL_DISCORD_SDK_DIR` to an extracted SDK root. No vendor binaries, headers or full
+archive are committed. The included notice file covers bundled open-source
+components; Discord's separate Social SDK terms govern the SDK itself. Preserve
+all notices and review the applicable terms when distributing an integrated build.
 
-## Existing protocol and deferred server work
+The native build discovers these assets, compiles the bridge and stages the runtime
+and notices beside the executable. The existing Windows installer script adds
+them as root resources when an SDK is present. It does not publish an installer.
+Source builds without an SDK remain usable and report connection/invites
+unavailable. Set `VEIL_DISCORD_SDK_DISABLED=1` to explicitly compile that fallback.
+Do not omit the DLL from an installer built with SDK support.
 
-No server contracts, admission/authentication, signaling, relay, capabilities,
-invitation formats or peer protocols change in this slice. The server is not
-edited or deployed. Server changes are explicitly deferred by the user.
+Production startup registers the actual executable with Discord for cold invitation
+launches. Debug builds do not replace that registration. The documented pending
+cold-launch join window is 180 seconds.
+Callback registration happens early; actual startup/expired-auth/first-link timing
+still needs native acceptance.
 
-The existing reusable link is `veil://join/<encoded-server-authority>/<22-char-code>`.
-An official-server link is 58 ASCII characters and fits the SDK's 128-character
-join-secret limit unchanged. The pure payload check accepts canonical production
-short links only and never truncates. A longer custom-server link remains usable
-through ordinary copy-link sharing. Reuse `joinShareLink`, short invitation lookup,
-host approval and the existing reset/stop APIs; no new resolver is needed for
-links that fit.
+## Independent development accounts
 
-Turning off direct Discord invites will remove discovery/joinable presence and
-stop new sends. It cannot revoke links already delivered. Those links work until
-the existing link is reset, sharing stops or the host session ends. Already
-approved guests retain their established connections according to current Veil
-semantics. Any recipient-bound invitations, selective Discord-only revocation or
-new resolver for arbitrary-length origins requires a separate server design and
-is deferred, not advertised here.
+`pnpm dev:multi` starts every client disconnected. Each process keeps its own OAuth
+tokens only in native memory; closing it discards them. It never reads, changes or
+deletes production credentials. Other debug builds use a separate Credential Manager
+service (`dev.veil.desktop.discord.development`) with a checkout-specific account
+key. Production builds preserve normal saved-token restore. Debug disconnects do
+not call Discord token revocation, because that can invalidate other authorizations
+for the same application/user. They only clear their own local authorization.
 
-The reviewed app compatibility generations are server `[2]` and peer `[1]`.
-The server revision pinned in app integration CI is
-`837d7e89c3c808418e02409323ff708a5647b447`; its compatibility implementation agrees.
-Recheck current app/server compatibility when the transport slice is implemented.
-No generation/version bump is needed for the current preparation work.
+Unlinked text-only presence is suppressed for isolated development clients, so
+fresh windows do not compete for the current desktop Discord account. The debug-only
+`VEIL_DISCORD_ALLOW_UNLINKED_PRESENCE=1` flag explicitly restores that behavior.
+`VEIL_DISCORD_EPHEMERAL=1` also enables process-only tokens in a regular debug run.
+These flags cannot change production credential behavior.
 
-## Verification and remaining acceptance
+For two-account acceptance, connect one Veil window at a time. Choose account A in
+the Discord authorization surface and confirm its avatar/name in Veil, then choose
+account B before connecting the second window. If Discord desktop supplies the
+authorization, switch its signed-in account between authorizations; if the SDK opens
+a browser, use the intended signed-in browser account. Keep the first Veil client
+running. Authorize sequentially to avoid competing loopback callback listeners.
 
-The repository leaves ordinary feature testing to the user. Regression cases were
-added but not run; no native OAuth, Discord invite, Windows installer or clean-machine
-acceptance is claimed. Formatting and diff checks are recorded in the task handoff.
+SDK 1.10.19337 exposes no documented parameter selecting Stable/PTB/Canary, a browser
+profile, or forcing an account picker in `AuthorizationArgs`. Veil does not claim
+to route clients to different Discord installations. The separate device flow is
+documented for limited-input devices and is not substituted for the requested
+desktop PKCE flow. Two-account connection and simultaneous presence still require
+live acceptance; isolated storage alone does not prove Discord routing behavior.
 
-Once the SDK is available, exercise cancellation/denial, expired/revoked tokens,
-Credential Manager failure, Discord closed/restarted, network failures/rate limits,
-warm/cold launch, malformed/oversized links, duplicate callbacks, two concurrent
-host tabs, reset/stop during an in-flight invite and both admission modes. Verify
-actual packaging before considering this feature release-ready. Follow the normal
-task worktree/PR workflow; this document does not authorize release or deployment.
+## Server compatibility and deferred work
+
+This feature reuses `veil://join/<encoded-server-authority>/<22-character-code>` and
+the existing short invitation resolve, host approval, compatibility and sharing
+reset/stop APIs. The official-server payload is 58 ASCII characters, within the
+SDK's 128-character limit. Neither frontend nor native code truncates links or
+substitutes a legacy invitation. A custom origin that makes the payload too long
+continues working through Copy link.
+
+There are no changes to server contracts, authentication/admission, signaling,
+relay, advertised capabilities, invitation formats or peer negotiation. Server
+and peer generations remain `[2]` and `[1]`. The reviewed server compatibility
+source at the app CI pin `837d7e89c3c808418e02409323ff708a5647b447` agrees. Server
+changes are explicitly deferred by the user. Recipient-bound invites, selective
+Discord-only revocation, or a resolver for arbitrary-length origins would need a
+separate coordinated server design and are not promised here.
+
+## Validation and acceptance limits
+
+Task handoff records compilation, lint and formatting separately from execution.
+Regression cases cover payload boundaries, one-document consent, stale work,
+cancel/disconnect, refresh rotation/persistence and invalid authorization. Under
+repository policy, local test suites and real user account flows are left to the
+user unless execution is explicitly requested.
+
+Real Windows/two-account acceptance remains necessary for consent denial/cancel,
+saved credential restore, expiry/revocation, Credential Manager failure, Discord
+closed/restarted, rate limiting, cold launch, concurrent tabs, reset/stop during a
+send, long custom-server links, automatic/approval admission, actual zero-max party
+invite behavior, avatar fallback, keyboard/screen-reader navigation and installer
+resource placement. Compilation alone does not prove those behaviors. No merge,
+release or deployment is authorized by this work. The requested remote review is a
+draft PR; remaining native acceptance is not represented as complete.
 
 ## Official references
 
-- [C++ SDK setup and runtime dependencies](https://docs.discord.com/developers/discord-social-sdk/getting-started/using-c%2B%2B)
-- [Account linking and public-client token lifecycle](https://docs.discord.com/developers/discord-social-sdk/development-guides/account-linking-with-discord)
-- [Scopes and public-client production cautions](https://docs.discord.com/developers/discord-social-sdk/core-concepts/oauth2-scopes)
-- [Activity invite scopes, send and launch lifecycle](https://docs.discord.com/developers/discord-social-sdk/development-guides/managing-game-invites)
+- [C++ setup and runtime dependencies](https://docs.discord.com/developers/discord-social-sdk/getting-started/using-c%2B%2B)
+- [PKCE and public-client token lifecycle](https://docs.discord.com/developers/discord-social-sdk/development-guides/account-linking-with-discord)
+- [Scopes and public-client guidance](https://docs.discord.com/developers/discord-social-sdk/core-concepts/oauth2-scopes)
+- [Invites, presence-only messages and launch lifecycle](https://docs.discord.com/developers/discord-social-sdk/development-guides/managing-game-invites)
 - [Join-secret bounds](https://discord.com/developers/docs/social-sdk/classdiscordpp_1_1ActivitySecrets.html)
 - [Party size semantics](https://discord.com/developers/docs/social-sdk/classdiscordpp_1_1ActivityParty.html)
-- [Social SDK terms and integrated distribution](https://support-dev.discord.com/hc/en-us/articles/30225844245271-Discord-Social-SDK-Terms)
+- [Social SDK terms](https://support-dev.discord.com/hc/en-us/articles/30225844245271-Discord-Social-SDK-Terms)

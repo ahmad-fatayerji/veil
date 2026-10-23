@@ -379,7 +379,8 @@ export function SettingsDialog({
               <p>Changes apply when you start sharing a new document.</p>
             </SettingsGroup>
             <SettingsGroup title="Discord">
-              <DiscordConnectionCard discord={discord} />
+              <DiscordConnectionCard connection={discord.connection} />
+              {discord.social.warning && <Banner tone="warning">{discord.social.warning}</Banner>}
               <div className="settings-card">
                 <SettingRow
                   label="Discord Rich Presence"
