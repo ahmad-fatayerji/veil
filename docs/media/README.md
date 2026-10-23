@@ -32,6 +32,15 @@ these are not the product defaults.
 | `live-overlay.gif`     | Native font-size changes and the overlay following document tab switches.       |
 | `overlay-settings.png` | Independent opacity sliders, font size, and formatting controls.                |
 | `hosting-settings.png` | Public hosting choice and its resource limits.                                  |
+| `promo-thumbnail.jpg`  | Thumbnail for the YouTube promo video (composed graphic; see below).            |
+
+`promo-thumbnail.jpg` is a designed graphic, not a screenshot. It places the app
+icon, title text and a play button beside real screenshots of the welcome screen,
+light workspace and overlay. Those were captured on 23 October 2026 from a debug
+build of `develop` (`012b7bd`) with disposable profiles and a loopback-only server.
+The [promo video](https://youtu.be/_OFk0o0yOP4) uses footage from the same session.
+Its capture-exclusion scene shows a single verified GDI capture on one Windows 11
+machine, not universal exclusion.
 
 Screenshots capture actual app window contents. Settings images crop to the actual
 settings dialog. Live invitation text is masked with a solid gray rectangle;

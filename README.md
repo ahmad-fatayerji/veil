@@ -12,11 +12,15 @@ Collaborative Markdown notes for Windows, with an overlay that stays visible to 
 
 [![Latest release](https://img.shields.io/github/v/release/ahmad-fatayerji/veil)](https://github.com/ahmad-fatayerji/veil/releases/latest) [![MIT license](https://img.shields.io/github/license/ahmad-fatayerji/veil)](LICENSE) [![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)](https://github.com/ahmad-fatayerji/veil/releases/latest)
 
-<img src="docs/media/workspace.png" alt="Veil's tabbed workspace with a shared checklist and two collaborators" width="1000" />
+[![Watch the Veil promo video on YouTube](docs/media/promo-thumbnail.jpg)](https://youtu.be/_OFk0o0yOP4)
+
+▶ [Watch the 30-second tour](https://youtu.be/_OFk0o0yOP4)
 
 </div>
 
 ## Features
+
+<img src="docs/media/workspace.png" alt="Veil's tabbed workspace with a shared checklist and two collaborators" width="1000" />
 
 - **A floating, editable overlay.** Keep notes on top, move and resize them, or let clicks pass through. Adjust font size, background opacity, and text opacity independently.
 - **Capture exclusion.** Keep the overlay out of compatible recordings and screen sharing. Results depend on the capture method; the main window remains capturable. [Compatibility details](docs/capture-compatibility.md).
