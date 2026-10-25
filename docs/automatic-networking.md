@@ -35,7 +35,7 @@ current document; content receives confirmation and Cancel preserves it.
 
 Reset link replaces the admission credential; Stop sharing revokes admission.
 Existing guests retain their tickets, recovery, and relay renewal. Links last until
-sharing stops or the host session ends. A server must advertise `groupSharing: 1` and `shortInvitations: 1`;
+sharing stops or the host session ends. A server may also advertise `sharingChannels: 2`, which lets a host register a secondary link (`channel: "secondary"`) that admits alongside the main one; the desktop uses it for Discord invitations. A server must advertise `groupSharing: 1` and `shortInvitations: 1`;
 otherwise Share explains the upgrade requirement without issuing single-use links.
 Pasted legacy `veil-invite:v2:` codes remain supported with their original ten-minute,
 single-use semantics. Older `veil-p2p:v1:` codes are incompatible. Forget saved host credential

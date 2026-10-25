@@ -78,6 +78,8 @@ export interface WorkspaceTab {
   hosted: boolean;
   sharing: boolean;
   sharingLink?: string;
+  /** The link Discord invitations carry; the shared link on single-link servers. */
+  discordLink?: string;
   baseline: string;
   close?: () => Promise<void>;
   unsubscribe?: () => void;
@@ -155,7 +157,7 @@ export class Workspace {
   /** Points Discord at this shared document. Returns the title of the document
    * that held it before, or null when nothing moved. */
   /** `link` is the tab's current link; a just-created one may not be recorded yet. */
-  useDiscordFor = (tab: WorkspaceTab, link = tab.sharingLink ?? '') => {
+  useDiscordFor = (tab: WorkspaceTab, link = tab.discordLink ?? '') => {
     const previous = this.discordInvites.current?.documentId;
     const changed = this.discordInvites.use({
       id: tab.id,
@@ -227,7 +229,7 @@ export class Workspace {
     this.discordInvites.reconcile({
       id: tab.id,
       host: tab.hosted && !!tab.document,
-      link: tab.sharingLink ?? '',
+      link: tab.discordLink ?? '',
     });
     this.changed();
   }
@@ -654,7 +656,7 @@ export function DocumentWorkspace() {
   });
   const discordKnownLinks = JSON.stringify(
     workspace.tabs.flatMap((tab) =>
-      [tab.sharingLink, tab.invitation].filter((link): link is string => !!link),
+      [tab.sharingLink, tab.discordLink, tab.invitation].filter((link): link is string => !!link),
     ),
   );
   useEffect(() => {

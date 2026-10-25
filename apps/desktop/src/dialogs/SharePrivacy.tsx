@@ -7,12 +7,15 @@ export function JoinModeControl({
   disabled,
   onChange,
   started,
+  note,
 }: {
   value: JoinMode;
   disabled: boolean;
   onChange: (mode: JoinMode) => void;
   /** Once a link exists, changing the mode keeps it and everyone already connected. */
   started: boolean;
+  /** How this relates to Discord friends, when Discord is ready. */
+  note?: string;
 }) {
   return (
     <div className="field">
@@ -32,6 +35,7 @@ export function JoinModeControl({
           ? 'People with the link join and edit right away.'
           : 'You’ll see a request above the document for each person.'}
         {started && ' Changing this keeps the link and current guests.'}
+        {note && ` ${note}`}
       </p>
     </div>
   );
@@ -65,7 +69,7 @@ export function DiscordJoinControl({
       />
       <p className="field-hint">
         {publicJoin
-          ? 'Discord friends join straight away from Join a session or your Discord profile. Who can join above still applies.'
+          ? 'Discord friends join straight away from Join a session or your Discord profile.'
           : 'Friends you invite join straight away. Others can ask, and you let each one in.'}
         {hint && ` ${hint}`}
       </p>
@@ -80,6 +84,7 @@ export function SharePrivacy({
   discord,
   publicJoin,
   discordElsewhere,
+  discordSeparate,
   onPublicJoinChange,
 }: {
   joinMode: JoinMode;
@@ -90,6 +95,8 @@ export function SharePrivacy({
   publicJoin: boolean;
   /** Title of another document Discord currently points to, if any. */
   discordElsewhere: string | null;
+  /** Whether Discord friends have their own link; false on single-link servers. */
+  discordSeparate: boolean | null;
   onPublicJoinChange: (publicJoin: boolean) => void;
 }) {
   return (
@@ -97,7 +104,19 @@ export function SharePrivacy({
       <h3 id="share-privacy-heading" className="share-section-title">
         Privacy
       </h3>
-      <JoinModeControl value={joinMode} disabled={busy} onChange={onJoinModeChange} started />
+      <JoinModeControl
+        value={joinMode}
+        disabled={busy}
+        onChange={onJoinModeChange}
+        started
+        note={
+          discord.kind !== 'ready' || discordSeparate === null
+            ? undefined
+            : discordSeparate
+              ? 'Discord friends follow Joining from Discord instead.'
+              : 'This server has one link, so this also applies to Discord friends.'
+        }
+      />
       {discord.kind === 'ready' && (
         <DiscordJoinControl
           publicJoin={publicJoin}

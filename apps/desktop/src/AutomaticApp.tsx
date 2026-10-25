@@ -115,6 +115,9 @@ export function AutomaticApp({
     tab.invitedBy && tab.invitation ? { link: tab.invitation, name: tab.invitedBy } : null,
   );
   const [link, setLink] = useState('');
+  /** The Discord-only link; 'shared' where the server keeps a single link, null until known. */
+  const [discordLink, setDiscordLink] = useState<string | null>(null);
+  const discordTarget = discordLink === 'shared' ? link : (discordLink ?? '');
   const [joinMode, setJoinMode] = useState<JoinMode>('auto');
   const [pendingGuests, setPendingGuests] = useState<PendingGuest[]>([]);
   const joining = useRef<AbortController | null>(null);
@@ -475,6 +478,7 @@ export function AutomaticApp({
       setSession(null);
       setPeers([]);
       setLink('');
+      setDiscordLink(null);
       setPendingGuests([]);
       setJoinMode('auto');
       setNotice('');
@@ -601,13 +605,26 @@ export function AutomaticApp({
       hosted: !guest,
       sharing: !!session,
       sharingLink: link,
+      discordLink: discordTarget || undefined,
     });
     // The tab controller always uses the latest closures without resetting its document.
-  }, [workspace, tab, busy, joinInProgress, updating, connection, guest, session, leave, link]);
+  }, [
+    workspace,
+    tab,
+    busy,
+    joinInProgress,
+    updating,
+    connection,
+    guest,
+    session,
+    leave,
+    link,
+    discordTarget,
+  ]);
   // With Discord connected, the document you share becomes the one friends can be
   // invited to, unless another shared document already holds it. Runs after the
   // update above so the workspace sees the new link.
-  const discordInvitable =
+  const discordReady =
     active &&
     !guest &&
     !!link &&
@@ -617,17 +634,33 @@ export function AutomaticApp({
       preferences: discord.preferences,
       link,
     }).kind === 'ready';
+  // Discord friends get their own link, so Who can join only governs the copied one.
+  useEffect(() => {
+    const host = network.current;
+    if (!discordReady || discordLink !== null || !host) return;
+    let current = true;
+    void host
+      .enableSecondarySharing()
+      .catch(() => '')
+      .then((value) => {
+        if (current) setDiscordLink(value || 'shared');
+      });
+    return () => {
+      current = false;
+    };
+  }, [discordReady, discordLink, link]);
+  const discordInvitable = discordReady && !!discordTarget;
   useEffect(() => {
     if (!discordInvitable || workspace.discordInvites.current) return;
     try {
-      workspace.useDiscordFor(tab, link);
+      workspace.useDiscordFor(tab, discordTarget);
       if (pendingPublicJoin.current !== null)
-        workspace.setDiscordPublicJoin(tab, pendingPublicJoin.current, link);
+        workspace.setDiscordPublicJoin(tab, pendingPublicJoin.current, discordTarget);
       pendingPublicJoin.current = null;
     } catch {
       /* The Share dialog explains why this link cannot be used on Discord. */
     }
-  }, [workspace, tab, discordInvitable, link]);
+  }, [workspace, tab, discordInvitable, discordTarget]);
   // An empty name on the first share or join uses the connected Discord name.
   const discordName =
     discord.connection.status === 'connected'
@@ -1069,13 +1102,15 @@ export function AutomaticApp({
         discord={discord}
         discordSelection={workspace.discordInvites.current}
         discordDocumentId={tab.id}
+        discordLink={discordTarget}
+        discordSeparate={discordLink === null ? null : discordLink !== 'shared'}
         discordElsewhere={discordElsewhere}
         onDiscordUse={() => {
           try {
             // The friend list can open in the same render that created the link.
-            const moved = workspace.useDiscordFor(tab, link);
+            const moved = workspace.useDiscordFor(tab, discordTarget);
             if (pendingPublicJoin.current !== null)
-              workspace.setDiscordPublicJoin(tab, pendingPublicJoin.current, link);
+              workspace.setDiscordPublicJoin(tab, pendingPublicJoin.current, discordTarget);
             pendingPublicJoin.current = null;
             return moved;
           } catch (cause) {
@@ -1085,7 +1120,7 @@ export function AutomaticApp({
         }}
         onDiscordPublicJoin={(publicJoin) => {
           try {
-            workspace.setDiscordPublicJoin(tab, publicJoin, link);
+            workspace.setDiscordPublicJoin(tab, publicJoin, discordTarget);
           } catch (cause) {
             setError(errorMessage(cause));
           }
@@ -1094,6 +1129,9 @@ export function AutomaticApp({
           void run(async () => {
             workspace.clearDiscordInvites(tab.id);
             setLink(await network.current!.enableSharing(true));
+            // Resetting also replaces the Discord link, so delivered Discord invites stop admitting.
+            if (discordLink && discordLink !== 'shared')
+              setDiscordLink((await network.current!.enableSecondarySharing(true)) || 'shared');
             setNotice('New link ready. The previous link no longer accepts new people.');
           })
         }
@@ -1103,6 +1141,7 @@ export function AutomaticApp({
             await network.current!.stopSharing();
             // The dialog's Sharing is off view says this; no second notice.
             setLink('');
+            setDiscordLink(null);
           })
         }
         onEnable={() => {

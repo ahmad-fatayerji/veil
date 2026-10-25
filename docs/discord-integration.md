@@ -22,7 +22,18 @@ works.
 The dialog's **Privacy** section holds the per-document choices. **Who can join**
 is anyone with the link, or only people the host approves; the latter can also be
 chosen before the first link is created. When Discord is connected and ready,
-**Joining from Discord** offers **Friends can join** (default; friends join without a host prompt, and Who can join still applies) or **Invite only** (each Discord join request needs the host to let them in).
+**Joining from Discord** offers **Friends can join** (default; friends join without a host prompt) or **Invite only** (each Discord join request needs the host to let them in).
+
+The two settings are independent where the server advertises `sharingChannels: 2`.
+Discord invitations and join requests then carry a separate Discord link, registered
+as the session's secondary sharing link. Guests arriving through it are admitted
+without Veil's approval prompt, because Discord already gated them. Who can join
+governs only the copied link. For example, Friends can join with Only people I
+approve lets Discord friends in directly while link holders still ask. Reset link
+replaces both links, and Stop sharing revokes both. On servers without the
+capability, Discord uses the single shared link, Who can join also applies to
+Discord friends, and the Share dialog says so. The Discord link is still a bearer
+capability: a friend who extracts it could pass it on.
 There is no separate on/off switch for invites: a connected host can always invite
 friends to a shared document.
 
@@ -46,7 +57,7 @@ not act on those requests (live behavior unverified). Friends can join publishes
 public party. Per the SDK, a public party is joinable from the profile only as
 the host's Discord account privacy settings allow (unverified live). Changing
 this republishes the activity without invalidating the published join secret.
-Admission still follows Who can join.
+Admission through the Discord link does not use Who can join (see above).
 
 Direct invitations require enabled Rich Presence and visible participant count.
 The friend view explains this and offers an explicit **Turn on** for both. It
@@ -267,13 +278,19 @@ SDK's 128-character limit. Neither frontend nor native code truncates links or
 substitutes a legacy invitation. A custom origin that makes the payload too long
 continues working through Copy link.
 
-There are no changes to server contracts, authentication/admission, signaling,
-relay, advertised capabilities, invitation formats or peer negotiation. Server
-and peer generations remain `[2]` and `[1]`. The reviewed server compatibility
-source at the app CI pin `837d7e89c3c808418e02409323ff708a5647b447` agrees. Server
-changes are explicitly deferred by the user. Recipient-bound invites, selective
-Discord-only revocation, or a resolver for arbitrary-length origins would need a
-separate coordinated server design and are not promised here.
+Separate Discord admission uses the additive secondary sharing link from
+coordinated server PR ahmad-fatayerji/veil-server#14. `POST
+/v3/sessions/:session/sharing` takes an optional `channel: "secondary"`, and
+capabilities advertise `sharingChannels: 2`. The app sends `channel` only to
+servers advertising the capability; otherwise it keeps one link. Signaling, relay,
+invitation formats and peer negotiation are unchanged. Server and peer generations
+remain `[2]` and `[1]`; the extension is capability-gated, like the earlier
+sharing extensions. Deploy the server before relying on separate Discord admission.
+
+App integration CI stays pinned to `837d7e89c3c808418e02409323ff708a5647b447`
+until the server PR merges, so CI exercises the single-link fallback. Moving the
+pin to the merged server revision is required before release. Recipient-bound
+invites and a resolver for arbitrary-length origins are not promised here.
 
 ## Validation and acceptance limits
 

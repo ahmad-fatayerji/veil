@@ -158,6 +158,9 @@ export class AutomaticSession {
   private bootstraps = new Map<string, GroupBootstrap>();
   private sharingLink = '';
   private activeGroup?: string;
+  /** A second link admitted automatically; the host gates it elsewhere (Discord). */
+  private secondaryLink = '';
+  private secondaryGroup?: string;
   private mode: JoinMode = 'auto';
   private pending = new Map<string, PendingAdmission>();
   private deciding = new Set<string>();
@@ -177,6 +180,15 @@ export class AutomaticSession {
   private groupGuestId?: string;
   get sharedLink() {
     return this.sharingLink;
+  }
+  get secondarySharedLink() {
+    return this.secondaryLink;
+  }
+  /** Whether a group still admits: the main link or the secondary link. */
+  private admits(groupId: unknown) {
+    return (
+      groupId === this.activeGroup || (!!this.secondaryGroup && groupId === this.secondaryGroup)
+    );
   }
   get serviceOnline() {
     return this.socketOnline && !this.ended;
@@ -378,11 +390,31 @@ export class AutomaticSession {
     if (this.role !== 'host' || this.stopped || this.ended)
       throw new Error('Only an active host can share.');
     if (this.sharingLink && !reset) return this.sharingLink;
+    await this.sharingCapabilities();
+    this.sharingLink = await this.registerGroup('primary');
+    return this.sharingLink;
+  }
+  /** Registers the secondary link where the server supports it. Returns '' on
+   * servers without `sharingChannels`, where the main link is the only one. */
+  async enableSecondarySharing(reset = false): Promise<string> {
+    if (this.role !== 'host' || this.stopped || this.ended)
+      throw new Error('Only an active host can share.');
+    if (!this.sharingLink) throw new Error('Share the document before adding another link.');
+    if (this.secondaryLink && !reset) return this.secondaryLink;
+    const capabilities = await this.sharingCapabilities();
+    if (!(Number(capabilities.sharingChannels) >= 2)) return '';
+    this.secondaryLink = await this.registerGroup('secondary');
+    return this.secondaryLink;
+  }
+  private async sharingCapabilities() {
     const capabilities = await this.request('/v2/capabilities', {}, 'GET');
     if (capabilities.groupSharing !== 1 || capabilities.shortInvitations !== 1)
       throw new Error(
         'This server needs an update to support short sharing links. Update the server, then retry.',
       );
+    return capabilities;
+  }
+  private async registerGroup(channel: 'primary' | 'secondary') {
     const signing = await createShareIdentity();
     const invite: ShareInvitation = {
       version: 4,
@@ -394,8 +426,10 @@ export class AutomaticSession {
       hostPublic: signing.publicKey,
     };
     const short = await encryptShortInvitation(invite);
-    const previousGroup = this.activeGroup;
-    this.activeGroup = invite.groupId;
+    const secondary = channel === 'secondary';
+    const previousGroup = secondary ? this.secondaryGroup : this.activeGroup;
+    if (secondary) this.secondaryGroup = invite.groupId;
+    else this.activeGroup = invite.groupId;
     // Store before registration so an immediately admitted guest finds its key.
     this.groups.set(invite.groupId, { invite, signingKey: signing.privateKey });
     try {
@@ -403,22 +437,27 @@ export class AutomaticSession {
         groupId: invite.groupId,
         admissionHash: await sha256(await shareAdmission(invite)),
         shortInvitation: short.record,
+        // Older servers reject the field; it is only sent where advertised.
+        ...(secondary ? { channel: 'secondary' } : {}),
       });
     } catch (error) {
       this.groups.delete(invite.groupId);
-      this.activeGroup = previousGroup;
+      if (secondary) this.secondaryGroup = previousGroup;
+      else this.activeGroup = previousGroup;
       throw error;
     }
+    // Replacing one link drops only the requests made through the link it replaced.
     for (const [id, pending] of this.pending) {
-      if (pending.message.groupId !== invite.groupId) this.forgetPending(id);
+      if (!this.admits(pending.message.groupId)) this.forgetPending(id);
     }
-    this.sharingLink = short.link;
-    return this.sharingLink;
+    return short.link;
   }
   async stopSharing() {
     await this.request(`/v3/sessions/${this.sessionId}/sharing`, {}, 'DELETE');
     this.sharingLink = '';
     this.activeGroup = undefined;
+    this.secondaryLink = '';
+    this.secondaryGroup = undefined;
     for (const id of this.pending.keys()) this.forgetPending(id);
   }
   async startGroupGuest(group: ShareInvitation, short = false) {
@@ -545,7 +584,7 @@ export class AutomaticSession {
       groupId = identity(message.groupId);
     if (this.links.has(id)) return;
     const group = this.groups.get(groupId);
-    if (groupId !== this.activeGroup) return;
+    if (!this.admits(groupId)) return;
     if (
       !group ||
       !Number.isInteger(message.clientId) ||
@@ -573,7 +612,8 @@ export class AutomaticSession {
       });
       return;
     }
-    const requiresApproval = this.mode === 'approval';
+    // The secondary link is gated before admission, so only the main link asks the host.
+    const requiresApproval = this.mode === 'approval' && groupId !== this.secondaryGroup;
     const exchange = await createExchange();
     const invite = linkInvitation(group.invite, id);
     this.bootstraps.set(id, {
@@ -582,7 +622,7 @@ export class AutomaticSession {
       exchange,
       remoteId: message.clientId as number,
     });
-    if (this.stopped || this.ended || groupId !== this.activeGroup) {
+    if (this.stopped || this.ended || !this.admits(groupId)) {
       this.bootstraps.delete(id);
       return;
     }
@@ -675,7 +715,7 @@ export class AutomaticSession {
         this.stopped ||
         this.ended ||
         this.pending.get(id) !== pending ||
-        pending.message.groupId !== this.activeGroup
+        !this.admits(pending.message.groupId)
       ) {
         await this.request('/v3/admission/decision', {
           sessionId: this.sessionId,
@@ -709,7 +749,7 @@ export class AutomaticSession {
         this.stopped ||
         this.ended ||
         this.pending.get(id) !== pending ||
-        groupId !== this.activeGroup
+        !this.admits(groupId)
       ) {
         await this.request('/v3/admission/decision', {
           sessionId: this.sessionId,
@@ -733,7 +773,7 @@ export class AutomaticSession {
         this.stopped ||
         this.ended ||
         this.pending.get(id) !== pending ||
-        groupId !== this.activeGroup
+        !this.admits(groupId)
       ) {
         await this.request('/v3/admission/decision', {
           sessionId: this.sessionId,

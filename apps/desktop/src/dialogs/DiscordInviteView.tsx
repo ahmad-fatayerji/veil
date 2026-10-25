@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import type { JoinMode } from '@veil/collaboration';
 import { Banner, Button } from '@veil/ui';
 import type { useDiscordPresence } from '../discord';
 import type { DiscordInvitationSelection } from '../discord-invitations';
@@ -14,7 +13,6 @@ export function DiscordInviteView({
   discord,
   selection,
   documentId,
-  joinMode,
   busy,
   onUse,
   onBack,
@@ -23,7 +21,6 @@ export function DiscordInviteView({
   discord: ReturnType<typeof useDiscordPresence>;
   selection: Readonly<DiscordInvitationSelection> | null;
   documentId: string;
-  joinMode: JoinMode;
   busy: boolean;
   /** Points Discord at this document; returns the title it moved from, if any. */
   onUse: () => string | null;
@@ -114,9 +111,6 @@ export function DiscordInviteView({
         {selection?.publicJoin && enabled
           ? 'Friends can also join from Join a session or your Discord profile. '
           : 'Only friends you invite join without asking. '}
-        {joinMode === 'approval'
-          ? 'You approve each person before they join.'
-          : 'Anyone with the link joins right away.'}{' '}
         <button type="button" className="text-link" onClick={onBack}>
           Change privacy
         </button>

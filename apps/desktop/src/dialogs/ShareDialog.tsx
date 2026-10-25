@@ -41,6 +41,8 @@ export function ShareDialog({
   discordSelection,
   discordDocumentId,
   discordElsewhere,
+  discordLink,
+  discordSeparate,
   onDiscordUse,
   onDiscordPublicJoin,
   onReset,
@@ -80,6 +82,10 @@ export function ShareDialog({
   discordDocumentId: string;
   /** Title of another document that currently holds Discord invites. */
   discordElsewhere: string | null;
+  /** The link Discord invitations carry; empty while it is being prepared. */
+  discordLink: string;
+  /** Whether Discord friends have their own link; null until the server answers. */
+  discordSeparate: boolean | null;
   /** Points Discord at this document; returns the title it moved from, if any. */
   onDiscordUse: () => string | null;
   onDiscordPublicJoin: (publicJoin: boolean) => void;
@@ -90,12 +96,17 @@ export function ShareDialog({
   error: string;
 }) {
   const discordRow = useRef<HTMLButtonElement>(null);
-  const discordState = discordShareState({
+  const resolvedDiscord = discordShareState({
     available: discord.social.available,
     connection: discord.connection,
     preferences: discord.preferences,
-    link,
+    link: discordLink || link,
   });
+  // The Discord link is registered once Discord is ready; until then, wait.
+  const discordState: typeof resolvedDiscord =
+    resolvedDiscord.kind === 'ready' && link && !discordLink
+      ? { kind: 'link', message: 'Preparing a Discord link…' }
+      : resolvedDiscord;
   const canStart = !!name.trim() && !(chooseHosting && !hosting.server.trim());
   const startDiscord = discordShareState({
     available: discord.social.available,
@@ -275,7 +286,6 @@ export function ShareDialog({
           discord={discord}
           selection={discordSelection}
           documentId={discordDocumentId}
-          joinMode={joinMode}
           busy={busy}
           onUse={onDiscordUse}
           onBack={back}
@@ -337,6 +347,7 @@ export function ShareDialog({
             discord={discordState}
             publicJoin={discordEnabled && !!discordSelection?.publicJoin}
             discordElsewhere={elsewhere}
+            discordSeparate={discordSeparate}
             onPublicJoinChange={onDiscordPublicJoin}
           />
           <div className="share-footer">
