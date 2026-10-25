@@ -624,11 +624,24 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                     if !consent.accept(owner, revision) {
                         continue;
                     }
-                    let mut view = worker.view.lock().unwrap();
-                    view.snapshot.invite_ready = false;
-                    view.snapshot.version += 1;
+                    // Title and participant count updates republish the same join
+                    // secret, so they keep an acknowledged publication usable.
+                    let same_join = match (&selection, &next) {
+                        (Some(current), Some(next)) => {
+                            current.owner == next.owner
+                                && current.document_id == next.document_id
+                                && current.link == next.link
+                                && current.generation == next.generation
+                        }
+                        _ => false,
+                    };
                     selection = next;
-                    activity_key.clear();
+                    if !same_join {
+                        let mut view = worker.view.lock().unwrap();
+                        view.snapshot.invite_ready = false;
+                        view.snapshot.version += 1;
+                        activity_key.clear();
+                    }
                 }
                 Command::Send(person, document, generation, owner, reply) => {
                     if Instant::now() < send_after {
