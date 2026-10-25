@@ -7,7 +7,7 @@ There are no Veil accounts, provisional accounts, identity backend, bot, or host
 OAuth redirect. Ordinary local documents, copy-link sharing and self-hosting do not
 require Discord. Linking never starts sharing or publishes an invitation.
 
-Settings > Sharing > Discord offers connection, cancel, connected identity,
+Settings > Sharing > Discord account offers connection, cancel, connected identity,
 reconnect and disconnect states. Existing Rich Presence title/count preferences
 remain separate. An unlinked user keeps the existing text-only presence path;
 the worker stops that publisher before the SDK takes over publication.
@@ -19,36 +19,76 @@ place. It is hidden in builds without the SDK. It is disabled, with the reason
 shown, when a long self-hosted link cannot fit Discord's join secret; Copy still
 works.
 
-The dialog's **Privacy** section holds the per-document choices: **Who can join**
-(anyone with the link, or only people the host approves; the latter can also be
-chosen before the first link is created) and **Discord invites** (**Off** by
-default, or **Friends I invite**). Off publishes no join secret and allows no
-sends, so nobody can join through Discord. Friends I invite selects one joinable
-document for the running app; switching tabs does not change it. Choosing it for
-another document says which document currently holds it, and moves it only on an
-explicit click. The selected document supplies presence title/count and its
-existing reusable link. The activity uses a private Discord party. Discord may
-still offer friends its own "Ask to join" on a private party; Veil does not act on
-those requests (live behavior unverified).
+The dialog's **Privacy** section holds the per-document choices. **Who can join**
+is anyone with the link, or only people the host approves; the latter can also be
+chosen before the first link is created. When Discord is connected and ready,
+**Joining from Discord** offers **Invite only** (default) or **Friends can join**.
+There is no separate on/off switch for invites: a connected host can always invite
+friends to a shared document.
+
+Discord activity points at one shared host document for the running app. It is
+selected implicitly:
+
+- when the active document starts sharing (or gets a new link) and nothing else
+  is selected;
+- when the host opens the friend view or changes Joining from Discord for a
+  document.
+
+Moving it from another document shows a note that earlier invites to that
+document may stop working. Switching tabs alone does not move it. Reselecting the
+same document and link keeps its consent generation, so readiness and sent states
+survive. The selected document supplies presence title/count and its existing
+reusable link.
+
+Invite only publishes a private Discord party, so friends need an invite sent from
+Veil. Discord may still offer its own "Ask to join" on a private party; Veil does
+not act on those requests (live behavior unverified). Friends can join publishes a
+public party. Per the SDK, a public party is joinable from the profile only as
+the host's Discord account privacy settings allow (unverified live). Changing
+this republishes the activity without invalidating the published join secret.
+Admission still follows Who can join.
 
 Direct invitations require enabled Rich Presence and visible participant count.
 The friend view explains this and offers an explicit **Turn on** for both. It
 never changes these privacy preferences silently.
 
-The friend view searches actual Discord friends by name/username. The list stays
-visible while Discord acknowledges this document's activity. Invite clicks made
-before that acknowledgement wait up to 10 seconds, then report that Discord is
-still getting ready. Per-person states cover sending, accepted send, retry and
-explicit "Invite again". Sent means Discord accepted the request, not
+Friends load as follows:
+
+- Discord pushes the friend list to the SDK after connect. The bridge reads
+  `GetRelationships()` on Ready and immediately on relationship create/delete.
+- User and presence updates are coalesced into at most one rescan every 2 seconds.
+- Native code keeps the list, including each friend's reported status (online,
+  idle, do not disturb, offline, or none), in an in-memory snapshot. The frontend
+  polls the snapshot every 750 ms, and only changed versions return data.
+
+The friend view searches by display name or username, ignoring case, width and
+accents. It orders people invited during this connection first, then online,
+idle, do-not-disturb and offline friends, each alphabetical. The order is fixed
+when the list first appears, so presence changes don't move rows under the
+pointer. Status shows as a dot on the avatar when Discord reports it. Whether the
+`sdk.social_layer_presence` scope exposes friends' statuses still needs live
+acceptance. The view renders the first 100 matches and asks the host to search
+for the rest.
+
+The list stays visible while Discord acknowledges the document's activity. Invite
+clicks made before that acknowledgement wait up to 10 seconds, then report that
+Discord is still getting ready. Per-person states cover sending, accepted send,
+retry and explicit "Invite again". Sent means Discord accepted the request, not
 delivered/read/joined. Title or participant-count updates for the same selected
-link keep an acknowledged publication usable. Only a changed document, link or
-consent generation requires a new acknowledgement. There is no chat or
-friend-management interface. Friend data, profiles and bounded avatar caches stay
-in memory and are cleared on disconnect. While sharing, the People panel offers
-Copy link, a Discord shortcut into the friend view (when connected) and Sharing
-options. Avatar requests are native, constrained to
-SDK-provided Discord CDN URLs, size/time/concurrency bounded and returned as raster
-data; the WebView CSP is unchanged.
+link keep an acknowledged publication usable.
+
+Avatars load lazily as rows scroll into view. Avatar requests are native,
+constrained to SDK-provided Discord CDN URLs, size/time/concurrency bounded and
+returned as raster data; the WebView CSP is unchanged. Native code keeps a
+least-recently-used cache: 256 entries or 12 MB, keyed by person and avatar URL so
+a changed avatar refetches. The frontend keeps up to 256 decoded avatars, keyed by
+person and avatar revision, so reopening the list needs no IPC. Both caches, the
+friend list and the invited-this-connection set stay in memory. They are cleared
+on disconnect or account change.
+
+There is no chat or friend-management interface. While sharing, the People panel
+offers Copy link, a Discord shortcut into the friend view (when connected) and
+Sharing options.
 
 Incoming invitations show the inviter's avatar and name and offer Open/Dismiss.
 Open obtains and validates the join payload, then opens the normal join form in a
@@ -66,9 +106,10 @@ and opened invitation links suppress notices for those sessions, independent of
 host/guest role. Invitations to other sessions remain available.
 
 Link reset, stop, close/session end, loss of connection, account disconnect and quit
-clear consent and invalidate queued sends. Consent is never persisted in Markdown,
-settings or recovery. Turning direct invites off removes joinable presence and
-blocks new sends. **Already delivered links remain usable until the existing link
+clear the selection and invalidate queued sends. The selection and Joining from
+Discord choice are never persisted in Markdown, settings or recovery. Stopping
+sharing, disconnecting Discord or turning off Discord status removes joinable
+presence and blocks new sends. **Already delivered links remain usable until the existing link
 is reset, sharing stops, or the host session ends.** Already connected guests keep
 their authenticated connections under Veil's established semantics.
 

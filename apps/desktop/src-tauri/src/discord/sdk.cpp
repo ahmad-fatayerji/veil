@@ -28,6 +28,10 @@ struct Bridge {
     std::chrono::steady_clock::time_point next_activity{};
     std::string published_link;
     bool friends_dirty = false;
+    // Presence updates arrive for every friend; relationship changes are applied at once.
+    bool friends_urgent = false;
+    std::chrono::steady_clock::time_point next_friends{};
+    bool public_join = false;
     std::string details, state, link, party;
     int count = 1;
     std::unordered_map<uint64_t, discordpp::ActivityInvite> invitations;
@@ -42,7 +46,7 @@ struct Bridge {
         return 0;
     }
     void user(int kind, discordpp::UserHandle const& person, uint64_t request = 0) {
-        emit(kind, request, person.Id(), 0, person.DisplayName(), person.Username(),
+        emit(kind, request, person.Id(), static_cast<int64_t>(person.Status()), person.DisplayName(), person.Username(),
              person.AvatarUrl(discordpp::UserHandle::AvatarType::Png, discordpp::UserHandle::AvatarType::Png));
     }
     void friends() {
@@ -83,8 +87,8 @@ struct Bridge {
             if (status == discordpp::Client::Status::Ready) { friends(); dirty = true; }
         });
         client->SetTokenExpirationCallback([this, guard]() { if (*guard) emit(13); });
-        client->SetRelationshipCreatedCallback([this, guard](uint64_t, bool) { if (*guard) friends_dirty = true; });
-        client->SetRelationshipDeletedCallback([this, guard](uint64_t, bool) { if (*guard) friends_dirty = true; });
+        client->SetRelationshipCreatedCallback([this, guard](uint64_t, bool) { if (*guard) friends_dirty = friends_urgent = true; });
+        client->SetRelationshipDeletedCallback([this, guard](uint64_t, bool) { if (*guard) friends_dirty = friends_urgent = true; });
         client->SetUserUpdatedCallback([this, guard](uint64_t) { if (*guard) friends_dirty = true; });
         // Empty command registers the actual executable, including paths with spaces.
         if (register_launch && !client->RegisterLaunchCommand(AppId, "")) emit(14);
@@ -136,7 +140,12 @@ struct Bridge {
     }
     void pump() {
         discordpp::RunCallbacks();
-        if (friends_dirty && client->GetStatus() == discordpp::Client::Status::Ready) { friends_dirty = false; friends(); }
+        auto now = std::chrono::steady_clock::now();
+        if (friends_dirty && (friends_urgent || now >= next_friends) && client->GetStatus() == discordpp::Client::Status::Ready) {
+            friends_dirty = friends_urgent = false;
+            next_friends = now + std::chrono::seconds(2);
+            friends();
+        }
         if (!dirty || updating || (!urgent && std::chrono::steady_clock::now() < next_activity) || client->GetStatus() != discordpp::Client::Status::Ready) return;
         dirty = false;
         urgent = false;
@@ -152,7 +161,7 @@ struct Bridge {
             group.SetId(party);
             group.SetCurrentSize(count);
             group.SetMaxSize(0);
-            group.SetPrivacy(discordpp::ActivityPartyPrivacy::Private);
+            group.SetPrivacy(public_join ? discordpp::ActivityPartyPrivacy::Public : discordpp::ActivityPartyPrivacy::Private);
             activity.SetParty(group);
             discordpp::ActivitySecrets secrets;
             secrets.SetJoin(link);
@@ -202,16 +211,19 @@ void veil_discord_disconnect(Bridge* bridge, char const* token) {
 }
 void veil_discord_friends(Bridge* bridge) { bridge->friends(); }
 void veil_discord_activity(Bridge* bridge, uint64_t generation, bool enabled, char const* details,
-                           char const* state, char const* link, char const* party, int count) {
+                           char const* state, char const* link, char const* party, int count, bool public_join) {
     if (bridge->link != link || bridge->enabled != enabled) {
         bridge->urgent = true; bridge->activity_failures = 0; bridge->published_link.clear();
     }
+    // Privacy only changes who may join from a profile; the published secret stays valid.
+    if (bridge->public_join != public_join) bridge->urgent = true;
     if (!enabled || (!bridge->link.empty() && !*link)) bridge->client->ClearRichPresence();
     bridge->desired = generation;
     bridge->published = 0;
     bridge->enabled = enabled;
     bridge->details = details; bridge->state = state; bridge->link = link; bridge->party = party;
     bridge->count = count;
+    bridge->public_join = public_join;
     bridge->dirty = true;
 }
 void veil_discord_send(Bridge* bridge, uint64_t request, uint64_t user, uint64_t generation) {

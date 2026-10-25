@@ -85,6 +85,21 @@ describe('session-only Discord invitation consent', () => {
     expect(new DiscordInvitationPolicy().current).toBeNull();
   });
 
+  it('reuses the current selection and changes join privacy without a new generation', () => {
+    const policy = new DiscordInvitationPolicy();
+    expect(policy.use(document('first'))).toBe(true);
+    const first = policy.current!;
+    expect(first.publicJoin).toBe(false);
+    expect(policy.use(document('first'))).toBe(false);
+    expect(policy.setPublicJoin('first', true)).toBe(true);
+    expect(policy.current).toMatchObject({ generation: first.generation, publicJoin: true });
+    expect(policy.isCurrent(first)).toBe(true);
+    expect(policy.setPublicJoin('second', true)).toBe(false);
+    expect(policy.use(document('second'))).toBe(true);
+    expect(policy.current).toMatchObject({ documentId: 'second', publicJoin: false });
+    expect(policy.isCurrent(first)).toBe(false);
+  });
+
   it('rejects guest re-sharing and does not replace working consent on invalid input', () => {
     const policy = new DiscordInvitationPolicy();
     policy.enable(document('first'));

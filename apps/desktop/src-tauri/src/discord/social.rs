@@ -16,6 +16,8 @@ pub struct Person {
     display_name: String,
     username: String,
     avatar_revision: String,
+    /// online, idle, dnd, offline, or empty when Discord does not report it.
+    status: &'static str,
 }
 #[derive(Clone, Serialize)]
 pub struct Invitation {
@@ -64,6 +66,8 @@ pub struct Selection {
     link: String,
     generation: u64,
     participant_count: u32,
+    /// Public party: friends may join from the profile. Private: invites only.
+    public_join: bool,
 }
 type Reply = oneshot::Sender<Result<String, String>>;
 enum Command {
@@ -144,11 +148,62 @@ impl ConsentGuard {
         self.revision += 1;
     }
 }
+/// Least-recently-used avatar data, bounded by count and size. Memory only;
+/// cleared with the account identity.
+#[derive(Default)]
+struct AvatarCache {
+    entries: HashMap<String, (String, String)>,
+    order: VecDeque<String>,
+    bytes: usize,
+}
+impl AvatarCache {
+    const ENTRIES: usize = 256;
+    const BYTES: usize = 12 * 1024 * 1024;
+    fn get(&mut self, person: &str, url: &str) -> Option<String> {
+        let image = self
+            .entries
+            .get(person)
+            .filter(|(cached, _)| cached == url)?
+            .1
+            .clone();
+        self.touch(person);
+        Some(image)
+    }
+    fn touch(&mut self, person: &str) {
+        if let Some(index) = self.order.iter().position(|item| item == person) {
+            if let Some(item) = self.order.remove(index) {
+                self.order.push_back(item);
+            }
+        }
+    }
+    fn insert(&mut self, person: String, url: String, image: String) {
+        if let Some((_, previous)) = self.entries.remove(&person) {
+            self.bytes -= previous.len();
+            self.order.retain(|item| *item != person);
+        }
+        self.bytes += image.len();
+        self.order.push_back(person.clone());
+        self.entries.insert(person, (url, image));
+        while self.entries.len() > Self::ENTRIES || self.bytes > Self::BYTES {
+            let Some(oldest) = self.order.pop_front() else {
+                break;
+            };
+            if let Some((_, image)) = self.entries.remove(&oldest) {
+                self.bytes -= image.len();
+            }
+        }
+    }
+    fn clear(&mut self) {
+        self.entries.clear();
+        self.order.clear();
+        self.bytes = 0;
+    }
+}
 struct View {
     snapshot: Snapshot,
     avatars: HashMap<String, String>,
     epoch: u64,
-    images: HashMap<String, (String, String)>,
+    images: AvatarCache,
 }
 impl View {
     fn clear_identity(&mut self) {
@@ -177,7 +232,7 @@ pub fn setup(app: &AppHandle) -> Worker {
         snapshot: Snapshot::default(),
         avatars: HashMap::new(),
         epoch: 0,
-        images: HashMap::new(),
+        images: AvatarCache::default(),
     }));
     app.manage(Social {
         sender,
@@ -335,10 +390,8 @@ pub async fn discord_avatar(
     let Some(url) = url else {
         return Ok(None);
     };
-    if let Some((cached_url, image)) = state.view.lock().unwrap().images.get(&person_id) {
-        if *cached_url == url {
-            return Ok(Some(image.clone()));
-        }
+    if let Some(image) = state.view.lock().unwrap().images.get(&person_id, &url) {
+        return Ok(Some(image));
     }
     let parsed = reqwest::Url::parse(&url).map_err(|_| "Invalid avatar.".to_string())?;
     if parsed.scheme() != "https" || parsed.host_str() != Some("cdn.discordapp.com") {
@@ -396,10 +449,7 @@ pub async fn discord_avatar(
         "data:{mime};base64,{}",
         base64::engine::general_purpose::STANDARD.encode(bytes)
     );
-    if view.images.len() >= 64 {
-        view.images.clear();
-    }
-    view.images.insert(person_id, (url, image.clone()));
+    view.images.insert(person_id, url, image.clone());
     Ok(Some(image))
 }
 
@@ -528,7 +578,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                 let _ = legacy.clear();
                 legacy.disconnect();
             }
-            sdk.activity(0, false, "", "", "", "", 1);
+            sdk.activity(0, false, "", "", "", "", 1, false);
             sdk.pump();
             return;
         }
@@ -745,14 +795,16 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
         let count = selection
             .as_ref()
             .map_or(1, |s| s.participant_count.min(i32::MAX as u32) as i32);
+        let public_join = !join.is_empty() && selection.as_ref().is_some_and(|s| s.public_join);
         let key = format!(
-            "{}:{}:{}:{}:{}:{}",
+            "{}:{}:{}:{}:{}:{}:{}",
             active,
             preferences.enabled,
             display.details,
             display.state.as_deref().unwrap_or(""),
             join,
-            count
+            count,
+            public_join
         );
         if key != activity_key {
             revision += 1;
@@ -769,6 +821,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                 join,
                 &party,
                 count,
+                public_join,
             );
         }
         for event in sdk.pump() {
@@ -820,6 +873,14 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                             let mut hash = std::collections::hash_map::DefaultHasher::new();
                             event.c.hash(&mut hash);
                             format!("{:x}", hash.finish())
+                        },
+                        // discordpp::StatusType; Invisible and Blocked read as offline.
+                        status: match event.value {
+                            0 | 6 => "online",
+                            3 => "idle",
+                            4 => "dnd",
+                            1 | 2 | 5 => "offline",
+                            _ => "",
                         },
                     };
                     let mut view = worker.view.lock().unwrap();
@@ -1031,6 +1092,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                                     display_name: "Discord invitation".into(),
                                     username: String::new(),
                                     avatar_revision: String::new(),
+                                    status: "",
                                 },
                             });
                             view.snapshot.version += 1;

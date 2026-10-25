@@ -47,6 +47,7 @@ unsafe extern "C" {
         link: *const c_char,
         party: *const c_char,
         count: i32,
+        public_join: bool,
     );
     fn veil_discord_send(client: *mut c_void, request: u64, user: u64, generation: u64);
     fn veil_discord_accept(client: *mut c_void, request: u64, invitation: u64);
@@ -135,6 +136,7 @@ impl Client {
         link: &str,
         party: &str,
         count: i32,
+        public_join: bool,
     ) {
         unsafe {
             veil_discord_activity(
@@ -146,6 +148,7 @@ impl Client {
                 string(link).as_ptr(),
                 string(party).as_ptr(),
                 count,
+                public_join,
             )
         }
     }

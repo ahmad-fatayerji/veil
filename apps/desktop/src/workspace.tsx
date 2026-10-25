@@ -151,13 +151,23 @@ export class Workspace {
     this.discordInvites.disable(documentId);
     if (before && !this.discordInvites.current) this.changed();
   };
-  allowDiscordInvites = (tab: WorkspaceTab) => {
-    this.discordInvites.enable({
+  /** Points Discord at this shared document. Returns the title of the document
+   * that held it before, or null when nothing moved. */
+  useDiscordFor = (tab: WorkspaceTab) => {
+    const previous = this.discordInvites.current?.documentId;
+    const changed = this.discordInvites.use({
       id: tab.id,
       host: tab.hosted && !!tab.document,
       link: tab.sharingLink ?? '',
     });
+    if (!changed) return null;
     this.changed();
+    const moved = previous && previous !== tab.id && this.tabs.find((item) => item.id === previous);
+    return moved ? moved.title.trim() || 'another document' : null;
+  };
+  setDiscordPublicJoin = (tab: WorkspaceTab, publicJoin: boolean) => {
+    if (this.discordInvites.current?.documentId !== tab.id) this.useDiscordFor(tab);
+    if (this.discordInvites.setPublicJoin(tab.id, publicJoin)) this.changed();
   };
   add(mode: WorkspaceTab['mode'], seed: Partial<WorkspaceTab> = {}) {
     const tab: WorkspaceTab = {

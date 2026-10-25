@@ -36,7 +36,8 @@ export function ShareDialog({
   discordSelection,
   discordDocumentId,
   discordElsewhere,
-  onDiscordConsent,
+  onDiscordUse,
+  onDiscordPublicJoin,
   onReset,
   onStop,
   onEnable,
@@ -70,7 +71,9 @@ export function ShareDialog({
   discordDocumentId: string;
   /** Title of another document that currently holds Discord invites. */
   discordElsewhere: string | null;
-  onDiscordConsent: (enabled: boolean) => void;
+  /** Points Discord at this document; returns the title it moved from, if any. */
+  onDiscordUse: () => string | null;
+  onDiscordPublicJoin: (publicJoin: boolean) => void;
   onReset: () => void;
   onStop: () => void;
   onEnable: () => void;
@@ -193,10 +196,9 @@ export function ShareDialog({
           discord={discord}
           selection={discordSelection}
           documentId={discordDocumentId}
-          discordElsewhere={elsewhere}
           joinMode={joinMode}
           busy={busy}
-          onEnable={() => onDiscordConsent(true)}
+          onUse={onDiscordUse}
           onBack={back}
         />
       ) : (
@@ -244,7 +246,7 @@ export function ShareDialog({
               ref={discordRow}
               state={discordState}
               connection={discord.connection}
-              enabled={discordEnabled}
+              publicJoin={discordEnabled && !!discordSelection?.publicJoin}
               busy={busy}
               onOpen={() => onViewChange('discord')}
             />
@@ -254,9 +256,9 @@ export function ShareDialog({
             onJoinModeChange={onJoinModeChange}
             busy={busy}
             discord={discordState}
-            discordEnabled={discordEnabled}
+            publicJoin={discordEnabled && !!discordSelection?.publicJoin}
             discordElsewhere={elsewhere}
-            onDiscordChange={onDiscordConsent}
+            onPublicJoinChange={onDiscordPublicJoin}
           />
           <div className="share-footer">
             <Button

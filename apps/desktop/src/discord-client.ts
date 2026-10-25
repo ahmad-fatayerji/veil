@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, errorMessage } from './overlay/api';
 import type { DiscordConnectionView, DiscordInviteResult, DiscordPerson } from './discord-social';
 import type { DiscordInvitationSelection } from './discord-invitations';
+import { clearDiscordAvatarCache } from './dialogs/DiscordAvatar';
 
 interface SocialSnapshot {
   available: boolean;
@@ -24,6 +25,17 @@ export function useDiscordSocial(onConnectionLost: () => void) {
   const lastVersion = useRef<number | null>(null);
   const consentEpoch = useRef<number | null>(null);
   const lost = useRef(onConnectionLost);
+  /** People invited this connection, listed first; memory only. */
+  const [invited, setInvited] = useState<ReadonlySet<string>>(() => new Set());
+  const identity = snapshot?.person?.id ?? null;
+  const [invitedFor, setInvitedFor] = useState(identity);
+  if (invitedFor !== identity) {
+    setInvitedFor(identity);
+    setInvited(new Set());
+  }
+  useEffect(() => {
+    clearDiscordAvatarCache();
+  }, [identity]);
   useEffect(() => {
     lost.current = onConnectionLost;
   }, [onConnectionLost]);
@@ -132,6 +144,7 @@ export function useDiscordSocial(onConnectionLost: () => void) {
         generation: selection.generation,
         owner: selection.owner,
       });
+      setInvited((current) => new Set(current).add(personId));
       return { ok: true };
     } catch (cause) {
       const reason = errorMessage(cause);
@@ -153,6 +166,7 @@ export function useDiscordSocial(onConnectionLost: () => void) {
     inviteReady: snapshot?.inviteReady ?? false,
     status: snapshot?.status ?? 'loading',
     friends: snapshot?.friends ?? [],
+    invited,
     invitations: snapshot?.invitations ?? [],
     warning: error || snapshot?.warning || '',
     refreshFriends: () => void action('discord_refresh_friends'),

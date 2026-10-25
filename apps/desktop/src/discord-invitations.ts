@@ -41,6 +41,8 @@ export interface DiscordInvitationSelection {
   documentId: string;
   link: string;
   generation: number;
+  /** Public Discord party: friends may join from the profile. Otherwise invites only. */
+  publicJoin: boolean;
 }
 
 /** Session-only consent, deliberately separate from presence preferences and
@@ -58,7 +60,7 @@ export class DiscordInvitationPolicy {
     return this.selection ? { ...this.selection } : null;
   }
 
-  enable(document: DiscordInvitationDocument) {
+  enable(document: DiscordInvitationDocument, publicJoin = false) {
     if (!document.host) throw new Error('Only the host can enable Discord invites.');
     const payload = discordJoinPayload(document.link);
     if (!payload.ok) throw new Error(payload.message);
@@ -67,7 +69,26 @@ export class DiscordInvitationPolicy {
       documentId: document.id,
       link: payload.value,
       generation: ++this.generation,
+      publicJoin,
     };
+  }
+
+  /** Selects a document unless it is already selected with the same link, so
+   * reopening invites keeps the generation, readiness and queued sends.
+   * Returns whether the selection changed. */
+  use(document: DiscordInvitationDocument) {
+    if (this.selection?.documentId === document.id && this.selection.link === document.link)
+      return false;
+    this.enable(document);
+    return true;
+  }
+
+  /** Changes who may join from Discord without invalidating sent invites. */
+  setPublicJoin(documentId: string, publicJoin: boolean) {
+    if (this.selection?.documentId !== documentId || this.selection.publicJoin === publicJoin)
+      return false;
+    this.selection = { ...this.selection, publicJoin };
+    return true;
   }
 
   disable(documentId?: string) {

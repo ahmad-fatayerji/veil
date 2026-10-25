@@ -382,8 +382,8 @@ export function SettingsDialog({
               <DiscordConnectionCard connection={discord.connection} />
               {discord.social.warning && <Banner tone="warning">{discord.social.warning}</Banner>}
               <p className="settings-group-hint">
-                Connecting never shares a document. You choose which document allows Discord invites
-                from its Share dialog.
+                Connecting never shares a document. Invite friends from any shared document’s Share
+                dialog.
               </p>
             </SettingsGroup>
             <SettingsGroup title="Discord activity">

@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Check, RefreshCw, Search } from 'lucide-react';
-import { Button, IconButton, Input } from '@veil/ui';
+import { Check, Search } from 'lucide-react';
+import { Button, Input } from '@veil/ui';
 import {
   discordInviteError,
+  matchesDiscordFriend,
+  orderDiscordFriends,
   type DiscordInviteResult,
   type DiscordPerson,
 } from '../discord-social';
@@ -11,9 +13,14 @@ import { DiscordAvatar } from './DiscordAvatar';
 
 /** How long an invite waits for Discord to acknowledge this document's activity. */
 export const INVITE_READY_TIMEOUT = 10_000;
+/** Rows rendered at once; search reaches everyone else. */
+const VISIBLE_FRIENDS = 100;
+const presenceLabel = { online: 'Online', idle: 'Idle', dnd: 'Do not disturb', offline: 'Offline' };
 
 interface Props {
   friends: readonly DiscordPerson[];
+  /** People invited earlier this connection, listed first. */
+  invited: ReadonlySet<string>;
   /** Null while this document does not allow Discord invites: friends show, Invite is off. */
   selection: Readonly<DiscordInvitationSelection> | null;
   /** Discord acknowledged the joinable activity; earlier clicks wait for it. */
@@ -29,7 +36,15 @@ interface Props {
 
 type SendState = { status: 'sending' | 'sent' } | { status: 'error'; message: string };
 
-function FriendPicker({ friends, selection, ready, disabled, onInvite, onRefresh }: Props) {
+function FriendPicker({
+  friends,
+  invited,
+  selection,
+  ready,
+  disabled,
+  onInvite,
+  onRefresh,
+}: Props) {
   const searchId = useId();
   const [query, setQuery] = useState('');
   const [states, setStates] = useState<Record<string, SendState>>({});
@@ -42,13 +57,19 @@ function FriendPicker({ friends, selection, ready, disabled, onInvite, onRefresh
     waiters.current.forEach((resolve) => resolve());
     waiters.current.clear();
   }, [ready]);
-  const normalized = query.trim().normalize('NFKC').toLowerCase();
-  const shown = friends.filter((friend) =>
-    `${friend.displayName}\n${friend.username}`
-      .normalize('NFKC')
-      .toLowerCase()
-      .includes(normalized),
-  );
+  // The order is fixed when the list first appears, so presence changes and
+  // new invites don't move rows under the pointer; new friends join the end.
+  const [rank, setRank] = useState<ReadonlyMap<string, number> | null>(null);
+  const ranked = orderDiscordFriends(friends, invited);
+  if (!rank && ranked.length) setRank(new Map(ranked.map((person, index) => [person.id, index])));
+  const ordered = rank
+    ? [...ranked].sort(
+        (a, b) =>
+          (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+      )
+    : ranked;
+  const shown = ordered.filter((person) => matchesDiscordFriend(person, query));
+  const visible = shown.slice(0, VISIBLE_FRIENDS);
 
   function whenReady() {
     if (readyRef.current) return Promise.resolve(true);
@@ -110,27 +131,45 @@ function FriendPicker({ friends, selection, ready, disabled, onInvite, onRefresh
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        <IconButton label="Refresh friends" disabled={disabled} onClick={onRefresh}>
-          <RefreshCw size={16} aria-hidden="true" />
-        </IconButton>
       </div>
       {!shown.length ? (
-        <p role="status" className="discord-friends-empty">
-          {friends.length
-            ? 'No friends match your search.'
-            : 'No Discord friends to show yet. Refresh, or copy the link instead.'}
-        </p>
+        <div role="status" className="discord-friends-empty">
+          {friends.length ? (
+            'No friends match your search.'
+          ) : (
+            <>
+              <p>No Discord friends to show yet.</p>
+              <Button size="sm" variant="ghost" disabled={disabled} onClick={onRefresh}>
+                Check again
+              </Button>
+            </>
+          )}
+        </div>
       ) : (
         <ul className="discord-friends" aria-label="Discord friends">
-          {shown.map((person) => {
+          {visible.map((person) => {
             const state = states[person.id];
             const name = person.displayName || person.username;
             const statusId = `${searchId}-${person.id}-status`;
             return (
               <li key={person.id} className="discord-friend-row" data-state={state?.status}>
-                <DiscordAvatar person={person} />
+                <span className="discord-presence">
+                  <DiscordAvatar person={person} />
+                  {person.status && (
+                    <span
+                      className="discord-presence-dot"
+                      data-status={person.status}
+                      title={presenceLabel[person.status]}
+                    />
+                  )}
+                </span>
                 <div className="discord-card-copy">
-                  <strong>{name}</strong>
+                  <strong>
+                    {name}
+                    {person.status && (
+                      <span className="visually-hidden">, {presenceLabel[person.status]}</span>
+                    )}
+                  </strong>
                   <p
                     id={statusId}
                     className={state?.status === 'error' ? 'discord-friend-error' : undefined}
@@ -169,6 +208,11 @@ function FriendPicker({ friends, selection, ready, disabled, onInvite, onRefresh
             );
           })}
         </ul>
+      )}
+      {shown.length > visible.length && (
+        <p className="discord-friends-more">
+          Showing {visible.length} of {shown.length}. Search to find more.
+        </p>
       )}
     </div>
   );

@@ -6,6 +6,32 @@ export interface DiscordPerson {
   /** Bounded raster data supplied by native code; never an arbitrary remote URL. */
   avatarDataUrl?: string;
   avatarRevision?: string;
+  /** Empty when Discord does not report presence for this person. */
+  status?: 'online' | 'idle' | 'dnd' | 'offline' | '';
+}
+
+const presenceRank = { online: 0, idle: 1, dnd: 2, offline: 3, '': 3 } as const;
+
+/** People invited this connection first, then online, idle, busy and offline
+ * friends, each alphabetical. */
+export function orderDiscordFriends(
+  friends: readonly DiscordPerson[],
+  invited: ReadonlySet<string>,
+): DiscordPerson[] {
+  const name = (person: DiscordPerson) => person.displayName || person.username;
+  return [...friends].sort(
+    (a, b) =>
+      Number(invited.has(b.id)) - Number(invited.has(a.id)) ||
+      presenceRank[a.status ?? ''] - presenceRank[b.status ?? ''] ||
+      name(a).localeCompare(name(b), undefined, { sensitivity: 'base' }),
+  );
+}
+
+/** Case-, width- and accent-insensitive match on display name or username. */
+export function matchesDiscordFriend(person: DiscordPerson, query: string) {
+  const fold = (value: string) => value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
+  const wanted = fold(query.trim());
+  return !wanted || fold(`${person.displayName}\n${person.username}`).includes(wanted);
 }
 
 export type DiscordConnectionView =

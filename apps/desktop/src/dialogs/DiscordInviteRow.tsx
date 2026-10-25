@@ -42,15 +42,15 @@ export function DiscordAccountAction({ connection }: { connection: DiscordConnec
 export function DiscordInviteRow({
   state,
   connection,
-  enabled,
+  publicJoin,
   busy,
   onOpen,
   ref,
 }: {
   state: DiscordShareState;
   connection: DiscordConnectionView;
-  /** Whether this document currently allows Discord invites. */
-  enabled: boolean;
+  /** Whether friends may join this document from the host's Discord profile. */
+  publicJoin: boolean;
   busy: boolean;
   onOpen: () => void;
   ref?: Ref<HTMLButtonElement>;
@@ -83,7 +83,7 @@ export function DiscordInviteRow({
   const detail =
     state.kind === 'link'
       ? state.message
-      : `@${person?.username ?? ''} · ${enabled ? 'Invites on for this document' : 'Invites off for this document'}`;
+      : `@${person?.username ?? ''} · ${publicJoin ? 'Friends can join' : 'Invite only'}`;
   return (
     <button
       ref={ref}

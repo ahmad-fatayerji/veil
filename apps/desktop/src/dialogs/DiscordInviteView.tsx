@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import type { JoinMode } from '@veil/collaboration';
 import { Banner, Button } from '@veil/ui';
@@ -14,20 +14,19 @@ export function DiscordInviteView({
   discord,
   selection,
   documentId,
-  discordElsewhere,
   joinMode,
   busy,
-  onEnable,
+  onUse,
   onBack,
 }: {
   state: DiscordShareState;
   discord: ReturnType<typeof useDiscordPresence>;
   selection: Readonly<DiscordInvitationSelection> | null;
   documentId: string;
-  discordElsewhere: string | null;
   joinMode: JoinMode;
   busy: boolean;
-  onEnable: () => void;
+  /** Points Discord at this document; returns the title it moved from, if any. */
+  onUse: () => string | null;
   onBack: () => void;
 }) {
   const view = useRef<HTMLDivElement>(null);
@@ -37,6 +36,18 @@ export function DiscordInviteView({
   const connection = discord.connection;
   const person = connection.status === 'connected' ? connection.person : null;
   const enabled = selection?.documentId === documentId;
+  const [movedFrom, setMovedFrom] = useState<string | null>(null);
+  // Opening the friend list is the intent to invite: no separate switch.
+  const ready = state.kind === 'ready';
+  const use = useRef(onUse);
+  useEffect(() => {
+    use.current = onUse;
+  });
+  useEffect(() => {
+    if (!ready) return;
+    const moved = use.current();
+    if (moved) setMovedFrom(moved);
+  }, [ready]);
   return (
     <div ref={view} className="share-subview">
       <button type="button" className="join-back" onClick={onBack}>
@@ -80,30 +91,18 @@ export function DiscordInviteView({
       ) : state.kind === 'link' ? (
         <Banner tone="warning">{state.message}</Banner>
       ) : (
-        !enabled && (
-          <div className="share-consent-card">
-            <div>
-              <strong>
-                {discordElsewhere
-                  ? `Discord invites are on for “${discordElsewhere}”`
-                  : 'Discord invites are off for this document'}
-              </strong>
-              <p>
-                {discordElsewhere
-                  ? 'Only one document can use Discord invites at a time. Moving them here stops new invites to the other one.'
-                  : 'Turn them on to invite friends. Friends you invite receive this document’s link.'}
-              </p>
-            </div>
-            <Button size="sm" variant="primary" disabled={busy} onClick={onEnable}>
-              {discordElsewhere ? 'Move here' : 'Turn on'}
-            </Button>
-          </div>
+        movedFrom && (
+          <p className="discord-moved-note" role="status">
+            Your Discord status now points to this document. Earlier invites to “{movedFrom}” may
+            stop working.
+          </p>
         )
       )}
       {discord.social.warning && <Banner tone="warning">{discord.social.warning}</Banner>}
       {person && (
         <DiscordFriendPicker
           friends={discord.social.friends}
+          invited={discord.social.invited}
           selection={enabled && state.kind === 'ready' ? selection : null}
           ready={discord.social.inviteReady}
           disabled={busy}
@@ -112,7 +111,9 @@ export function DiscordInviteView({
         />
       )}
       <p className="field-hint">
-        “Sent” means Discord accepted the invite, not that your friend joined.{' '}
+        {selection?.publicJoin && enabled
+          ? 'Friends can also join from your Discord profile. '
+          : 'Only friends you invite get the link. '}
         {joinMode === 'approval'
           ? 'You approve each person before they join.'
           : 'Anyone with the link joins right away.'}{' '}

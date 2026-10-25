@@ -37,57 +37,53 @@ export function JoinModeControl({
   );
 }
 
-type DiscordChoice = 'off' | 'invited';
+type DiscordJoin = 'invite' | 'public';
 
 export function SharePrivacy({
   joinMode,
   onJoinModeChange,
   busy,
   discord,
-  discordEnabled,
+  publicJoin,
   discordElsewhere,
-  onDiscordChange,
+  onPublicJoinChange,
 }: {
   joinMode: JoinMode;
   onJoinModeChange: (mode: JoinMode) => void;
   busy: boolean;
   discord: DiscordShareState;
-  discordEnabled: boolean;
-  /** Title of another document that currently holds Discord invites, if any. */
+  /** Whether Discord friends may join this document from the host's profile. */
+  publicJoin: boolean;
+  /** Title of another document Discord currently points to, if any. */
   discordElsewhere: string | null;
-  onDiscordChange: (enabled: boolean) => void;
+  onPublicJoinChange: (publicJoin: boolean) => void;
 }) {
-  const discordHint = discordEnabled
-    ? 'Friends you invite receive this link. Your Discord status shows you’re in a Veil document.'
-    : discord.kind === 'account'
-      ? 'Connect Discord above to invite friends.'
-      : discord.kind === 'needs-activity'
-        ? 'Needs Discord activity sharing. Open Invite Discord friends to turn it on.'
-        : discord.kind === 'link'
-          ? discord.message
-          : discordElsewhere
-            ? `Discord invites are on for “${discordElsewhere}”. Turning them on here moves them to this document.`
-            : 'Nobody can join this document through Discord.';
   return (
     <section className="share-section" aria-labelledby="share-privacy-heading">
       <h3 id="share-privacy-heading" className="share-section-title">
         Privacy
       </h3>
       <JoinModeControl value={joinMode} disabled={busy} onChange={onJoinModeChange} started />
-      {discord.kind !== 'hidden' && (
+      {discord.kind === 'ready' && (
         <div className="field">
-          <span className="field-label">Discord invites</span>
-          <SegmentedControl<DiscordChoice>
-            label="Discord invites"
-            value={discordEnabled ? 'invited' : 'off'}
-            disabled={busy || (!discordEnabled && discord.kind !== 'ready')}
-            onChange={(choice) => onDiscordChange(choice === 'invited')}
+          <span className="field-label">Joining from Discord</span>
+          <SegmentedControl<DiscordJoin>
+            label="Joining from Discord"
+            value={publicJoin ? 'public' : 'invite'}
+            disabled={busy}
+            onChange={(choice) => onPublicJoinChange(choice === 'public')}
             options={[
-              { value: 'off', label: 'Off' },
-              { value: 'invited', label: 'Friends I invite' },
+              { value: 'invite', label: 'Invite only' },
+              { value: 'public', label: 'Friends can join' },
             ]}
           />
-          <p className="field-hint">{discordHint}</p>
+          <p className="field-hint">
+            {publicJoin
+              ? 'Friends can join from your Discord profile, if your Discord privacy settings allow it. Who can join above still applies.'
+              : 'Only friends you invite from Veil get the link.'}
+            {discordElsewhere &&
+              ` Your Discord status points to “${discordElsewhere}”; changing this moves it here.`}
+          </p>
         </div>
       )}
     </section>

@@ -2,12 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import type { DiscordPerson } from '../discord-social';
 import { invoke } from '../overlay/api';
 
+/** Avatars already fetched this connection, so reopening a list needs no IPC.
+ * Keyed by person and avatar revision; cleared with the Discord identity. */
+const downloadedAvatars = new Map<string, string>();
+const AVATAR_ENTRIES = 256;
+
+export function clearDiscordAvatarCache() {
+  downloadedAvatars.clear();
+}
+
 function AvatarImage({ person, small }: { person: DiscordPerson; small?: boolean }) {
   const [failed, setFailed] = useState(false);
-  const [downloaded, setDownloaded] = useState<string | undefined>();
+  const cacheKey = `${person.id}:${person.avatarRevision ?? ''}`;
+  const [downloaded, setDownloaded] = useState(() => downloadedAvatars.get(cacheKey));
   const container = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    if (person.avatarDataUrl || person.id === '0') return;
+    if (person.avatarDataUrl || person.id === '0' || downloadedAvatars.has(cacheKey)) return;
     let active = true;
     const observer = new IntersectionObserver(
       (items) => {
@@ -15,7 +25,11 @@ function AvatarImage({ person, small }: { person: DiscordPerson; small?: boolean
         observer.disconnect();
         void invoke<string | null>('discord_avatar', { personId: person.id })
           .then((value) => {
-            if (active && value) setDownloaded(value);
+            if (!value) return;
+            if (downloadedAvatars.size >= AVATAR_ENTRIES)
+              downloadedAvatars.delete(downloadedAvatars.keys().next().value!);
+            downloadedAvatars.set(cacheKey, value);
+            if (active) setDownloaded(value);
           })
           .catch(() => {});
       },
@@ -26,7 +40,7 @@ function AvatarImage({ person, small }: { person: DiscordPerson; small?: boolean
       active = false;
       observer.disconnect();
     };
-  }, [person.id, person.avatarDataUrl, person.avatarRevision]);
+  }, [person.id, person.avatarDataUrl, cacheKey]);
   const image = person.avatarDataUrl ?? downloaded;
   const raster =
     image &&

@@ -51,6 +51,7 @@ import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
 import { ShareDialog, type ShareView } from './dialogs/ShareDialog';
+import { discordShareState } from './dialogs/discord-share-state';
 import type { useDiscordPresence } from './discord';
 import { defaultKeybinds, matchesShortcut } from './keybinds';
 import {
@@ -590,6 +591,27 @@ export function AutomaticApp({
     });
     // The tab controller always uses the latest closures without resetting its document.
   }, [workspace, tab, busy, joinInProgress, updating, connection, guest, session, leave, link]);
+  // With Discord connected, the document you share becomes the one friends can be
+  // invited to, unless another shared document already holds it. Runs after the
+  // update above so the workspace sees the new link.
+  const discordInvitable =
+    active &&
+    !guest &&
+    !!link &&
+    discordShareState({
+      available: discord.social.available,
+      connection: discord.connection,
+      preferences: discord.preferences,
+      link,
+    }).kind === 'ready';
+  useEffect(() => {
+    if (!discordInvitable || workspace.discordInvites.current) return;
+    try {
+      workspace.useDiscordFor(tab);
+    } catch {
+      /* The Share dialog explains why this link cannot be used on Discord. */
+    }
+  }, [workspace, tab, discordInvitable, link]);
   const settingsButton = (
     <IconButton
       label="Settings"
@@ -1003,10 +1025,17 @@ export function AutomaticApp({
         discordSelection={workspace.discordInvites.current}
         discordDocumentId={tab.id}
         discordElsewhere={discordElsewhere}
-        onDiscordConsent={(enabled) => {
+        onDiscordUse={() => {
           try {
-            if (enabled) workspace.allowDiscordInvites(tab);
-            else workspace.clearDiscordInvites(tab.id);
+            return workspace.useDiscordFor(tab);
+          } catch (cause) {
+            setError(errorMessage(cause));
+            return null;
+          }
+        }}
+        onDiscordPublicJoin={(publicJoin) => {
+          try {
+            workspace.setDiscordPublicJoin(tab, publicJoin);
           } catch (cause) {
             setError(errorMessage(cause));
           }
