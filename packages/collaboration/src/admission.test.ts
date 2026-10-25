@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import * as protocol from '@veil/protocol';
 import { createPeerSession } from './peer';
 import {
   joinShareLink,
@@ -11,6 +12,8 @@ import {
   decodeShortLink,
   decryptShortInvitation,
   encryptShortInvitation,
+  encodeServerInvitation,
+  encodeShareLink,
   invitationKeys,
   linkInvitation,
   SignalCipher,
@@ -75,7 +78,7 @@ async function fixture() {
     decodeShortLink(originalLink),
     registrations[0].shortInvitation,
   );
-  async function guest(id: string, clientId = 123) {
+  async function guest(id: string, clientId = 123, waitForApproval = true) {
     const exchange = await createExchange();
     const cipher = new SignalCipher(
       linkInvitation(group, id),
@@ -88,7 +91,7 @@ async function fixture() {
       clientId,
       guestPublic: exchange.publicKey,
     });
-    if (host.joinMode === 'approval')
+    if (host.joinMode === 'approval' && waitForApproval)
       await vi.waitFor(() => {
         expect(host.pendingGuests.some((p) => p.id === id)).toBe(true);
         expect(sent.some((e) => e.inviteId === id)).toBe(true);
@@ -127,9 +130,9 @@ async function fixture() {
     },
   };
 }
-it('withholds the signed handshake until approval and preserves pending decisions when switching modes', async () => {
+it('withholds the signed handshake until approval and admits waiting guests when switching to auto', async () => {
   const f = await fixture();
-  f.host.setJoinMode('approval');
+  await f.host.setJoinMode('approval');
   const id = 'c'.repeat(32);
   const guest = await f.guest(id);
   await guest.hello();
@@ -141,13 +144,11 @@ it('withholds the signed handshake until approval and preserves pending decision
   };
   await verifyAdmissionStatus(f.group, waiting.status, waiting.signature);
   expect(waiting.status.state).toBe('waiting');
-  f.host.setJoinMode('auto');
+  await f.host.setJoinMode('auto');
   guest.admitted();
   const previousSends = f.sent.length;
   await guest.hello();
   await vi.waitFor(() => expect(f.sent.length).toBeGreaterThan(previousSends));
-  expect(f.decisions).toEqual([]);
-  await f.host.approveGuest(id);
   expect(f.decisions).toEqual([{ sessionId: f.group.sessionId, inviteId: id, approve: true }]);
   let handshake: { handshake: ShareHandshake; signature: string } | undefined;
   for (const envelope of f.sent.slice(1)) {
@@ -163,9 +164,81 @@ it('withholds the signed handshake until approval and preserves pending decision
   expect(f.host.pendingGuests).toEqual([]);
   expect(f.host.sharedLink).toBe(f.originalLink);
 });
+it('waits for a validated guest handshake before automatically admitting an existing registration', async () => {
+  const f = await fixture();
+  await f.host.setJoinMode('approval');
+  const guest = await f.guest('6'.repeat(32));
+  await f.host.setJoinMode('auto');
+  expect(f.decisions).toEqual([]);
+  expect(f.host.pendingGuests).toEqual([]);
+  await guest.hello();
+  await vi.waitFor(() => expect(f.decisions[0]?.approve).toBe(true));
+});
+
+it('uses the latest mode if it changes while admission keys are being prepared', async () => {
+  const f = await fixture();
+  await f.host.setJoinMode('approval');
+  const exchange = await createExchange();
+  const original = protocol.createExchange;
+  let release!: (exchange: Awaited<ReturnType<typeof createExchange>>) => void;
+  const preparing = vi.spyOn(protocol, 'createExchange');
+  preparing.mockImplementationOnce(original).mockReturnValueOnce(
+    new Promise((resolve) => {
+      release = resolve;
+    }),
+  );
+  const guest = await f.guest('5'.repeat(32), 123, false);
+  await vi.waitFor(() => expect(preparing).toHaveBeenCalledTimes(2));
+  await f.host.setJoinMode('auto');
+  release(exchange);
+  await guest.hello();
+  await vi.waitFor(() => expect(f.decisions[0]?.approve).toBe(true));
+  expect(f.host.pendingGuests).toEqual([]);
+  expect(f.sent).toHaveLength(1);
+  const payload = (await guest.cipher.open(f.sent[0], 'host')) as {
+    handshake: ShareHandshake;
+    signature: string;
+    status?: AdmissionStatus;
+  };
+  expect(payload.status).toBeUndefined();
+  await verifyHandshake(f.group, payload.handshake, payload.signature);
+});
+
+it('surfaces a failed server decision without blocking other auto admissions or guest retries', async () => {
+  const f = await fixture();
+  await f.host.setJoinMode('approval');
+  const firstId = '4'.repeat(32);
+  const first = await f.guest(firstId);
+  const secondId = '3'.repeat(32);
+  const second = await f.guest(secondId, 456);
+  await first.hello('First');
+  await second.hello('Second');
+  await vi.waitFor(() =>
+    expect(f.host.pendingGuests.map((p) => p.name)).toEqual(['First', 'Second']),
+  );
+  const request = f.transport.request;
+  f.transport.request = async (server, path, method, body, ticket) => {
+    if (path === '/v3/admission/decision' && (body as { inviteId: string }).inviteId === firstId)
+      throw new Error('Server unavailable');
+    return request(server, path, method, body, ticket);
+  };
+  await expect(f.host.setJoinMode('auto')).rejects.toThrow('Server unavailable');
+  expect(f.host.joinMode).toBe('auto');
+  expect(f.decisions).toEqual([
+    { sessionId: f.group.sessionId, inviteId: secondId, approve: true },
+  ]);
+  f.transport.request = request;
+  await first.hello('First');
+  await vi.waitFor(() => expect(f.decisions).toHaveLength(2));
+  expect(f.decisions[1]).toEqual({
+    sessionId: f.group.sessionId,
+    inviteId: firstId,
+    approve: true,
+  });
+});
 it('shows the latest name when a waiting guest resends the join request', async () => {
   const f = await fixture();
-  f.host.setJoinMode('approval');
+  await f.host.setJoinMode('approval');
   const id = '9'.repeat(32);
   const guest = await f.guest(id);
   await guest.hello();
@@ -189,9 +262,30 @@ it('automatically approves new requests in auto mode without creating a peer bef
   };
   await verifyHandshake(f.group, payload.handshake, payload.signature);
 });
+it('resends authenticated handshakes without an approval prompt for duplicate auto-join requests', async () => {
+  const f = await fixture();
+  const guest = await f.guest('8'.repeat(32));
+  await guest.hello();
+  await vi.waitFor(() => expect(f.sent).toHaveLength(1));
+  guest.admitted();
+  await guest.hello();
+  await vi.waitFor(() => expect(f.sent).toHaveLength(2));
+  for (const envelope of f.sent) {
+    const payload = (await guest.cipher.open(envelope, 'host')) as {
+      handshake: ShareHandshake;
+      signature: string;
+      status?: AdmissionStatus;
+    };
+    expect(payload.status).toBeUndefined();
+    await verifyHandshake(f.group, payload.handshake, payload.signature);
+  }
+  expect(f.host.joinMode).toBe('auto');
+  expect(f.host.pendingGuests).toEqual([]);
+  expect(f.decisions).toHaveLength(1);
+});
 it('rejects pending guests with signed status and cancels the queue on reset and stop', async () => {
   const f = await fixture();
-  f.host.setJoinMode('approval');
+  await f.host.setJoinMode('approval');
   const id = 'e'.repeat(32);
   const guest = await f.guest(id);
   await f.host.rejectGuest(id);
@@ -212,7 +306,7 @@ it('rejects pending guests with signed status and cancels the queue on reset and
 });
 it('preserves the previous link and pending requests after a failed reset and rejects expired requests', async () => {
   const f = await fixture();
-  f.host.setJoinMode('approval');
+  await f.host.setJoinMode('approval');
   const id = 'e'.repeat(32);
   await f.guest(id);
   f.fail();
@@ -234,6 +328,61 @@ it('does not resolve or admit a cancelled short-link join', async () => {
     joinShareLink(f.originalLink, 'Guest', f.transport, () => {}, false, controller.signal),
   ).rejects.toThrow('cancelled');
   expect(request).not.toHaveBeenCalled();
+});
+
+it('checks the resolved short-link session before requesting admission or opening a guest socket', async () => {
+  const f = await fixture();
+  const encrypted = await encryptShortInvitation(f.group, decodeShortLink(f.originalLink).code);
+  const paths: string[] = [];
+  f.transport.request = async (_server, path) => {
+    paths.push(path);
+    if (path === '/v2/capabilities') return { shortInvitations: 1 };
+    if (path === '/v3/invitations/resolve') return encrypted.record;
+    throw new Error('Unexpected request');
+  };
+  const connect = vi.spyOn(f.transport, 'connect');
+  const started = vi.fn();
+  const beforeJoin = vi.fn((invite: { server: string; sessionId: string }) => {
+    expect(invite.sessionId).toBe(f.group.sessionId);
+    expect(invite.server).toBe(f.group.server);
+    throw new Error('Session already open');
+  });
+  await expect(
+    joinShareLink(
+      f.originalLink,
+      'Guest',
+      f.transport,
+      () => {},
+      false,
+      undefined,
+      started,
+      beforeJoin,
+    ),
+  ).rejects.toThrow('Session already open');
+  expect(paths).toEqual(['/v2/capabilities', '/v3/invitations/resolve']);
+  expect(beforeJoin).toHaveBeenCalledOnce();
+  expect(started).not.toHaveBeenCalled();
+  expect(connect).not.toHaveBeenCalled();
+});
+
+it('checks retained long and legacy invitations before any server request', async () => {
+  const f = await fixture();
+  const request = vi.spyOn(f.transport, 'request');
+  const connect = vi.spyOn(f.transport, 'connect');
+  for (const code of [
+    encodeShareLink(f.group),
+    encodeServerInvitation(linkInvitation(f.group, '7'.repeat(32))),
+  ]) {
+    const beforeJoin = vi.fn(() => {
+      throw new Error('Session already open');
+    });
+    await expect(
+      joinShareLink(code, 'Guest', f.transport, () => {}, false, undefined, undefined, beforeJoin),
+    ).rejects.toThrow('Session already open');
+    expect(beforeJoin).toHaveBeenCalledOnce();
+  }
+  expect(request).not.toHaveBeenCalled();
+  expect(connect).not.toHaveBeenCalled();
 });
 
 it('cleans up a ticket returned after cancellation during admission without opening a socket', async () => {

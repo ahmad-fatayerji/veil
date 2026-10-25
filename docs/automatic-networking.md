@@ -221,6 +221,15 @@ Never declare unsupported generations or infer compatibility from equal versions
 
 ## Short links and guest approval
 
+Within one desktop workspace, a session can be open in only one tab. The workspace
+remembers hosted links, including previous reset links, and reserves links as soon
+as a join starts. Reusing a known link is rejected locally before any server
+request, including while another tab is still resolving it. Retained invitations
+that contain a session identity are also checked locally. An unfamiliar short
+link still requires lookup to discover its encrypted session identity; that
+identity is checked before admission. Closing a session or cancelling a join
+releases that tab's reservations. Link history is held only in memory.
+
 The server address remains readable; the 22-character unpadded Base64url code
 contains 128 random bits. It is a secret: share privately and redact the entire
 link from reports. Opening or pasting only validates the link locally. Lookup and
@@ -234,8 +243,10 @@ cancel and requests expire after two minutes. Pending tickets cannot request rel
 credentials or exchange established signaling. The host withholds its signed key
 exchange and document transport until it approves.
 
-Changing mode keeps the same link and affects new requests. Existing waiting
-requests still require a decision, and connected collaborators remain connected.
+Changing mode keeps the same link. Selecting Auto join also admits existing
+waiting requests once their encrypted guest handshakes have been validated.
+Selecting Require approval affects new requests; already admitted collaborators
+remain connected.
 Guests retry the encrypted initial handshake every two seconds until the host
 authenticates or the join deadline expires (two minutes for short links, thirty
 seconds for retained long links). Cancellation stops retries. This recovers a

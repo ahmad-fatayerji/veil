@@ -25,7 +25,6 @@ import {
   type PendingGuest,
   type JoinMode,
 } from '@veil/collaboration';
-import { parseShareLink, decodeServerInvitation } from '@veil/protocol';
 import { loadMarkdown, useDocumentTitle } from '@veil/editor';
 import {
   Banner,
@@ -184,10 +183,11 @@ export function AutomaticApp({
     return () => {
       initializing = false;
       mounted.current = false;
+      workspace.releaseSession(tab);
       void network.current?.close();
       if (!network.current) documentRef.current?.destroy();
     };
-  }, [tab.mode]);
+  }, [tab, workspace]);
   useEffect(() => {
     if (!active) return;
     void invoke<{ server: string; official: string; credential: boolean; development: boolean }>(
@@ -282,13 +282,12 @@ export function AutomaticApp({
   }
   async function join() {
     if (!name.trim()) throw new Error('Enter your name.');
-    if (invitation.trim().startsWith('veil://')) parseShareLink(invitation.trim(), development);
-    else decodeServerInvitation(invitation.trim(), development);
     const controller = new AbortController();
     joining.current = controller;
     setJoinInProgress(true);
     let opened = false;
     try {
+      workspace.claimInvitation(tab, invitation, development);
       await invoke('document_open', { documentId: tab.id });
       opened = true;
       setCompatibilityNotice('');
@@ -303,6 +302,7 @@ export function AutomaticApp({
         (started) => {
           admitting.current = started;
         },
+        (invite) => workspace.claimSession(tab, invite.server, invite.sessionId),
       );
       network.current = joined;
       setSession(joined);
@@ -310,6 +310,7 @@ export function AutomaticApp({
       setInvitation('');
       setJoinOpen(false);
     } catch (e) {
+      workspace.releaseSession(tab);
       if (opened) await invoke('document_closed', { documentId: tab.id });
       setNotice('');
       throw e;
@@ -355,10 +356,13 @@ export function AutomaticApp({
         return;
       }
       network.current = started;
+      workspace.claimSession(tab, started.server, started.session.provider.sessionId!);
       setSession(started);
       setJoinMode(started.joinMode);
     }
-    setLink(await network.current.enableSharing());
+    const invitation = await network.current.enableSharing();
+    workspace.claimInvitation(tab, invitation, development);
+    setLink(invitation);
     setShareOpen(true);
     setNotice('');
     setServiceOnline(network.current.serviceOnline);
@@ -454,6 +458,7 @@ export function AutomaticApp({
       if (current) await current.close();
       else documentRef.current?.destroy();
     } finally {
+      workspace.releaseSession(tab);
       await invoke('document_closed', { documentId: tab.id });
       documentRef.current = null;
       setDocument(null);
@@ -468,7 +473,7 @@ export function AutomaticApp({
       setShareOpen(false);
       setPeople(false);
     }
-  }, [tab.id]);
+  }, [tab, workspace]);
   function requestLeave() {
     void workspace.close(tab);
   }
@@ -946,11 +951,20 @@ export function AutomaticApp({
         onClose={closeShare}
         started={!!session}
         link={link}
-        joinMode={joinMode}
-        onJoinModeChange={(mode) => {
-          network.current?.setJoinMode(mode);
-          setJoinMode(mode);
-        }}
+        joinMode={session?.joinMode ?? joinMode}
+        onJoinModeChange={(mode) =>
+          void run(async () => {
+            const current = network.current;
+            if (!current) return;
+            const changed = current.setJoinMode(mode);
+            setJoinMode(current.joinMode);
+            try {
+              await changed;
+            } finally {
+              setPendingGuests(current.pendingGuests);
+            }
+          })
+        }
         name={name}
         onNameChange={saveDisplayName}
         busy={busy}
@@ -971,7 +985,9 @@ export function AutomaticApp({
         }
         onReset={() =>
           void run(async () => {
-            setLink(await network.current!.enableSharing(true));
+            const invitation = await network.current!.enableSharing(true);
+            workspace.claimInvitation(tab, invitation, development);
+            setLink(invitation);
             setNotice('New link ready. The previous link no longer accepts new people.');
           })
         }
