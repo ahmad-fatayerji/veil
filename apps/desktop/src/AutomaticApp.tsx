@@ -25,7 +25,6 @@ import {
   type PendingGuest,
   type JoinMode,
 } from '@veil/collaboration';
-import { parseShareLink, decodeServerInvitation } from '@veil/protocol';
 import { loadMarkdown, useDocumentTitle } from '@veil/editor';
 import {
   Banner,
@@ -283,13 +282,12 @@ export function AutomaticApp({
   }
   async function join() {
     if (!name.trim()) throw new Error('Enter your name.');
-    if (invitation.trim().startsWith('veil://')) parseShareLink(invitation.trim(), development);
-    else decodeServerInvitation(invitation.trim(), development);
     const controller = new AbortController();
     joining.current = controller;
     setJoinInProgress(true);
     let opened = false;
     try {
+      workspace.claimInvitation(tab, invitation, development);
       await invoke('document_open', { documentId: tab.id });
       opened = true;
       setCompatibilityNotice('');
@@ -362,7 +360,9 @@ export function AutomaticApp({
       setSession(started);
       setJoinMode(started.joinMode);
     }
-    setLink(await network.current.enableSharing());
+    const invitation = await network.current.enableSharing();
+    workspace.claimInvitation(tab, invitation, development);
+    setLink(invitation);
     setShareOpen(true);
     setNotice('');
     setServiceOnline(network.current.serviceOnline);
@@ -985,7 +985,9 @@ export function AutomaticApp({
         }
         onReset={() =>
           void run(async () => {
-            setLink(await network.current!.enableSharing(true));
+            const invitation = await network.current!.enableSharing(true);
+            workspace.claimInvitation(tab, invitation, development);
+            setLink(invitation);
             setNotice('New link ready. The previous link no longer accepts new people.');
           })
         }

@@ -11,7 +11,7 @@ import {
   suggestedFilename,
   useDocumentTitle,
 } from '@veil/editor';
-import { DOCUMENT_TITLE, parseShareLink } from '@veil/protocol';
+import { DOCUMENT_TITLE, parseShareLink, decodeServerInvitation } from '@veil/protocol';
 import {
   Banner,
   Button,
@@ -102,6 +102,24 @@ export class Workspace {
   private exiting = false;
   // Reserve before admission, including while another tab is still waiting to join.
   private sessions = new Map<string, { server: string; sessionId: string }>();
+  private invitations = new Map<string, Set<string>>();
+  /** Reserve a known link before lookup, including simultaneous joins of that link. */
+  claimInvitation(tab: WorkspaceTab, invitation: string, development = false) {
+    const text = invitation.trim();
+    const parsed = text.startsWith('veil://')
+      ? parseShareLink(text, development)
+      : decodeServerInvitation(text, development);
+    if (!('code' in parsed)) {
+      this.claimSession(tab, parsed.server, parsed.sessionId);
+      return;
+    }
+    const key = JSON.stringify([parsed.server, parsed.code]);
+    if ([...this.invitations].some(([id, links]) => id !== tab.id && links.has(key)))
+      throw new Error('This session is already open in another tab. Switch to that tab to use it.');
+    const links = this.invitations.get(tab.id) ?? new Set<string>();
+    links.add(key);
+    this.invitations.set(tab.id, links);
+  }
   claimSession(tab: WorkspaceTab, server: string, sessionId: string) {
     const owner = [...this.sessions].find(
       ([id, session]) =>
@@ -113,6 +131,7 @@ export class Workspace {
   }
   releaseSession(tab: WorkspaceTab) {
     this.sessions.delete(tab.id);
+    this.invitations.delete(tab.id);
   }
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);

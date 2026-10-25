@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import type { PeerSession } from '@veil/collaboration';
 import { documentFingerprint, loadMarkdown } from '@veil/editor';
-import { DOCUMENT_TITLE } from '@veil/protocol';
+import { DOCUMENT_TITLE, encodeShortLink, encodeServerInvitation } from '@veil/protocol';
 import { invoke } from './overlay/api';
 import { Workspace } from './workspace';
 
@@ -33,6 +33,57 @@ function documentTab(workspace: Workspace, title: string) {
 }
 
 describe('document workspace lifecycle', () => {
+  it('rejects known host links and reset links locally before any lookup', () => {
+    const workspace = new Workspace();
+    const host = workspace.add('new');
+    const guest = workspace.add('join');
+    const links = ['A'.repeat(22), 'B'.repeat(21) + 'A'].map((code) =>
+      encodeShortLink({ server: 'https://share.example.com', code }),
+    );
+    for (const link of links) workspace.claimInvitation(host, link);
+    for (const link of links) {
+      expect(() => workspace.claimInvitation(guest, ` ${link}\n`)).toThrow('already open');
+      workspace.releaseSession(guest);
+      expect(() => workspace.claimInvitation(guest, link)).toThrow('already open');
+    }
+    expect(invoke).not.toHaveBeenCalled();
+    workspace.releaseSession(host);
+    expect(() => workspace.claimInvitation(guest, links[0])).not.toThrow();
+  });
+
+  it('reserves short links while a join is still resolving and releases cancelled attempts', () => {
+    const workspace = new Workspace();
+    const first = workspace.add('join');
+    const second = workspace.add('join');
+    const link = encodeShortLink({ server: 'https://share.example.com', code: 'A'.repeat(22) });
+    workspace.claimInvitation(first, link);
+    expect(() => workspace.claimInvitation(second, link)).toThrow('already open');
+    workspace.releaseSession(first);
+    expect(() => workspace.claimInvitation(second, link)).not.toThrow();
+    const separate = new Workspace();
+    expect(() => separate.claimInvitation(separate.add('join'), link)).not.toThrow();
+  });
+
+  it('checks session identities from retained invitations without resolving the link', () => {
+    const workspace = new Workspace();
+    const host = workspace.add('new');
+    const guest = workspace.add('join');
+    const server = 'https://share.example.com';
+    const sessionId = 'a'.repeat(32);
+    workspace.claimSession(host, server, sessionId);
+    const invitation = encodeServerInvitation({
+      version: 2,
+      server,
+      sessionId,
+      inviteId: 'b'.repeat(32),
+      secret: 'c'.repeat(64),
+      hostClientId: 1,
+      expiresAt: Date.now() + 60_000,
+    });
+    expect(() => workspace.claimInvitation(guest, invitation)).toThrow('already open');
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it('blocks joining a hosted or pending session twice, even with different links', () => {
     const workspace = new Workspace();
     const host = workspace.add('new');

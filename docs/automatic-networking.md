@@ -221,11 +221,14 @@ Never declare unsupported generations or infer compatibility from equal versions
 
 ## Short links and guest approval
 
-Within one desktop workspace, a session can be open in only one tab. Joining
-checks the decrypted invitation's server and session identity before requesting
-admission, including while another tab is still joining. This also blocks the
-host from joining its own document through another tab or a reset invitation.
-Closing the session or cancelling a join releases that tab's reservation.
+Within one desktop workspace, a session can be open in only one tab. The workspace
+remembers hosted links, including previous reset links, and reserves links as soon
+as a join starts. Reusing a known link is rejected locally before any server
+request, including while another tab is still resolving it. Retained invitations
+that contain a session identity are also checked locally. An unfamiliar short
+link still requires lookup to discover its encrypted session identity; that
+identity is checked before admission. Closing a session or cancelling a join
+releases that tab's reservations. Link history is held only in memory.
 
 The server address remains readable; the 22-character unpadded Base64url code
 contains 128 random bits. It is a secret: share privately and redact the entire
