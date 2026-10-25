@@ -60,7 +60,8 @@ export class DiscordInvitationPolicy {
     return this.selection ? { ...this.selection } : null;
   }
 
-  enable(document: DiscordInvitationDocument, publicJoin = false) {
+  /** Friends can join by default; Invite only is an explicit choice. */
+  enable(document: DiscordInvitationDocument, publicJoin = true) {
     if (!document.host) throw new Error('Only the host can enable Discord invites.');
     const payload = discordJoinPayload(document.link);
     if (!payload.ok) throw new Error(payload.message);

@@ -112,8 +112,8 @@ export function DiscordInviteView({
       )}
       <p className="field-hint">
         {selection?.publicJoin && enabled
-          ? 'Friends can also join from your Discord profile. '
-          : 'Only friends you invite get the link. '}
+          ? 'Friends can also join from Join a session or your Discord profile. '
+          : 'Only friends you invite join without asking. '}
         {joinMode === 'approval'
           ? 'You approve each person before they join.'
           : 'Anyone with the link joins right away.'}{' '}

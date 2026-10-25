@@ -59,14 +59,14 @@ export function DiscordJoinControl({
         disabled={disabled}
         onChange={(choice) => onChange(choice === 'public')}
         options={[
-          { value: 'invite', label: 'Invite only' },
           { value: 'public', label: 'Friends can join' },
+          { value: 'invite', label: 'Invite only' },
         ]}
       />
       <p className="field-hint">
         {publicJoin
-          ? 'Friends can join from your Discord profile or from Join a session in Veil.'
-          : 'Friends you invite can join. Others can ask, and you choose who gets in.'}
+          ? 'Discord friends join straight away from Join a session or your Discord profile. Who can join above still applies.'
+          : 'Friends you invite join straight away. Others can ask, and you let each one in.'}
         {hint && ` ${hint}`}
       </p>
     </div>

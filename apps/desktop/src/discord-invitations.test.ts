@@ -89,14 +89,14 @@ describe('session-only Discord invitation consent', () => {
     const policy = new DiscordInvitationPolicy();
     expect(policy.use(document('first'))).toBe(true);
     const first = policy.current!;
-    expect(first.publicJoin).toBe(false);
+    expect(first.publicJoin).toBe(true);
     expect(policy.use(document('first'))).toBe(false);
-    expect(policy.setPublicJoin('first', true)).toBe(true);
-    expect(policy.current).toMatchObject({ generation: first.generation, publicJoin: true });
+    expect(policy.setPublicJoin('first', false)).toBe(true);
+    expect(policy.current).toMatchObject({ generation: first.generation, publicJoin: false });
     expect(policy.isCurrent(first)).toBe(true);
-    expect(policy.setPublicJoin('second', true)).toBe(false);
+    expect(policy.setPublicJoin('second', false)).toBe(false);
     expect(policy.use(document('second'))).toBe(true);
-    expect(policy.current).toMatchObject({ documentId: 'second', publicJoin: false });
+    expect(policy.current).toMatchObject({ documentId: 'second', publicJoin: true });
     expect(policy.isCurrent(first)).toBe(false);
   });
 

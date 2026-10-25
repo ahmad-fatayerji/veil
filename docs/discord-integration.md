@@ -22,7 +22,7 @@ works.
 The dialog's **Privacy** section holds the per-document choices. **Who can join**
 is anyone with the link, or only people the host approves; the latter can also be
 chosen before the first link is created. When Discord is connected and ready,
-**Joining from Discord** offers **Invite only** (default) or **Friends can join**.
+**Joining from Discord** offers **Friends can join** (default; friends join without a host prompt, and Who can join still applies) or **Invite only** (each Discord join request needs the host to let them in).
 There is no separate on/off switch for invites: a connected host can always invite
 friends to a shared document.
 

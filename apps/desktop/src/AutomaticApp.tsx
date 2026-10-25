@@ -138,7 +138,7 @@ export function AutomaticApp({
   const [shareOpen, setShareOpen] = useState(false);
   const [shareView, setShareView] = useState<ShareView>('main');
   /** Joining from Discord chosen before the first link; applied once Discord points here. */
-  const [startPublicJoin, setStartPublicJoin] = useState(false);
+  const [startPublicJoin, setStartPublicJoin] = useState(true);
   const pendingPublicJoin = useRef<boolean | null>(null);
   // The Share dialog asks where to host on the first share, or after a server was full.
   const [hostingStep, setHostingStep] = useState(false);
@@ -621,7 +621,8 @@ export function AutomaticApp({
     if (!discordInvitable || workspace.discordInvites.current) return;
     try {
       workspace.useDiscordFor(tab, link);
-      if (pendingPublicJoin.current) workspace.setDiscordPublicJoin(tab, true, link);
+      if (pendingPublicJoin.current !== null)
+        workspace.setDiscordPublicJoin(tab, pendingPublicJoin.current, link);
       pendingPublicJoin.current = null;
     } catch {
       /* The Share dialog explains why this link cannot be used on Discord. */
@@ -1073,7 +1074,8 @@ export function AutomaticApp({
           try {
             // The friend list can open in the same render that created the link.
             const moved = workspace.useDiscordFor(tab, link);
-            if (pendingPublicJoin.current) workspace.setDiscordPublicJoin(tab, true, link);
+            if (pendingPublicJoin.current !== null)
+              workspace.setDiscordPublicJoin(tab, pendingPublicJoin.current, link);
             pendingPublicJoin.current = null;
             return moved;
           } catch (cause) {
