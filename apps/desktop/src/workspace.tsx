@@ -26,6 +26,7 @@ import {
 import { useDiscordPresence } from './discord';
 import { DiscordInvitationPolicy } from './discord-invitations';
 import { DiscordAvatar } from './dialogs/DiscordAvatar';
+import { discordInviteError } from './discord-social';
 import { AutomaticApp } from './AutomaticApp';
 import { SessionBridge, flushOverlay } from './overlay/session';
 import { errorMessage, invoke, useOverlay } from './overlay/api';
@@ -785,14 +786,29 @@ export function DocumentWorkspace() {
     );
   const toasts = (
     <>
-      {discord.social.invitations.map((invitation) => (
-        <DiscordIncomingInvitation
-          key={invitation.id}
-          invitation={invitation}
+      {discord.social.joinRequests.map((request) => (
+        <DiscordJoinRequest
+          key={request.id}
+          request={request}
           discord={discord}
-          workspace={workspace}
+          documentTitle={
+            workspace.tabs
+              .find((tab) => tab.id === workspace.discordInvites.current?.documentId)
+              ?.title.trim() || 'your document'
+          }
         />
       ))}
+      {/* Answers to this window's own join requests open from Join a session. */}
+      {discord.social.invitations
+        .filter((item) => !(item.requested && discord.social.awaiting.has(item.person.id)))
+        .map((invitation) => (
+          <DiscordIncomingInvitation
+            key={invitation.id}
+            invitation={invitation}
+            discord={discord}
+            workspace={workspace}
+          />
+        ))}
       {workspace.notice && (
         <Banner tone="info" role="status" className="toast" onDismiss={workspace.dismissNotice}>
           {workspace.notice}
@@ -877,6 +893,56 @@ export function DocumentWorkspace() {
         </div>
       </Dialog>
     </div>
+  );
+}
+
+/** A Discord friend asked to join the document Discord points to. Letting
+ * them in sends a normal invite; Who can join still decides admission. */
+function DiscordJoinRequest({
+  request,
+  discord,
+  documentTitle,
+}: {
+  request: ReturnType<typeof useDiscordPresence>['social']['joinRequests'][number];
+  discord: ReturnType<typeof useDiscordPresence>;
+  documentTitle: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const name = request.person.displayName || request.person.username;
+  function answer(accept: boolean) {
+    setBusy(true);
+    setError('');
+    void discord.social
+      .answerJoin(request.id, accept)
+      .then((result) => {
+        if (!result.ok) setError(discordInviteError(result));
+      })
+      .finally(() => setBusy(false));
+  }
+  return (
+    <Banner
+      className="toast discord-invite-toast"
+      tone={error ? 'danger' : 'info'}
+      role={error ? 'alert' : 'status'}
+      icon={error ? undefined : <DiscordAvatar person={request.person} small />}
+      actions={
+        <>
+          <Button size="sm" variant="primary" loading={busy} onClick={() => answer(true)}>
+            Let in
+          </Button>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => answer(false)}>
+            Ignore
+          </Button>
+        </>
+      }
+    >
+      {error || (
+        <>
+          <strong>{name}</strong> wants to join “{documentTitle}” from Discord.
+        </>
+      )}
+    </Banner>
   );
 }
 
@@ -1110,7 +1176,7 @@ function TabStrip({ workspace, keybinds }: { workspace: Workspace; keybinds: Key
             shortcut={keybinds.joinDocument}
             onSelect={() => workspace.joinTab()}
           >
-            Join with link…
+            Join a session…
           </MenuItem>
         </Menu>
       </div>

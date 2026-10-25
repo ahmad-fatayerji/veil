@@ -8,6 +8,15 @@ export interface DiscordPerson {
   avatarRevision?: string;
   /** Empty when Discord does not report presence for this person. */
   status?: 'online' | 'idle' | 'dnd' | 'offline' | '';
+  /** The Veil session this friend is in, when Discord reports a joinable party. */
+  activity?: { details: string; state: string; size: number };
+}
+
+export interface DiscordInvitation {
+  id: string;
+  person: DiscordPerson;
+  /** This user asked the sender to join, so it may open without another prompt. */
+  requested: boolean;
 }
 
 const presenceRank = { online: 0, idle: 1, dnd: 2, offline: 3, '': 3 } as const;

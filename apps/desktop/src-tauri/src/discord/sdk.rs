@@ -52,6 +52,9 @@ unsafe extern "C" {
     fn veil_discord_send(client: *mut c_void, request: u64, user: u64, generation: u64);
     fn veil_discord_accept(client: *mut c_void, request: u64, invitation: u64);
     fn veil_discord_dismiss(client: *mut c_void, invitation: u64);
+    fn veil_discord_request_join(client: *mut c_void, request: u64, user: u64);
+    fn veil_discord_reply_join(client: *mut c_void, request: u64, join_request: u64);
+    fn veil_discord_dismiss_join(client: *mut c_void, join_request: u64);
 }
 #[allow(clippy::too_many_arguments)] // Fixed C callback ABI.
 unsafe extern "C" fn receive(
@@ -160,6 +163,15 @@ impl Client {
     }
     pub fn dismiss(&mut self, invitation: u64) {
         unsafe { veil_discord_dismiss(self.raw, invitation) }
+    }
+    pub fn request_join(&mut self, request: u64, user: u64) {
+        unsafe { veil_discord_request_join(self.raw, request, user) }
+    }
+    pub fn reply_join(&mut self, request: u64, join_request: u64) {
+        unsafe { veil_discord_reply_join(self.raw, request, join_request) }
+    }
+    pub fn dismiss_join(&mut self, join_request: u64) {
+        unsafe { veil_discord_dismiss_join(self.raw, join_request) }
     }
 }
 impl Drop for Client {

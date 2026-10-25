@@ -90,6 +90,49 @@ There is no chat or friend-management interface. While sharing, the People panel
 offers Copy link, a Discord shortcut into the friend view (when connected) and
 Sharing options.
 
+**Join a session** (the start screen card, tab menu and keybind formerly named
+Join with a link) shows Discord sections above the link field. Without the SDK it
+shows only the link field. When Discord is disconnected it offers Connect in
+place. When connected it lists:
+
+- **Invites for you:** pending invites from friends, each with Join.
+- **Friends in Veil:** friends whose Discord activity for this application has a
+  party. Each row shows the title if the host shares it, the participant count
+  and the friend's status.
+
+Joining a friend never needs a Veil account or extra server. The flow:
+
+1. **Join** sends a Discord join request (`SendActivityJoinRequest`) for that
+   friend's party.
+2. The host's Veil receives it only for the party it currently publishes.
+3. With **Friends can join**, the host's Veil answers automatically
+   (`SendActivityJoinRequestReply`). With **Invite only**, the host sees
+   "… wants to join “title” from Discord" with **Let in** / **Ignore**. Only one
+   prompt per friend is kept; a newer request replaces the older one. A changed
+   document, link or selection discards outstanding requests.
+4. Letting someone in sends an ordinary Discord invite. The requester's Veil
+   recognizes the answer to its own request (180-second window) and opens it
+   without another prompt. If the requester has a saved name, Veil joins right
+   away; otherwise the form asks for one.
+5. The connection then follows the normal path. The link names the host's own
+   server, so the guest needs no server setup. Admission (Who can join, approval
+   prompts, compatibility checks) is unchanged.
+
+Accepted invites from the hub join in the current tab, with the inviter shown on
+the form. If the hub closes while a request is pending, the answer falls back to
+the normal invite notification.
+
+Limits needing live acceptance:
+
+- The SDK documents that join requests require the target activity to "have
+  space". Veil publishes a party maximum of 0 (hidden maximum). If Discord treats
+  that as full, a display-only maximum would be needed; Veil itself still
+  imposes no participant cap.
+- Friends' party privacy is not exposed to other users, so every friend session
+  shows the same Join action.
+- Whether friends' Veil activities are visible under `sdk.social_layer_presence`
+  is also unverified.
+
 Incoming invitations show the inviter's avatar and name and offer Open/Dismiss.
 Open obtains and validates the join payload, then opens the normal join form in a
 new tab. The form shows "Invited by … on Discord" (memory only, dropped if the link

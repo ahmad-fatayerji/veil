@@ -132,7 +132,7 @@ try {
   await host.keyboard.press('Control+j');
   await expect(host.getByLabel('Invite link')).toBeFocused();
   await host.keyboard.press('Escape');
-  await expect(host.getByRole('button', { name: /^Join with a link/ })).toBeFocused();
+  await expect(host.getByRole('button', { name: /^Join a session/ })).toBeFocused();
   await expect(host.getByLabel('Invite link')).toHaveCount(0);
   await screenshot(host, 'welcome-light');
   assert.equal(await host.getByLabel('Server address').isVisible(), false);
@@ -250,7 +250,7 @@ try {
       assert.equal(await share.getByLabel('Invite link').inputValue(), link);
       await share.getByRole('button', { name: 'Close Share document' }).click();
     }
-    await page.getByRole('button', { name: /^Join with a link/ }).click();
+    await page.getByRole('button', { name: /^Join a session/ }).click();
     await page.getByLabel('Invite link').fill(link);
     await page.getByRole('textbox', { name: /Your name/ }).fill(name);
     await page.getByRole('button', { name: 'Join session', exact: true }).click();

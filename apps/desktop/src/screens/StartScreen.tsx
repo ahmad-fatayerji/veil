@@ -29,6 +29,7 @@ export function StartScreen({
   onNameChange,
   invitation,
   invitedBy,
+  sessions,
   onInvitationChange,
   joinOpen,
   onJoinOpenChange,
@@ -46,6 +47,8 @@ export function StartScreen({
   invitation: string;
   /** Shown when the link came from a Discord invite and is unchanged. */
   invitedBy?: string;
+  /** Discord invites and friends' sessions, shown above the link field. */
+  sessions?: ReactNode;
   onInvitationChange: (value: string) => void;
   joinOpen: boolean;
   onJoinOpenChange: (open: boolean) => void;
@@ -176,8 +179,8 @@ export function StartScreen({
             })}
             {card({
               ref: joinRow,
-              title: 'Join with a link',
-              description: 'Paste an invitation from the host',
+              title: 'Join a session',
+              description: 'Accept an invite, join a friend, or paste a link',
               shortcut: keybinds.joinDocument,
               icon: <Link2 size={20} />,
               onClick: () => onJoinOpenChange(true),
@@ -206,6 +209,12 @@ export function StartScreen({
               <ArrowLeft size={16} aria-hidden="true" />
               Back
             </button>
+            {sessions}
+            {sessions && (
+              <p className="join-divider" aria-hidden="true">
+                <span>or join with a link</span>
+              </p>
+            )}
             <Field label="Invite link" htmlFor={`${formId}-automatic-invitation`} error={error}>
               <Textarea
                 ref={invitationInput}

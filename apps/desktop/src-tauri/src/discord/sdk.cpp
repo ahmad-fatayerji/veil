@@ -35,6 +35,9 @@ struct Bridge {
     std::string details, state, link, party;
     int count = 1;
     std::unordered_map<uint64_t, discordpp::ActivityInvite> invitations;
+    // Friends asking to join the selected party, answered by the host or by
+    // the "Friends can join" choice.
+    std::unordered_map<uint64_t, discordpp::ActivityInvite> join_requests;
 
     void emit(int kind, uint64_t request = 0, uint64_t id = 0, int64_t value = 0,
               std::string const& a = {}, std::string const& b = {}, std::string const& c = {}) {
@@ -55,7 +58,16 @@ struct Bridge {
         emit(3);
         for (auto const& relationship : client->GetRelationships()) {
             if (relationship.DiscordRelationshipType() == discordpp::RelationshipType::Friend)
-                if (auto person = relationship.User()) user(4, *person);
+                if (auto person = relationship.User()) {
+                    user(4, *person);
+                    // Only a Veil activity with a party is a session a friend can ask to join.
+                    if (auto activity = person->GameActivity()) {
+                        auto group = activity->Party();
+                        if (group && activity->ApplicationId().value_or(AppId) == AppId)
+                            emit(17, 0, person->Id(), group->CurrentSize(), activity->Details().value_or(""),
+                                 activity->State().value_or(""), group->Id());
+                    }
+                }
         }
         emit(5);
     }
@@ -71,7 +83,17 @@ struct Bridge {
             auto current = client->GetCurrentUserV2();
             // ActivityInvite has no recipient field in SDK 1.10.19337. The
             // current authenticated user is the reliable direction boundary.
-            if (!current || invite.SenderId() == current->Id() || !invite.IsValid() || invite.Type() != discordpp::ActivityActionTypes::Join) return;
+            if (!current || invite.SenderId() == current->Id() || !invite.IsValid()) return;
+            if (invite.Type() == discordpp::ActivityActionTypes::JoinRequest) {
+                // Only requests for the party this app currently publishes.
+                if (party.empty() || invite.PartyId() != party || join_requests.size() >= 32) return;
+                auto key = invite.MessageId();
+                join_requests.insert_or_assign(key, invite);
+                if (auto person = client->GetUser(invite.SenderId())) user(19, *person, key);
+                else emit(19, key, invite.SenderId(), 0, "Discord friend", "");
+                return;
+            }
+            if (invite.Type() != discordpp::ActivityActionTypes::Join) return;
             if (!party.empty() && invite.PartyId() == party) return;
             auto key = invite.MessageId();
             if (invitations.size() >= 32) return;
@@ -203,6 +225,7 @@ void veil_discord_disconnect(Bridge* bridge, char const* token) {
     bridge->client->ClearRichPresence();
     bridge->client->Disconnect();
     bridge->invitations.clear();
+    bridge->join_requests.clear();
     if (!token || !*token) { bridge->emit(12, 0, 0, 1); return; }
     auto guard = bridge->alive;
     bridge->client->RevokeToken(AppId, token, [bridge, guard](auto result) {
@@ -246,4 +269,27 @@ void veil_discord_accept(Bridge* bridge, uint64_t request, uint64_t invite) {
     });
 }
 void veil_discord_dismiss(Bridge* bridge, uint64_t invite) { bridge->invitations.erase(invite); }
+void veil_discord_request_join(Bridge* bridge, uint64_t request, uint64_t user) {
+    if (bridge->client->GetStatus() != discordpp::Client::Status::Ready) { bridge->emit(9, request, 0, 1); return; }
+    if (bridge->client->GetRelationshipHandle(user).DiscordRelationshipType() != discordpp::RelationshipType::Friend) { bridge->emit(9, request, 0, 2); return; }
+    auto guard = bridge->alive;
+    bridge->client->SendActivityJoinRequest(user, [bridge, guard, request](auto result) {
+        if (*guard) bridge->emit(9, request, static_cast<uint64_t>(std::ceil(std::max(0.0f, result.RetryAfter()))), result.Successful() ? -1 : bridge->failure(result));
+    });
+}
+void veil_discord_reply_join(Bridge* bridge, uint64_t request, uint64_t key) {
+    auto found = bridge->join_requests.find(key);
+    // A request for an earlier link or document cannot admit anyone to this one.
+    if (found == bridge->join_requests.end() || found->second.PartyId() != bridge->party || bridge->published_link != bridge->link || bridge->link.empty()) {
+        if (found != bridge->join_requests.end()) bridge->join_requests.erase(found);
+        bridge->emit(9, request, 0, 4); return;
+    }
+    auto item = found->second;
+    bridge->join_requests.erase(found);
+    auto guard = bridge->alive;
+    bridge->client->SendActivityJoinRequestReply(item, [bridge, guard, request](auto result) {
+        if (*guard) bridge->emit(9, request, static_cast<uint64_t>(std::ceil(std::max(0.0f, result.RetryAfter()))), result.Successful() ? -1 : bridge->failure(result));
+    });
+}
+void veil_discord_dismiss_join(Bridge* bridge, uint64_t key) { bridge->join_requests.erase(key); }
 }

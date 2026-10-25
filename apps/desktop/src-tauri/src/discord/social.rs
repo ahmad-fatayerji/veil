@@ -18,11 +18,24 @@ pub struct Person {
     avatar_revision: String,
     /// online, idle, dnd, offline, or empty when Discord does not report it.
     status: &'static str,
+    /// A Veil session this friend is in, when Discord reports one with a party.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    activity: Option<FriendActivity>,
+}
+#[derive(Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FriendActivity {
+    details: String,
+    state: String,
+    size: u32,
 }
 #[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Invitation {
     id: String,
     person: Person,
+    /// The current user asked this person to join, so it can open without a second prompt.
+    requested: bool,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +45,8 @@ pub struct Snapshot {
     person: Option<Person>,
     friends: Vec<Person>,
     invitations: Vec<Invitation>,
+    /// Friends asking to join the selected document; the host answers them.
+    join_requests: Vec<Invitation>,
     warning: Option<String>,
     version: u64,
     invite_ready: bool,
@@ -50,6 +65,7 @@ impl Default for Snapshot {
             person: None,
             friends: vec![],
             invitations: vec![],
+            join_requests: vec![],
             warning: None,
             version: 0,
             invite_ready: false,
@@ -80,6 +96,8 @@ enum Command {
     Send(String, String, u64, String, Reply),
     Review(String, Reply),
     Dismiss(String),
+    RequestJoin(String, Reply),
+    AnswerJoin(String, bool, Reply),
 }
 
 /// Scope consent to one WebView workspace and monotonically reject stale
@@ -213,6 +231,7 @@ impl View {
         self.snapshot.person = None;
         self.snapshot.friends.clear();
         self.snapshot.invitations.clear();
+        self.snapshot.join_requests.clear();
         self.snapshot.invite_ready = false;
         self.snapshot.version += 1;
     }
@@ -352,6 +371,29 @@ pub async fn discord_send_invite(
         &state,
         Command::Send(person_id, document_id, generation, owner, tx),
     )?;
+    response(rx).await
+}
+#[tauri::command]
+pub async fn discord_request_join(
+    caller: WebviewWindow,
+    state: State<'_, Social>,
+    person_id: String,
+) -> Result<String, String> {
+    authorize(&caller)?;
+    let (tx, rx) = oneshot::channel();
+    enqueue(&state, Command::RequestJoin(person_id, tx))?;
+    response(rx).await
+}
+#[tauri::command]
+pub async fn discord_answer_join_request(
+    caller: WebviewWindow,
+    state: State<'_, Social>,
+    request_id: String,
+    accept: bool,
+) -> Result<String, String> {
+    authorize(&caller)?;
+    let (tx, rx) = oneshot::channel();
+    enqueue(&state, Command::AnswerJoin(request_id, accept, tx))?;
     response(rx).await
 }
 #[tauri::command]
@@ -545,6 +587,8 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
     let mut refresh_failures = 0_u32;
     let mut send_after = Instant::now();
     let mut friend_batch = Vec::new();
+    // Friends this user asked to join, so their answering invite opens directly.
+    let mut asked: HashMap<String, Instant> = HashMap::new();
     let mut legacy = super::transport::Client::new();
     let mut legacy_connected = false;
     let mut legacy_published = None;
@@ -644,6 +688,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                     view.snapshot.person = None;
                     view.snapshot.friends.clear();
                     view.snapshot.invitations.clear();
+                    view.snapshot.join_requests.clear();
                     view.snapshot.status = "disconnecting".into();
                     view.snapshot.consent_epoch += 1;
                     view.snapshot.warning = error.map(|error| error.to_string());
@@ -688,6 +733,12 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                     selection = next;
                     if !same_join {
                         let mut view = worker.view.lock().unwrap();
+                        // Requests were for the previous party; they cannot admit anyone here.
+                        for item in view.snapshot.join_requests.drain(..) {
+                            if let Ok(key) = item.id.parse() {
+                                sdk.dismiss_join(key);
+                            }
+                        }
                         view.snapshot.invite_ready = false;
                         view.snapshot.version += 1;
                         activity_key.clear();
@@ -735,6 +786,54 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                         sdk.accept(sequence, invite);
                     } else {
                         let _ = reply.send(Err("This invitation is no longer available.".into()));
+                    }
+                }
+                Command::RequestJoin(person, reply) => {
+                    if Instant::now() < send_after {
+                        let _ = reply.send(Err("rate-limit".into()));
+                        continue;
+                    }
+                    let Ok(user) = person.parse::<u64>() else {
+                        let _ = reply.send(Err("not-friend".into()));
+                        continue;
+                    };
+                    if pending.len() >= 16 {
+                        let _ = reply.send(Err("unavailable".into()));
+                        continue;
+                    }
+                    asked.retain(|_, time| time.elapsed() < Duration::from_secs(180));
+                    if asked.len() < 32 {
+                        asked.insert(person, Instant::now());
+                    }
+                    sequence += 1;
+                    pending.insert(sequence, (Instant::now(), reply));
+                    sdk.request_join(sequence, user);
+                }
+                Command::AnswerJoin(id, accept, reply) => {
+                    let found = {
+                        let mut view = worker.view.lock().unwrap();
+                        let before = view.snapshot.join_requests.len();
+                        view.snapshot.join_requests.retain(|item| item.id != id);
+                        view.snapshot.version += 1;
+                        before != view.snapshot.join_requests.len()
+                    };
+                    let Some(key) = id.parse::<u64>().ok().filter(|_| found) else {
+                        let _ = reply.send(Err("stale-document".into()));
+                        continue;
+                    };
+                    if !accept {
+                        sdk.dismiss_join(key);
+                        let _ = reply.send(Ok(String::new()));
+                    } else if selection.is_none()
+                        || !preferences.enabled
+                        || !preferences.show_participant_count
+                    {
+                        sdk.dismiss_join(key);
+                        let _ = reply.send(Err("stale-document".into()));
+                    } else {
+                        sequence += 1;
+                        pending.insert(sequence, (Instant::now(), reply));
+                        sdk.reply_join(sequence, key);
                     }
                 }
                 Command::Dismiss(id) => {
@@ -847,7 +946,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                         view.snapshot.version += 1;
                     }
                 }
-                2 | 4 | 10 => {
+                2 | 4 | 10 | 19 => {
                     if disconnect_at.is_some() || auth.tokens().is_none() {
                         continue;
                     }
@@ -882,6 +981,7 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                             1 | 2 | 5 => "offline",
                             _ => "",
                         },
+                        activity: None,
                     };
                     let mut view = worker.view.lock().unwrap();
                     if view.avatars.get(&person.id) != Some(&event.c) {
@@ -891,6 +991,44 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                         view.snapshot.person = Some(person);
                     } else if event.kind == 4 {
                         friend_batch.push(person);
+                    } else if event.kind == 19 {
+                        let id = event.request.to_string();
+                        let open = selection.as_ref().is_some_and(|s| s.public_join)
+                            && preferences.enabled
+                            && preferences.show_participant_count;
+                        if open {
+                            // "Friends can join": answer at once. Admission still
+                            // follows the document's Who can join setting.
+                            drop(view);
+                            sequence += 1;
+                            sdk.reply_join(sequence, event.request);
+                            continue;
+                        }
+                        // One prompt per friend; a newer request replaces the older one.
+                        let previous: Vec<String> = view
+                            .snapshot
+                            .join_requests
+                            .iter()
+                            .filter(|item| item.person.id == person.id)
+                            .map(|item| item.id.clone())
+                            .collect();
+                        for old in &previous {
+                            if let Ok(key) = old.parse() {
+                                sdk.dismiss_join(key);
+                            }
+                        }
+                        view.snapshot
+                            .join_requests
+                            .retain(|item| item.person.id != person.id);
+                        if view.snapshot.join_requests.len() < 32 {
+                            view.snapshot.join_requests.push(Invitation {
+                                id,
+                                person,
+                                requested: false,
+                            });
+                        } else {
+                            sdk.dismiss_join(event.request);
+                        }
                     } else if view.snapshot.invitations.len() < 32 {
                         let id = event.request.to_string();
                         if view
@@ -910,6 +1048,9 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                                         .is_some_and(|link| invitation_party(link) == *party)
                                 })
                             {
+                                existing.requested |= asked
+                                    .remove(&person.id)
+                                    .is_some_and(|time| time.elapsed() < Duration::from_secs(180));
                                 existing.person = person;
                                 view.snapshot.version += 1;
                                 sdk.dismiss(event.request);
@@ -917,12 +1058,31 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                             }
                         }
                         if !view.snapshot.invitations.iter().any(|i| i.id == id) {
-                            view.snapshot.invitations.push(Invitation { id, person });
+                            let requested = asked
+                                .remove(&person.id)
+                                .is_some_and(|time| time.elapsed() < Duration::from_secs(180));
+                            view.snapshot.invitations.push(Invitation {
+                                id,
+                                person,
+                                requested,
+                            });
                         }
                     }
                     view.snapshot.version += 1;
                 }
                 3 => friend_batch.clear(),
+                17 => {
+                    if let Some(friend) = friend_batch
+                        .last_mut()
+                        .filter(|friend| friend.id == event.id.to_string())
+                    {
+                        friend.activity = Some(FriendActivity {
+                            details: super::title(&event.a),
+                            state: super::title(&event.b),
+                            size: event.value.clamp(0, u32::MAX as i64) as u32,
+                        });
+                    }
+                }
                 5 => {
                     let mut view = worker.view.lock().unwrap();
                     if view.snapshot.friends != friend_batch {
@@ -1093,7 +1253,9 @@ pub(super) fn run(shared: super::Shared, worker: Worker) {
                                     username: String::new(),
                                     avatar_revision: String::new(),
                                     status: "",
+                                    activity: None,
                                 },
+                                requested: false,
                             });
                             view.snapshot.version += 1;
                         }

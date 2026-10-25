@@ -60,7 +60,7 @@ async function general(main) {
   return settings;
 }
 async function openJoin(main) {
-  await main.getByRole('button', { name: /^Join with a link/ }).click();
+  await main.getByRole('button', { name: /^Join a session/ }).click();
   await expect(main.locator('[id$="-automatic-name"]')).toBeVisible();
 }
 async function quit(main) {

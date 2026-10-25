@@ -48,6 +48,7 @@ import { PeopleButton, type ConnectionState } from './shell/TitleBar';
 import { StatusBar } from './shell/StatusBar';
 import { OverlayStatus } from './shell/OverlayStatus';
 import { StartScreen } from './screens/StartScreen';
+import { JoinSessions } from './screens/JoinSessions';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
 import { ShareDialog, type ShareView } from './dialogs/ShareDialog';
@@ -109,6 +110,10 @@ export function AutomaticApp({
   const [savingServer, setSavingServer] = useState(false);
   const name = useDisplayName();
   const [invitation, setInvitation] = useState(tab.invitation ?? '');
+  /** Who sent the link on Discord, shown while the form still holds that link. */
+  const [inviter, setInviter] = useState(
+    tab.invitedBy && tab.invitation ? { link: tab.invitation, name: tab.invitedBy } : null,
+  );
   const [link, setLink] = useState('');
   const [joinMode, setJoinMode] = useState<JoinMode>('auto');
   const [pendingGuests, setPendingGuests] = useState<PendingGuest[]>([]);
@@ -282,10 +287,11 @@ export function AutomaticApp({
       throw e;
     }
   }
-  async function join() {
+  /** Joins with the form's link, or one Discord handed over. */
+  async function join(target = invitation) {
     if (!name.trim()) throw new Error('Enter your name.');
-    if (invitation.trim().startsWith('veil://')) parseShareLink(invitation.trim(), development);
-    else decodeServerInvitation(invitation.trim(), development);
+    if (target.trim().startsWith('veil://')) parseShareLink(target.trim(), development);
+    else decodeServerInvitation(target.trim(), development);
     const controller = new AbortController();
     joining.current = controller;
     setJoinInProgress(true);
@@ -296,7 +302,7 @@ export function AutomaticApp({
       setCompatibilityNotice('');
       setNotice('Connecting to host...');
       const joined = await joinShareLink(
-        invitation,
+        target,
         name.trim(),
         signaling(),
         setNotice,
@@ -537,6 +543,10 @@ export function AutomaticApp({
     discordHolder && discordHolder !== tab.id
       ? workspace.tabs.find((item) => item.id === discordHolder)?.title.trim() || 'another document'
       : null;
+  const discordJoinVisible =
+    discord.social.available &&
+    discord.connection.status !== 'unavailable' &&
+    discord.connection.status !== 'loading';
   const awaitingApproval =
     joinInProgress && notice === 'Waiting for the host to approve your request.';
   const overlayVisible = !!overlay.state?.settings.visible;
@@ -764,7 +774,21 @@ export function AutomaticApp({
             name={name}
             onNameChange={saveDisplayName}
             invitation={invitation}
-            invitedBy={invitation.trim() === tab.invitation ? tab.invitedBy : undefined}
+            invitedBy={inviter && invitation.trim() === inviter.link ? inviter.name : undefined}
+            sessions={
+              discordJoinVisible && (
+                <JoinSessions
+                  discord={discord}
+                  busy={busy}
+                  onJoinLink={(target, from) => {
+                    setInviter({ link: target, name: from });
+                    setInvitation(target);
+                    // A saved name means nothing is left to ask: join right away.
+                    if (name.trim()) void run(() => join(target));
+                  }}
+                />
+              )
+            }
             onInvitationChange={setInvitation}
             joinOpen={joinOpen}
             onJoinOpenChange={setJoinOpen}

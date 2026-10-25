@@ -101,6 +101,8 @@ fn main() {
             discord::social::discord_send_invite,
             discord::social::discord_review_invite,
             discord::social::discord_dismiss_invite,
+            discord::social::discord_request_join,
+            discord::social::discord_answer_join_request,
             discord::social::discord_avatar,
             overlay::overlay_snapshot,
             overlay::overlay_update,

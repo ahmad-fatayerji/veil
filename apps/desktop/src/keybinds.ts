@@ -21,7 +21,7 @@ export const keybindActions: { id: KeybindAction; label: string; description: st
   },
   {
     id: 'joinDocument',
-    label: 'Join with a link',
+    label: 'Join a session',
     description: 'Open the join form in a new tab.',
   },
   { id: 'copyInvite', label: 'Copy invite link', description: 'While hosting a shared document.' },

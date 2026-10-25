@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, errorMessage } from './overlay/api';
-import type { DiscordConnectionView, DiscordInviteResult, DiscordPerson } from './discord-social';
+import type {
+  DiscordConnectionView,
+  DiscordInvitation,
+  DiscordInviteResult,
+  DiscordPerson,
+} from './discord-social';
 import type { DiscordInvitationSelection } from './discord-invitations';
 import { clearDiscordAvatarCache } from './dialogs/DiscordAvatar';
 
@@ -9,11 +14,26 @@ interface SocialSnapshot {
   status: string;
   person: DiscordPerson | null;
   friends: DiscordPerson[];
-  invitations: { id: string; person: DiscordPerson }[];
+  invitations: DiscordInvitation[];
+  joinRequests: DiscordInvitation[];
   warning: string | null;
   version: number;
   inviteReady: boolean;
   consentEpoch: number;
+}
+
+function inviteFailure(cause: unknown): Extract<DiscordInviteResult, { ok: false }> {
+  const reason = errorMessage(cause);
+  return {
+    ok: false,
+    reason:
+      reason === 'connection' ||
+      reason === 'not-friend' ||
+      reason === 'rate-limit' ||
+      reason === 'stale-document'
+        ? reason
+        : 'unavailable',
+  };
 }
 
 export function useDiscordSocial(onConnectionLost: () => void) {
@@ -28,10 +48,13 @@ export function useDiscordSocial(onConnectionLost: () => void) {
   /** People invited this connection, listed first; memory only. */
   const [invited, setInvited] = useState<ReadonlySet<string>>(() => new Set());
   const identity = snapshot?.person?.id ?? null;
+  /** Friends this window asked to join; their answering invite opens directly. */
+  const [awaiting, setAwaiting] = useState<ReadonlySet<string>>(() => new Set());
   const [invitedFor, setInvitedFor] = useState(identity);
   if (invitedFor !== identity) {
     setInvitedFor(identity);
     setInvited(new Set());
+    setAwaiting(new Set());
   }
   useEffect(() => {
     clearDiscordAvatarCache();
@@ -147,17 +170,33 @@ export function useDiscordSocial(onConnectionLost: () => void) {
       setInvited((current) => new Set(current).add(personId));
       return { ok: true };
     } catch (cause) {
-      const reason = errorMessage(cause);
-      return {
-        ok: false,
-        reason:
-          reason === 'connection' ||
-          reason === 'not-friend' ||
-          reason === 'rate-limit' ||
-          reason === 'stale-document'
-            ? reason
-            : 'unavailable',
-      };
+      return inviteFailure(cause);
+    }
+  }
+  async function requestJoin(personId: string): Promise<DiscordInviteResult> {
+    setAwaiting((current) => new Set(current).add(personId));
+    try {
+      await invoke('discord_request_join', { personId });
+      return { ok: true };
+    } catch (cause) {
+      stopAwaiting(personId);
+      return inviteFailure(cause);
+    }
+  }
+  function stopAwaiting(personId: string) {
+    setAwaiting((current) => {
+      if (!current.has(personId)) return current;
+      const next = new Set(current);
+      next.delete(personId);
+      return next;
+    });
+  }
+  async function answerJoin(requestId: string, accept: boolean): Promise<DiscordInviteResult> {
+    try {
+      await invoke('discord_answer_join_request', { requestId, accept });
+      return { ok: true };
+    } catch (cause) {
+      return inviteFailure(cause);
     }
   }
   return {
@@ -168,6 +207,11 @@ export function useDiscordSocial(onConnectionLost: () => void) {
     friends: snapshot?.friends ?? [],
     invited,
     invitations: snapshot?.invitations ?? [],
+    joinRequests: snapshot?.joinRequests ?? [],
+    awaiting,
+    requestJoin,
+    stopAwaiting,
+    answerJoin,
     warning: error || snapshot?.warning || '',
     refreshFriends: () => void action('discord_refresh_friends'),
     send,

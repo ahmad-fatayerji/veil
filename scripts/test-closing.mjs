@@ -441,7 +441,7 @@ test('guest quits while connected; host can still quit afterwards', async () => 
   await host.newDoc('host doc');
   const link = await host.share();
   const guest = await launch();
-  await guest.main.getByRole('button', { name: /^Join with a link/ }).click();
+  await guest.main.getByRole('button', { name: /^Join a session/ }).click();
   await guest.main.getByLabel('Invite link').fill(link);
   await guest.main.getByRole('textbox', { name: /Your name/ }).fill('Guest');
   await guest.main.getByRole('button', { name: 'Join session', exact: true }).click();
@@ -467,7 +467,7 @@ test('quit while a guest is still joining', async () => {
   await share.getByRole('radio', { name: 'Only people I approve' }).click();
   await share.getByRole('button', { name: 'Close Share document' }).click();
   const guest = await launch();
-  await guest.main.getByRole('button', { name: /^Join with a link/ }).click();
+  await guest.main.getByRole('button', { name: /^Join a session/ }).click();
   await guest.main.getByLabel('Invite link').fill(link);
   await guest.main.getByRole('textbox', { name: /Your name/ }).fill('Waiting');
   await guest.main.getByRole('button', { name: 'Join session', exact: true }).click();
