@@ -8,6 +8,25 @@ async function join(page: Page, name: string) {
   await expect(page.getByRole('status')).toHaveText('Connected');
 }
 
+// Visibility alone misses a name tag stranded at an earlier insertion point.
+async function expectCaretAfter(page: Page, name: string, prefix: string) {
+  const label = page.locator('.collaboration-carets__label');
+  await expect
+    .poll(() =>
+      label.evaluateAll((labels, name) => {
+        const label = labels.find((element) => (element as HTMLElement).dataset.name === name);
+        const caret = label?.parentElement;
+        const editor = caret?.closest('.document-editor');
+        if (!caret || !editor) return null;
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.setEndBefore(caret);
+        return range.toString();
+      }, name),
+    )
+    .toBe(prefix);
+}
+
 test('remote cursors, selections, and activity follow their author and clear on leave', async ({
   browser,
 }) => {
@@ -48,11 +67,27 @@ test('remote cursors, selections, and activity follow their author and clear on 
     await expect(alex.locator('.participant-activity')).not.toHaveText('Typing…');
     const caret = a.locator('.collaboration-carets__label[data-name="Sam"]');
     await expect(caret).toBeVisible();
+    await expectCaretAfter(a, 'Sam', 'A shared sentence. Together.');
+    // Move away from the old cursor and keep typing, including a new paragraph.
+    await secondEditor.press('Control+Home');
+    await b.keyboard.insertText('Start. ');
+    await expectCaretAfter(a, 'Sam', 'Start. ');
+    await secondEditor.press('Enter');
+    await b.keyboard.insertText('Next. ');
+    await expectCaretAfter(a, 'Sam', 'Start. Next. ');
+    await secondEditor.press('Control+End');
+    for (const text of [' More', ' typing', '.']) {
+      await b.keyboard.insertText(text);
+      await expectCaretAfter(a, 'Sam', (await secondEditor.textContent()) ?? '');
+    }
     await expect(a.locator('.collaboration-carets__label[data-name="Alex"]')).toHaveCount(0);
     await expect(sam.locator('.participant-activity')).toHaveText('In document');
     await secondEditor.press('Control+a');
     await expect(sam.locator('.participant-activity')).toHaveText('Selecting text');
-    await expect(a.locator('.collaboration-selection[data-selection-user="Sam"]')).toBeVisible();
+    const selections = a.locator('.collaboration-selection[data-selection-user="Sam"]');
+    await expect(selections).toHaveCount(2);
+    await expect(selections.nth(0)).toBeVisible();
+    await expect(selections.nth(1)).toBeVisible();
     await a.screenshot({
       path: test.info().outputPath('minimal-editor-presence.png'),
       fullPage: true,
