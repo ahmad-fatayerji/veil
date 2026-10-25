@@ -69,7 +69,8 @@ export function ShareDialog({
   hostingSummary: string;
   onChangeHosting: () => void;
   onSelfHosting: () => void;
-  onStart: () => void;
+  /** Creates the link; 'discord' opens the friend list right after. */
+  onStart: (view?: ShareView) => void;
   /** Joining from Discord chosen before the link exists. */
   startPublicJoin: boolean;
   onStartPublicJoinChange: (publicJoin: boolean) => void;
@@ -95,6 +96,7 @@ export function ShareDialog({
     preferences: discord.preferences,
     link,
   });
+  const canStart = !!name.trim() && !(chooseHosting && !hosting.server.trim());
   const startDiscord = discordShareState({
     available: discord.social.available,
     connection: discord.connection,
@@ -125,30 +127,13 @@ export function ShareDialog({
           }}
         >
           <p>Invite people you trust. Everyone who joins can read and edit this document.</p>
-          <Field label="Your name" htmlFor="share-name" hint="Shown to people who join.">
-            <Input
-              id="share-name"
-              value={name}
-              maxLength={40}
-              placeholder="e.g. Alex"
-              autoComplete="nickname"
-              data-autofocus
-              disabled={busy}
-              aria-describedby="share-name-hint"
-              onChange={(event) => onNameChange(event.target.value)}
-            />
-          </Field>
-          <JoinModeControl
-            value={joinMode}
-            disabled={busy}
-            onChange={onJoinModeChange}
-            started={false}
-          />
           {startDiscord.kind === 'ready' ? (
-            <DiscordJoinControl
+            <DiscordInviteRow
+              state={startDiscord}
+              connection={discord.connection}
               publicJoin={startPublicJoin}
-              disabled={busy}
-              onChange={onStartPublicJoinChange}
+              busy={busy || !canStart}
+              onOpen={() => onStart('discord')}
             />
           ) : startDiscord.kind === 'account' ? (
             <div className="discord-invite-row">
@@ -181,6 +166,32 @@ export function ShareDialog({
               </Button>
             </div>
           ) : null}
+          <Field label="Your name" htmlFor="share-name" hint="Shown to people who join.">
+            <Input
+              id="share-name"
+              value={name}
+              maxLength={40}
+              placeholder="e.g. Alex"
+              autoComplete="nickname"
+              data-autofocus
+              disabled={busy}
+              aria-describedby="share-name-hint"
+              onChange={(event) => onNameChange(event.target.value)}
+            />
+          </Field>
+          <JoinModeControl
+            value={joinMode}
+            disabled={busy}
+            onChange={onJoinModeChange}
+            started={false}
+          />
+          {startDiscord.kind === 'ready' && (
+            <DiscordJoinControl
+              publicJoin={startPublicJoin}
+              disabled={busy}
+              onChange={onStartPublicJoinChange}
+            />
+          )}
           {chooseHosting ? (
             <div className="field">
               <span className="field-label">Where to host</span>
@@ -202,12 +213,7 @@ export function ShareDialog({
           )}
           <div className="dialog-actions">
             <Button onClick={onClose}>Cancel</Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={busy}
-              disabled={!name.trim() || (chooseHosting && !hosting.server.trim())}
-            >
+            <Button type="submit" variant="primary" loading={busy} disabled={!canStart}>
               Create invite link
             </Button>
           </div>

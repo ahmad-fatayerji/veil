@@ -135,7 +135,7 @@ export function DocumentScreen({
                       Copy link
                     </Button>
                   )}
-                  {link && onInviteDiscord && (
+                  {onInviteDiscord && (
                     <Button
                       size="sm"
                       icon={<DiscordLogo size={14} />}

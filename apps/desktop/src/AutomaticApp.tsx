@@ -1052,8 +1052,8 @@ export function AutomaticApp({
           openSettings('Sharing');
         }}
         onSelfHosting={() => void openUrl(SELF_HOSTING_URL).catch((e) => setError(errorMessage(e)))}
-        onStart={() => {
-          setShareView('main');
+        onStart={(view = 'main') => {
+          setShareView(view);
           pendingPublicJoin.current = startPublicJoin;
           void run(startSharing);
         }}
