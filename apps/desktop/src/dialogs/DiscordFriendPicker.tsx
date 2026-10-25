@@ -10,6 +10,7 @@ import {
 } from '../discord-social';
 import type { DiscordInvitationSelection } from '../discord-invitations';
 import { DiscordAvatar } from './DiscordAvatar';
+import { DiscordStatusIcon } from './DiscordStatusIcon';
 
 /** How long an invite waits for Discord to acknowledge this document's activity. */
 export const INVITE_READY_TIMEOUT = 10_000;
@@ -160,7 +161,9 @@ function FriendPicker({
                       className="discord-presence-dot"
                       data-status={person.status}
                       title={presenceLabel[person.status]}
-                    />
+                    >
+                      <DiscordStatusIcon status={person.status} />
+                    </span>
                   )}
                 </span>
                 <div className="discord-card-copy">

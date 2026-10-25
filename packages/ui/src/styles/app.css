@@ -1348,28 +1348,31 @@
     display: inline-flex;
     flex-shrink: 0;
   }
+  /* The ring is cut from the avatar in the surface colour, as Discord does. */
   .discord-presence-dot {
     position: absolute;
-    right: -1px;
-    bottom: -1px;
-    width: 12px;
-    height: 12px;
-    border: 2px solid var(--surface-raised);
+    right: -3px;
+    bottom: -3px;
+    display: grid;
+    width: 16px;
+    height: 16px;
+    place-items: center;
     border-radius: var(--radius-full);
-    background: var(--fg-muted);
+    background: var(--surface-raised);
+    color: #80848e;
+  }
+  .discord-presence-dot > svg {
+    display: block;
   }
   /* Discord's own presence colours, so status reads the same as in Discord. */
   .discord-presence-dot[data-status='online'] {
-    background: #23a55a;
+    color: #23a55a;
   }
   .discord-presence-dot[data-status='idle'] {
-    background: #f0b232;
+    color: #f0b232;
   }
   .discord-presence-dot[data-status='dnd'] {
-    background: #f23f43;
-  }
-  .discord-presence-dot[data-status='offline'] {
-    background: #80848e;
+    color: #f23f43;
   }
   .discord-card-copy h4 {
     margin: 0;
