@@ -1,8 +1,9 @@
 import type { Ref } from 'react';
-import { ChevronRight, Send } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Button } from '@veil/ui';
 import type { DiscordConnectionView } from '../discord-social';
 import { DiscordAvatar } from './DiscordAvatar';
+import { DiscordLogo } from './DiscordLogo';
 import { discordAccountMessage, type DiscordShareState } from './discord-share-state';
 
 /** Connect, reconnect or cancel in place, so the Share dialog never closes for Settings. */
@@ -63,7 +64,7 @@ export function DiscordInviteRow({
     <DiscordAvatar person={person} />
   ) : (
     <span className="discord-card-icon" aria-hidden="true">
-      <Send size={18} />
+      <DiscordLogo size={20} />
     </span>
   );
   if (state.kind === 'account')

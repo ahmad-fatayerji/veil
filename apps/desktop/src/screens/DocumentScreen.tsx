@@ -1,9 +1,10 @@
 import { useRef } from 'react';
-import { ChevronRight, Copy, Send, UserPlus } from 'lucide-react';
+import { ChevronRight, Copy, UserPlus } from 'lucide-react';
 import type { PeerSession, PeerSummary, PendingGuest } from '@veil/collaboration';
 import { DocumentTitle } from '@veil/editor';
 import { Banner, Button, PeoplePanel } from '@veil/ui';
 import { DesktopEditor } from '../overlay/session';
+import { DiscordLogo } from '../dialogs/DiscordLogo';
 
 export function JoinRequests({
   guests,
@@ -137,7 +138,7 @@ export function DocumentScreen({
                   {link && onInviteDiscord && (
                     <Button
                       size="sm"
-                      icon={<Send size={14} aria-hidden="true" />}
+                      icon={<DiscordLogo size={14} />}
                       aria-label="Invite Discord friends"
                       disabled={busy}
                       onClick={onInviteDiscord}

@@ -1168,8 +1168,9 @@
     height: var(--control-lg);
     place-items: center;
     border-radius: var(--radius-md);
-    background: var(--surface-sunken);
-    color: var(--fg-muted);
+    /* Discord's brand colour, so the mark reads as Discord rather than a Veil action. */
+    background: #5865f2;
+    color: #ffffff;
   }
   .discord-card-copy {
     display: grid;

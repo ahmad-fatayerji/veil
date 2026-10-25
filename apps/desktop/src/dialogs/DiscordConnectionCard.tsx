@@ -1,8 +1,8 @@
 import { useId } from 'react';
-import { Send } from 'lucide-react';
 import { Button } from '@veil/ui';
 import type { DiscordConnectionView } from '../discord-social';
 import { DiscordAvatar } from './DiscordAvatar';
+import { DiscordLogo } from './DiscordLogo';
 import { discordAccountMessage } from './discord-share-state';
 
 /** Only the actual native adapter may supply connected/authorizing states. */
@@ -27,7 +27,7 @@ export function DiscordConnectionCard({ connection }: { connection: DiscordConne
           <DiscordAvatar person={person} />
         ) : (
           <span className="discord-card-icon" aria-hidden="true">
-            <Send size={18} />
+            <DiscordLogo size={20} />
           </span>
         )}
         <div className="setting-row-text">
