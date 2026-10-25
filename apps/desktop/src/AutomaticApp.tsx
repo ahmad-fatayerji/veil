@@ -1098,11 +1098,14 @@ export function AutomaticApp({
           void run(async () => {
             workspace.clearDiscordInvites(tab.id);
             await network.current!.stopSharing();
+            // The dialog's Sharing is off view says this; no second notice.
             setLink('');
-            setNotice('Sharing stopped. Existing collaborators stay connected.');
           })
         }
-        onEnable={() => void run(() => share())}
+        onEnable={() => {
+          pendingPublicJoin.current = startPublicJoin;
+          void run(() => share());
+        }}
         notice={notice}
         error={error}
       />

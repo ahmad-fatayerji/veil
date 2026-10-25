@@ -223,34 +223,56 @@ export function ShareDialog({
           </div>
         </form>
       ) : !link ? (
-        <div className="share-paused">
-          <span className="share-paused-icon" aria-hidden="true">
-            <Link2Off size={22} />
-          </span>
-          <div className="share-paused-copy">
-            <h3>Sharing is off</h3>
-            <p>
-              The old invite link no longer lets anyone in.{' '}
-              {othersConnected === 0
-                ? 'No one else is connected.'
-                : `${othersConnected} ${othersConnected === 1 ? 'person is' : 'people are'} still connected and can keep editing.`}
-            </p>
+        <form
+          className="dialog-body-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onEnable();
+          }}
+        >
+          <div className="share-off-card" role="status">
+            <span className="share-off-icon" aria-hidden="true">
+              <Link2Off size={18} />
+            </span>
+            <div>
+              <h3>Sharing is off</h3>
+              <p>
+                New people can’t join.{' '}
+                {othersConnected === 0
+                  ? 'No one else is connected.'
+                  : `${othersConnected} ${othersConnected === 1 ? 'person is' : 'people are'} still here and can keep editing.`}
+              </p>
+            </div>
           </div>
-          <div className="share-paused-actions">
-            <Button
-              variant="primary"
-              icon={<Link2 size={16} aria-hidden="true" />}
-              loading={busy}
-              data-autofocus
-              onClick={onEnable}
-            >
-              Create a new link
-            </Button>
-            <Button variant="ghost" onClick={onClose}>
-              Not now
-            </Button>
+          <JoinModeControl
+            value={joinMode}
+            disabled={busy}
+            onChange={onJoinModeChange}
+            started={false}
+          />
+          {startDiscord.kind === 'ready' && (
+            <DiscordJoinControl
+              publicJoin={startPublicJoin}
+              disabled={busy}
+              onChange={onStartPublicJoinChange}
+            />
+          )}
+          <div className="share-off-actions">
+            <p className="field-hint">You’ll get a new link. The old one stays off.</p>
+            <div className="dialog-actions">
+              <Button onClick={onClose}>Close</Button>
+              <Button
+                type="submit"
+                variant="primary"
+                icon={<Link2 size={16} aria-hidden="true" />}
+                loading={busy}
+                data-autofocus
+              >
+                Share again
+              </Button>
+            </div>
           </div>
-        </div>
+        </form>
       ) : showDiscord ? (
         <DiscordInviteView
           state={discordState}

@@ -1047,42 +1047,46 @@
   .share-status > svg {
     flex-shrink: 0;
   }
-  .share-paused {
-    display: grid;
-    justify-items: center;
-    gap: var(--space-4);
-    padding: var(--space-3) 0 var(--space-1);
-    text-align: center;
-  }
-  .share-paused-icon {
-    display: grid;
-    width: 48px;
-    height: 48px;
-    place-items: center;
-    border-radius: var(--radius-full);
+  .share-off-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
     background: var(--surface-sunken);
+  }
+  .share-off-icon {
+    display: grid;
+    flex: 0 0 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
     color: var(--fg-muted);
   }
-  .share-paused-copy {
-    display: grid;
-    gap: var(--space-1);
-    max-width: 340px;
-  }
-  .share-paused-copy h3 {
+  .share-off-card h3 {
     margin: 0;
-    font-size: var(--text-body);
+    font-size: var(--text-md);
     font-weight: var(--weight-semibold);
   }
-  .share-paused-copy p {
-    margin: 0;
+  .share-off-card p {
+    margin: 2px 0 0;
     color: var(--fg-muted);
     font-size: var(--text-sm);
   }
-  .share-paused-actions {
+  .share-off-actions {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
+    align-items: center;
+    justify-content: space-between;
     gap: var(--space-2);
+  }
+  .share-off-actions .field-hint {
+    margin: 0;
+  }
+  .share-off-actions .dialog-actions {
+    margin-top: 0;
   }
   .share-section {
     display: grid;
