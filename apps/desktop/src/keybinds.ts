@@ -49,9 +49,11 @@ type KeyEvent = Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'altKey' | 'shi
 
 export function shortcutFromEvent(event: KeyEvent): string | null {
   if (event.metaKey || !(event.ctrlKey || event.altKey)) return null;
-  const code = /^(?:Key([A-Z])|Digit([0-9])|(F(?:[1-9]|1[0-2])))$/.exec(event.code);
-  if (event.code && !code) return null;
-  const key = code ? code[1] || code[2] || code[3] : event.key.toUpperCase();
+  if (event.code.startsWith('Numpad')) return null;
+  // Letters follow the active layout: AZERTY A reports key='a', code='KeyQ'.
+  // Keep number-row shortcuts stable when Shift/layout produces punctuation.
+  const digit = /^Digit([0-9])$/.exec(event.code);
+  const key = digit ? digit[1] : event.key.toUpperCase();
   if (!/^(?:[A-Z0-9]|F(?:[1-9]|1[0-2]))$/.test(key)) return null;
   return [event.ctrlKey && 'Ctrl', event.altKey && 'Alt', event.shiftKey && 'Shift', key]
     .filter(Boolean)

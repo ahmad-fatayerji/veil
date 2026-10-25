@@ -17,21 +17,47 @@ function key(overrides: Partial<KeyboardEvent> = {}): KeyboardEvent {
 }
 
 describe('device-local keybind matching', () => {
-  it('uses physical keys consistently with native shortcuts, including shifted numbers', () => {
+  it('keeps number-row shortcuts stable, including shifted numbers', () => {
     expect(shortcutFromEvent(key({ key: '!', code: 'Digit1', shiftKey: true }))).toBe(
       'Ctrl+Shift+1',
     );
-    expect(shortcutFromEvent(key({ key: 'a', code: 'KeyQ', altKey: true }))).toBe('Ctrl+Alt+Q');
+    expect(shortcutFromEvent(key({ key: '&', code: 'Digit1' }))).toBe('Ctrl+1');
     expect(shortcutFromEvent(key({ key: 'F12', code: 'F12', ctrlKey: false, altKey: true }))).toBe(
       'Alt+F12',
+    );
+  });
+
+  it.each([
+    ['a', 'KeyQ', 'A'],
+    ['q', 'KeyA', 'Q'],
+    ['z', 'KeyW', 'Z'],
+    ['w', 'KeyZ', 'W'],
+    ['m', 'Semicolon', 'M'],
+    ['y', 'KeyZ', 'Y'],
+    ['b', 'KeyN', 'B'],
+  ])('records and matches layout letter %s from physical %s', (letter, code, expected) => {
+    const event = key({ key: letter, code, altKey: true });
+    expect(shortcutFromEvent(event)).toBe(`Ctrl+Alt+${expected}`);
+    expect(matchesShortcut(event, `Ctrl+Alt+${expected}`)).toBe(true);
+    expect(matchesShortcut(event, `Ctrl+Alt+${code.replace('Key', '')}`)).toBe(false);
+    expect(shortcutFromEvent(key({ key: letter.toUpperCase(), code, shiftKey: true }))).toBe(
+      `Ctrl+Shift+${expected}`,
     );
   });
 
   it('requires a supported non-modifier key with Ctrl or Alt', () => {
     expect(shortcutFromEvent(key({ ctrlKey: false }))).toBeNull();
     expect(shortcutFromEvent(key({ metaKey: true }))).toBeNull();
-    for (const code of ['Escape', 'ControlLeft', 'Numpad1', 'F13']) {
-      expect(shortcutFromEvent(key({ code }))).toBeNull();
+    for (const [value, code] of [
+      ['Escape', 'Escape'],
+      ['Control', 'ControlLeft'],
+      ['1', 'Numpad1'],
+      ['F13', 'F13'],
+      ['Dead', 'Quote'],
+      ['Unidentified', 'KeyA'],
+      [';', 'Semicolon'],
+    ]) {
+      expect(shortcutFromEvent(key({ key: value, code }))).toBeNull();
     }
   });
 
