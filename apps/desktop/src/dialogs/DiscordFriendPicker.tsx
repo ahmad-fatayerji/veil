@@ -1,6 +1,6 @@
-import { useId, useRef, useState } from 'react';
-import { Check, Search } from 'lucide-react';
-import { Banner, Button, Field, Input } from '@veil/ui';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Check, RefreshCw, Search } from 'lucide-react';
+import { Button, IconButton, Input } from '@veil/ui';
 import {
   discordInviteError,
   type DiscordInviteResult,
@@ -9,12 +9,16 @@ import {
 import type { DiscordInvitationSelection } from '../discord-invitations';
 import { DiscordAvatar } from './DiscordAvatar';
 
+/** How long an invite waits for Discord to acknowledge this document's activity. */
+export const INVITE_READY_TIMEOUT = 10_000;
+
 interface Props {
   friends: readonly DiscordPerson[];
-  loading: boolean;
-  error: string;
+  /** Null while this document does not allow Discord invites: friends show, Invite is off. */
+  selection: Readonly<DiscordInvitationSelection> | null;
+  /** Discord acknowledged the joinable activity; earlier clicks wait for it. */
+  ready: boolean;
   disabled: boolean;
-  selection: Readonly<DiscordInvitationSelection>;
   /** The native adapter must recheck the selected generation before sending. */
   onInvite: (
     personId: string,
@@ -25,19 +29,19 @@ interface Props {
 
 type SendState = { status: 'sending' | 'sent' } | { status: 'error'; message: string };
 
-function FriendPicker({
-  friends,
-  loading,
-  error,
-  disabled,
-  selection,
-  onInvite,
-  onRefresh,
-}: Props) {
+function FriendPicker({ friends, selection, ready, disabled, onInvite, onRefresh }: Props) {
   const searchId = useId();
   const [query, setQuery] = useState('');
   const [states, setStates] = useState<Record<string, SendState>>({});
   const inFlight = useRef(new Set<string>());
+  const readyRef = useRef(ready);
+  const waiters = useRef(new Set<() => void>());
+  useEffect(() => {
+    readyRef.current = ready;
+    if (!ready) return;
+    waiters.current.forEach((resolve) => resolve());
+    waiters.current.clear();
+  }, [ready]);
   const normalized = query.trim().normalize('NFKC').toLowerCase();
   const shown = friends.filter((friend) =>
     `${friend.displayName}\n${friend.username}`
@@ -46,17 +50,36 @@ function FriendPicker({
       .includes(normalized),
   );
 
+  function whenReady() {
+    if (readyRef.current) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        waiters.current.delete(done);
+        resolve(false);
+      }, INVITE_READY_TIMEOUT);
+      waiters.current.add(done);
+    });
+  }
+
   async function send(personId: string) {
-    if (disabled || loading || inFlight.current.has(personId)) return;
+    if (!selection || disabled || inFlight.current.has(personId)) return;
     inFlight.current.add(personId);
     setStates((current) => ({ ...current, [personId]: { status: 'sending' } }));
     try {
-      const result = await onInvite(personId, selection);
+      const result: DiscordInviteResult | null = (await whenReady())
+        ? await onInvite(personId, selection)
+        : null;
       setStates((current) => ({
         ...current,
-        [personId]: result.ok
-          ? { status: 'sent' }
-          : { status: 'error', message: discordInviteError(result) },
+        [personId]: !result
+          ? { status: 'error', message: 'Discord is still getting ready. Try again in a moment.' }
+          : result.ok
+            ? { status: 'sent' }
+            : { status: 'error', message: discordInviteError(result) },
       }));
     } catch {
       setStates((current) => ({
@@ -72,78 +95,72 @@ function FriendPicker({
   }
 
   return (
-    <div className="discord-friend-picker" aria-busy={loading}>
-      <Field label="Find a Discord friend" htmlFor={searchId}>
+    <div className="discord-friend-picker">
+      <div className="discord-search-row">
         <div className="discord-search">
           <Search size={16} aria-hidden="true" />
           <Input
             id={searchId}
             type="search"
             value={query}
-            placeholder="Search name or username"
+            placeholder="Search friends"
+            aria-label="Search Discord friends"
             autoComplete="off"
-            disabled={disabled}
+            data-autofocus
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-      </Field>
-      {error && (
-        <Banner
-          tone="danger"
-          role="alert"
-          actions={
-            <Button size="sm" onClick={onRefresh} disabled={loading}>
-              Retry
-            </Button>
-          }
-        >
-          {error}
-        </Banner>
-      )}
-      {loading ? (
-        <p role="status" className="field-hint">
-          Preparing Discord invitations…
-        </p>
-      ) : !error && !shown.length ? (
-        <p role="status" className="field-hint">
+        <IconButton label="Refresh friends" disabled={disabled} onClick={onRefresh}>
+          <RefreshCw size={16} aria-hidden="true" />
+        </IconButton>
+      </div>
+      {!shown.length ? (
+        <p role="status" className="discord-friends-empty">
           {friends.length
             ? 'No friends match your search.'
-            : 'No Discord friends are available. You can still copy the invite link.'}
+            : 'No Discord friends to show yet. Refresh, or copy the link instead.'}
         </p>
       ) : (
         <ul className="discord-friends" aria-label="Discord friends">
           {shown.map((person) => {
             const state = states[person.id];
+            const name = person.displayName || person.username;
             const statusId = `${searchId}-${person.id}-status`;
             return (
-              <li key={person.id} className="discord-friend-row">
+              <li key={person.id} className="discord-friend-row" data-state={state?.status}>
                 <DiscordAvatar person={person} />
                 <div className="discord-card-copy">
-                  <strong>{person.displayName || person.username}</strong>
-                  <p>@{person.username}</p>
-                  <p id={statusId} role={state?.status === 'error' ? 'alert' : 'status'}>
-                    {state?.status === 'error'
-                      ? state.message
-                      : state?.status === 'sent'
-                        ? 'Invite sent through Discord.'
-                        : state?.status === 'sending'
-                          ? 'Sending invite…'
-                          : ''}
+                  <strong>{name}</strong>
+                  <p
+                    id={statusId}
+                    className={state?.status === 'error' ? 'discord-friend-error' : undefined}
+                    role={state?.status === 'error' ? 'alert' : 'status'}
+                  >
+                    {state?.status === 'error' ? (
+                      state.message
+                    ) : state?.status === 'sent' ? (
+                      <span className="discord-friend-sent">
+                        <Check size={14} aria-hidden="true" />
+                        Invite sent
+                      </span>
+                    ) : state?.status === 'sending' ? (
+                      'Sending…'
+                    ) : (
+                      `@${person.username}`
+                    )}
                   </p>
                 </div>
                 <Button
                   size="sm"
+                  variant={state?.status === 'sent' ? 'ghost' : 'secondary'}
                   loading={state?.status === 'sending'}
-                  disabled={disabled || loading}
-                  aria-label={`${state?.status === 'error' ? 'Retry invite to' : state?.status === 'sent' ? 'Send another invite to' : 'Invite'} ${person.displayName || person.username}`}
+                  disabled={disabled || !selection}
+                  aria-label={`${state?.status === 'error' ? 'Retry invite to' : state?.status === 'sent' ? 'Invite again:' : 'Invite'} ${name}`}
                   aria-describedby={statusId}
-                  icon={
-                    state?.status === 'sent' ? <Check size={16} aria-hidden="true" /> : undefined
-                  }
                   onClick={() => void send(person.id)}
                 >
                   {state?.status === 'sent'
-                    ? 'Send again'
+                    ? 'Invite again'
                     : state?.status === 'error'
                       ? 'Retry'
                       : 'Invite'}
@@ -153,13 +170,6 @@ function FriendPicker({
           })}
         </ul>
       )}
-      <Button size="sm" variant="ghost" disabled={loading || disabled} onClick={onRefresh}>
-        Refresh friends
-      </Button>
-      <p className="field-hint">
-        Sent means Discord accepted the invite. It does not confirm delivery or that your friend
-        joined.
-      </p>
     </div>
   );
 }
@@ -168,6 +178,9 @@ function FriendPicker({
  * remount on account change and use a new selection generation on link reset. */
 export function DiscordFriendPicker(props: Props) {
   return (
-    <FriendPicker key={`${props.selection.documentId}:${props.selection.generation}`} {...props} />
+    <FriendPicker
+      key={props.selection ? `${props.selection.documentId}:${props.selection.generation}` : 'off'}
+      {...props}
+    />
   );
 }

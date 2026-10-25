@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ChevronRight, UserPlus } from 'lucide-react';
+import { ChevronRight, Copy, Send, UserPlus } from 'lucide-react';
 import type { PeerSession, PeerSummary, PendingGuest } from '@veil/collaboration';
 import { DocumentTitle } from '@veil/editor';
 import { Banner, Button, PeoplePanel } from '@veil/ui';
@@ -65,6 +65,7 @@ export function DocumentScreen({
   link,
   onCopyLink,
   onShare,
+  onInviteDiscord,
 }: {
   document: PeerSession;
   peers: PeerSummary[];
@@ -81,6 +82,8 @@ export function DocumentScreen({
   link: string;
   onCopyLink: () => void;
   onShare: () => void;
+  /** Present only while Discord invites can be sent from this device. */
+  onInviteDiscord?: () => void;
 }) {
   const page = useRef<HTMLElement>(null);
   return (
@@ -115,28 +118,37 @@ export function DocumentScreen({
           invite={
             role === 'host' && (
               <div className="people-invite">
-                {link ? (
-                  <>
-                    <span className="people-invite-link" title={link}>
-                      {link}
-                    </span>
+                <span className="muted">
+                  {link
+                    ? 'Invite more people to edit with you.'
+                    : 'Invite people to edit with you.'}
+                </span>
+                <div className="people-invite-actions">
+                  {link && (
                     <Button
                       size="sm"
+                      icon={<Copy size={14} aria-hidden="true" />}
                       disabled={busy}
                       onClick={onCopyLink}
-                      aria-label="Copy invite link"
                     >
-                      Copy
+                      Copy link
                     </Button>
-                  </>
-                ) : (
-                  <>
-                    <span className="muted">Invite people to edit with you.</span>
-                    <Button size="sm" disabled={busy} onClick={onShare}>
-                      Share…
+                  )}
+                  {link && onInviteDiscord && (
+                    <Button
+                      size="sm"
+                      icon={<Send size={14} aria-hidden="true" />}
+                      aria-label="Invite Discord friends"
+                      disabled={busy}
+                      onClick={onInviteDiscord}
+                    >
+                      Discord
                     </Button>
-                  </>
-                )}
+                  )}
+                  <Button size="sm" variant="ghost" disabled={busy} onClick={onShare}>
+                    {link ? 'Sharing options' : 'Share…'}
+                  </Button>
+                </div>
               </div>
             )
           }

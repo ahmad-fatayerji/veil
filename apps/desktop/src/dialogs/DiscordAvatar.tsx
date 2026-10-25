@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { DiscordPerson } from '../discord-social';
 import { invoke } from '../overlay/api';
 
-function AvatarImage({ person }: { person: DiscordPerson }) {
+function AvatarImage({ person, small }: { person: DiscordPerson; small?: boolean }) {
   const [failed, setFailed] = useState(false);
   const [downloaded, setDownloaded] = useState<string | undefined>();
   const container = useRef<HTMLSpanElement>(null);
@@ -33,7 +33,11 @@ function AvatarImage({ person }: { person: DiscordPerson }) {
     image.length <= 512 * 1024 &&
     /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/.test(image);
   return (
-    <span ref={container} className="discord-avatar" aria-hidden="true">
+    <span
+      ref={container}
+      className={`discord-avatar ${small ? 'discord-avatar-sm' : ''}`}
+      aria-hidden="true"
+    >
       {raster && !failed ? (
         <img src={image} alt="" onError={() => setFailed(true)} />
       ) : (
@@ -43,6 +47,12 @@ function AvatarImage({ person }: { person: DiscordPerson }) {
   );
 }
 
-export function DiscordAvatar({ person }: { person: DiscordPerson }) {
-  return <AvatarImage key={`${person.id}:${person.avatarRevision ?? ''}`} person={person} />;
+export function DiscordAvatar({ person, small }: { person: DiscordPerson; small?: boolean }) {
+  return (
+    <AvatarImage
+      key={`${person.id}:${person.avatarRevision ?? ''}`}
+      person={person}
+      small={small}
+    />
+  );
 }

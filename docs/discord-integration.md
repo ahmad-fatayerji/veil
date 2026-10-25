@@ -12,25 +12,49 @@ reconnect and disconnect states. Existing Rich Presence title/count preferences
 remain separate. An unlinked user keeps the existing text-only presence path;
 the worker stops that publisher before the SDK takes over publication.
 
-Each host document's Share dialog has **Allow direct Discord invites for this
-document**, off by default. It selects one joinable document for the running app;
-switching tabs does not change it. Sharing another document through Discord needs
-an explicit switch. The selected document supplies presence title/count and its
-existing reusable link. Direct invitations require enabled Rich Presence and
-visible participant count; the UI explains these requirements without silently
-changing privacy preferences. Long self-hosted links retain the copy-link path.
+The Share dialog has one invite link with one Copy button. Below it, one **Invite
+Discord friends** row opens a friend view inside the same dialog. The row never
+sends people to Settings. It can connect, reconnect or cancel authorization in
+place. It is hidden in builds without the SDK. It is disabled, with the reason
+shown, when a long self-hosted link cannot fit Discord's join secret; Copy still
+works.
 
-The friend picker searches actual Discord friends by name/username. Per-person
-states cover preparing, sending, accepted send, retry and explicit resend. Sent
-means Discord accepted the request, not delivered/read/joined. There is no chat or
+The dialog's **Privacy** section holds the per-document choices: **Who can join**
+(anyone with the link, or only people the host approves; the latter can also be
+chosen before the first link is created) and **Discord invites** (**Off** by
+default, or **Friends I invite**). Off publishes no join secret and allows no
+sends, so nobody can join through Discord. Friends I invite selects one joinable
+document for the running app; switching tabs does not change it. Choosing it for
+another document says which document currently holds it, and moves it only on an
+explicit click. The selected document supplies presence title/count and its
+existing reusable link. The activity uses a private Discord party. Discord may
+still offer friends its own "Ask to join" on a private party; Veil does not act on
+those requests (live behavior unverified).
+
+Direct invitations require enabled Rich Presence and visible participant count.
+The friend view explains this and offers an explicit **Turn on** for both. It
+never changes these privacy preferences silently.
+
+The friend view searches actual Discord friends by name/username. The list stays
+visible while Discord acknowledges this document's activity. Invite clicks made
+before that acknowledgement wait up to 10 seconds, then report that Discord is
+still getting ready. Per-person states cover sending, accepted send, retry and
+explicit "Invite again". Sent means Discord accepted the request, not
+delivered/read/joined. Title or participant-count updates for the same selected
+link keep an acknowledged publication usable. Only a changed document, link or
+consent generation requires a new acknowledgement. There is no chat or
 friend-management interface. Friend data, profiles and bounded avatar caches stay
-in memory and are cleared on disconnect. Avatar requests are native, constrained to
+in memory and are cleared on disconnect. While sharing, the People panel offers
+Copy link, a Discord shortcut into the friend view (when connected) and Sharing
+options. Avatar requests are native, constrained to
 SDK-provided Discord CDN URLs, size/time/concurrency bounded and returned as raster
 data; the WebView CSP is unchanged.
 
-Incoming invitations offer Review/Dismiss. Review obtains and validates the join
-payload, then opens the normal join form in a new tab, showing the server and
-asking for explicit Join. It does not bypass host approval, compatibility checks,
+Incoming invitations show the inviter's avatar and name and offer Open/Dismiss.
+Open obtains and validates the join payload, then opens the normal join form in a
+new tab. The form shows "Invited by … on Discord" (memory only, dropped if the link
+is edited) and the server, and asks for an explicit Join. In approval mode the
+joining dialog says the guest is waiting for the host. It does not bypass host approval, compatibility checks,
 guest names or existing admission errors. Repeated launch callbacks cannot silently
 open duplicate tabs for the same invitation.
 

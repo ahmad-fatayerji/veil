@@ -28,6 +28,7 @@ export function StartScreen({
   name,
   onNameChange,
   invitation,
+  invitedBy,
   onInvitationChange,
   joinOpen,
   onJoinOpenChange,
@@ -43,6 +44,8 @@ export function StartScreen({
   name: string;
   onNameChange: (value: string) => void;
   invitation: string;
+  /** Shown when the link came from a Discord invite and is unchanged. */
+  invitedBy?: string;
   onInvitationChange: (value: string) => void;
   joinOpen: boolean;
   onJoinOpenChange: (open: boolean) => void;
@@ -219,6 +222,11 @@ export function StartScreen({
                 onBlur={() => setInvitationTouched(true)}
               />
             </Field>
+            {invitedBy && (
+              <p className="join-invited-by">
+                Invited by <strong>{invitedBy}</strong> on Discord
+              </p>
+            )}
             {invitationServer && (
               <p className="field-hint">
                 Server: <strong>{invitationServer}</strong>. Join only if you trust this invitation.

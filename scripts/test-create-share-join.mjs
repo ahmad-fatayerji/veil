@@ -282,9 +282,7 @@ try {
   await share.getByRole('button', { name: 'Reset link', exact: true }).click();
   await expect(share.getByLabel('Invite link')).not.toHaveValue(link);
   await share.getByRole('button', { name: 'Stop sharing', exact: true }).click();
-  await expect(
-    share.getByText('Sharing is off. New people can’t join; current collaborators stay connected.'),
-  ).toBeVisible();
+  await expect(share.getByRole('heading', { name: 'Sharing is off', exact: true })).toBeVisible();
   await share.getByRole('button', { name: 'Close Share document' }).click();
   await other.getByRole('textbox', { name: 'Shared document' }).press('Control+End');
   await other.keyboard.insertText(' After sharing stopped.');

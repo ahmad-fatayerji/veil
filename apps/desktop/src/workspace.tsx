@@ -25,6 +25,7 @@ import {
 } from '@veil/ui';
 import { useDiscordPresence } from './discord';
 import { DiscordInvitationPolicy } from './discord-invitations';
+import { DiscordAvatar } from './dialogs/DiscordAvatar';
 import { AutomaticApp } from './AutomaticApp';
 import { SessionBridge, flushOverlay } from './overlay/session';
 import { errorMessage, invoke, useOverlay } from './overlay/api';
@@ -62,6 +63,8 @@ export interface WorkspaceTab {
   mode: 'start' | 'new' | 'join';
   source?: string;
   invitation?: string;
+  /** Discord display name of the inviter; memory only, never recovered. */
+  invitedBy?: string;
   file?: DocumentFile;
   recoveredDirty?: boolean;
   recoveredBaseline?: string | null;
@@ -99,7 +102,7 @@ export class Workspace {
   private writes: Promise<unknown> = Promise.resolve();
   private pending: Promise<unknown> = Promise.resolve();
   private pathsWaiting = false;
-  private linksWaiting: string[] = [];
+  private linksWaiting: { invitation: string; invitedBy?: string }[] = [];
   private quitWaiting = false;
   private quitting = false;
   private exiting = false;
@@ -190,7 +193,7 @@ export class Workspace {
   newTab = () => {
     if (!this.working) this.add('new');
   };
-  joinTab = (invitation = '') => {
+  joinTab = (invitation = '', invitedBy?: string) => {
     if (invitation) {
       try {
         parseShareLink(invitation, true);
@@ -204,8 +207,8 @@ export class Workspace {
       this.select(existing);
       return;
     }
-    if (this.working) this.linksWaiting.push(invitation);
-    else this.add('join', { invitation });
+    if (this.working) this.linksWaiting.push({ invitation, invitedBy });
+    else this.add('join', { invitation, invitedBy });
   };
   update(tab: WorkspaceTab, patch: Partial<WorkspaceTab>) {
     Object.assign(tab, patch);
@@ -255,7 +258,8 @@ export class Workspace {
       this.fail(cause);
     } finally {
       this.working = false;
-      for (const invitation of this.linksWaiting.splice(0)) this.joinTab(invitation);
+      for (const { invitation, invitedBy } of this.linksWaiting.splice(0))
+        this.joinTab(invitation, invitedBy);
       this.changed();
       if (this.quitWaiting) {
         this.quitWaiting = false;
@@ -877,27 +881,31 @@ function DiscordIncomingInvitation({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const known = invitation.person.id !== '0';
+  const inviter = invitation.person.displayName || invitation.person.username;
   return (
     <Banner
-      className="toast"
+      className="toast discord-invite-toast"
       tone={error ? 'danger' : 'info'}
       role={error ? 'alert' : 'status'}
+      icon={known && !error ? <DiscordAvatar person={invitation.person} small /> : undefined}
       actions={
         <>
           <Button
             size="sm"
+            variant="primary"
             loading={busy}
             onClick={() => {
               setBusy(true);
               setError('');
               void discord.social
                 .review(invitation.id)
-                .then((link) => workspace.joinTab(link))
+                .then((link) => workspace.joinTab(link, known ? inviter : undefined))
                 .catch((cause: unknown) => setError(errorMessage(cause)))
                 .finally(() => setBusy(false));
             }}
           >
-            Review
+            Open
           </Button>
           <Button
             size="sm"
@@ -911,9 +919,13 @@ function DiscordIncomingInvitation({
       }
     >
       {error ||
-        (invitation.person.id === '0'
-          ? 'A Discord invitation is ready. Review the server and join settings before joining.'
-          : `${invitation.person.displayName} invited you to collaborate. Review the server and join settings before joining.`)}
+        (known ? (
+          <>
+            <strong>{inviter}</strong> invited you to a Veil document on Discord.
+          </>
+        ) : (
+          'You have a Veil invitation from Discord.'
+        ))}
     </Banner>
   );
 }

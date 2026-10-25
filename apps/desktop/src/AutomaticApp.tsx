@@ -50,7 +50,7 @@ import { OverlayStatus } from './shell/OverlayStatus';
 import { StartScreen } from './screens/StartScreen';
 import { DocumentScreen } from './screens/DocumentScreen';
 import { SettingsDialog, type Section } from './dialogs/SettingsDialog';
-import { ShareDialog } from './dialogs/ShareDialog';
+import { ShareDialog, type ShareView } from './dialogs/ShareDialog';
 import type { useDiscordPresence } from './discord';
 import { defaultKeybinds, matchesShortcut } from './keybinds';
 import {
@@ -130,6 +130,7 @@ export function AutomaticApp({
   const [settings, setSettings] = useState(false);
   const [section, setSection] = useState<Section>('General');
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareView, setShareView] = useState<ShareView>('main');
   // The Share dialog asks where to host on the first share, or after a server was full.
   const [hostingStep, setHostingStep] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -354,16 +355,18 @@ export function AutomaticApp({
         setCapacity(problem);
         return;
       }
+      // The admission choice made before the link exists applies to its first guest.
+      started.setJoinMode(joinMode);
       network.current = started;
       setSession(started);
-      setJoinMode(started.joinMode);
     }
     setLink(await network.current.enableSharing());
     setShareOpen(true);
     setNotice('');
     setServiceOnline(network.current.serviceOnline);
   }
-  function requestShare() {
+  function requestShare(view: ShareView = 'main') {
+    setShareView(view);
     // Ask for a name and a server before the first invitation so guests know who is hosting.
     if (!network.current && (!name.trim() || !savedServer)) setShareOpen(true);
     else void run(() => share());
@@ -402,6 +405,7 @@ export function AutomaticApp({
   }
   function closeShare() {
     setShareOpen(false);
+    setShareView('main');
     if (!hostingStep) return;
     setHostingStep(false);
     discardHostingChanges();
@@ -527,6 +531,13 @@ export function AutomaticApp({
         : link
           ? 'sharing'
           : 'local';
+  const discordHolder = workspace.discordInvites.current?.documentId;
+  const discordElsewhere =
+    discordHolder && discordHolder !== tab.id
+      ? workspace.tabs.find((item) => item.id === discordHolder)?.title.trim() || 'another document'
+      : null;
+  const awaitingApproval =
+    joinInProgress && notice === 'Waiting for the host to approve your request.';
   const overlayVisible = !!overlay.state?.settings.visible;
   const leaveLabel = guest ? 'Leave session' : 'Close document';
   // Settings and the Share dialog edit the same hosting choice.
@@ -624,7 +635,7 @@ export function AutomaticApp({
           className="share-button"
           data-sharing={link ? '' : undefined}
           disabled={busy}
-          onClick={requestShare}
+          onClick={() => requestShare()}
         >
           {link ? (
             <Radio size={18} aria-hidden="true" />
@@ -731,6 +742,7 @@ export function AutomaticApp({
             name={name}
             onNameChange={saveDisplayName}
             invitation={invitation}
+            invitedBy={invitation.trim() === tab.invitation ? tab.invitedBy : undefined}
             onInvitationChange={setInvitation}
             joinOpen={joinOpen}
             onJoinOpenChange={setJoinOpen}
@@ -769,7 +781,12 @@ export function AutomaticApp({
             onReconnect={() => void run(() => session!.reconnect())}
             link={link}
             onCopyLink={copyInvite}
-            onShare={requestShare}
+            onShare={() => requestShare()}
+            onInviteDiscord={
+              discord.social.available && discord.connection.status === 'connected'
+                ? () => requestShare('discord')
+                : undefined
+            }
           />
         )}
         <StatusBar
@@ -929,8 +946,16 @@ export function AutomaticApp({
             decideCompatibility(false);
           }}
         >
-          <p role="status">{notice || 'Connecting to host...'}</p>
-          <p className="muted">Keep the host's Veil app open while connecting.</p>
+          <p role="status">
+            {awaitingApproval
+              ? 'Waiting for the host to let you in. They approve each person before they join.'
+              : notice || 'Connecting to host...'}
+          </p>
+          <p className="muted">
+            {awaitingApproval
+              ? 'You can cancel at any time. The host sees the name you entered.'
+              : "Keep the host's Veil app open while connecting."}
+          </p>
           <div className="dialog-actions">
             <Button
               onClick={() => {
@@ -946,8 +971,11 @@ export function AutomaticApp({
       <ShareDialog
         open={active && shareOpen}
         onClose={closeShare}
+        view={shareView}
+        onViewChange={setShareView}
         started={!!session}
         link={link}
+        othersConnected={Math.max(0, participants.length - 1)}
         joinMode={joinMode}
         onJoinModeChange={(mode) => {
           network.current?.setJoinMode(mode);
@@ -971,10 +999,10 @@ export function AutomaticApp({
             setNotice('Link copied.');
           })
         }
-        discordCapabilities={discord.capabilities}
         discord={discord}
         discordSelection={workspace.discordInvites.current}
         discordDocumentId={tab.id}
+        discordElsewhere={discordElsewhere}
         onDiscordConsent={(enabled) => {
           try {
             if (enabled) workspace.allowDiscordInvites(tab);
@@ -982,14 +1010,6 @@ export function AutomaticApp({
           } catch (cause) {
             setError(errorMessage(cause));
           }
-        }}
-        onDiscordSettings={() => {
-          closeShare();
-          openSettings('Sharing');
-        }}
-        onCopyForDiscord={async () => {
-          if (!link) throw new Error('Sharing is off.');
-          await navigator.clipboard.writeText(link);
         }}
         onReset={() =>
           void run(async () => {

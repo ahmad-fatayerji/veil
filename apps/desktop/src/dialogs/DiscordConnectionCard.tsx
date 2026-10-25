@@ -29,7 +29,7 @@ export function DiscordConnectionCard({ connection }: { connection: DiscordConne
                   : connection.status === 'expired'
                     ? 'Discord authorization expired or was revoked. Connect again to use direct invites.'
                     : connection.status === 'connected'
-                      ? 'Connected on this device. Each document needs its own permission for invites.'
+                      ? 'Connected on this device. Turn on Discord invites per document in Share › Privacy.'
                       : 'Connect to invite your Discord friends. No Veil account needed.';
   return (
     <div className="settings-card discord-connection-card">
