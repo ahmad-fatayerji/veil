@@ -410,6 +410,19 @@ try {
     async () => (await authorActivity.textContent()).startsWith('Typing'),
     'control-panel typing presence',
   );
+  await waitFor(async () => {
+    const label = guest.locator('.collaboration-carets__label[data-name="Desktop author"]');
+    if ((await label.count()) !== 1) return false;
+    return label.evaluate((element) => {
+      const caret = element.parentElement;
+      const editor = caret?.closest('.document-editor');
+      if (!caret || !editor) return false;
+      const before = document.createRange();
+      before.selectNodeContents(editor);
+      before.setEndBefore(caret);
+      return before.toString() === editor.textContent;
+    });
+  }, 'main-editor name follows the insertion point');
   await waitFor(
     async () => (await overlayGuest.getAttribute('data-activity')) === 'away',
     'overlay shows remote away activity',

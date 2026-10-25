@@ -9,6 +9,7 @@ import { formatMarkdown, markdownShortcut, type MarkdownCommand } from './markdo
 type SourceCommand = (command: MarkdownCommand, level?: number) => void;
 import Collaboration, { isChangeOrigin } from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
+import { trackCursor } from './cursor';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
   Bold,
@@ -117,6 +118,11 @@ export function SharedEditor({
     },
     [doc, provider],
   );
+
+  useEffect(() => {
+    if (!editor) return;
+    return trackCursor(editor, provider.awareness);
+  }, [editor, provider]);
 
   useEffect(() => {
     if (!editor) return;
