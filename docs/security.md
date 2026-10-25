@@ -46,9 +46,9 @@ current document title (labeled "Document: ...") and how many other participants
 documents show a solo editing message; without a document it shows "No document
 open". Pending join requests are excluded from the count.
 
-In **Settings > Sharing > Discord**, turn off **Show document title** to use "Editing a
+In **Settings > Sharing > Discord activity**, turn off **Show document title** to use "Editing a
 document" instead, or turn off **Show participant count** to omit that information.
-Turn off **Discord Rich Presence** to clear Veil's activity and stop connecting
+Turn off **Show Veil in my Discord status** to clear Veil's activity and stop connecting
 to Discord. All three settings default to on and are remembered on this device;
 the individual privacy choices are retained when Rich Presence is disabled.
 If saved preferences cannot be read, presence stays paused until a setting is

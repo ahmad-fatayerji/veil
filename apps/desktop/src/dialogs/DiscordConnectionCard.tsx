@@ -1,12 +1,13 @@
 import { useId } from 'react';
-import { Link2 } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { Button } from '@veil/ui';
 import type { DiscordConnectionView } from '../discord-social';
 import { DiscordAvatar } from './DiscordAvatar';
+import { discordAccountMessage } from './discord-share-state';
 
 /** Only the actual native adapter may supply connected/authorizing states. */
 export function DiscordConnectionCard({ connection }: { connection: DiscordConnectionView }) {
-  const availabilityId = useId();
+  const statusId = useId();
   const person =
     connection.status === 'connected' || connection.status === 'reconnecting'
       ? connection.person
@@ -16,66 +17,59 @@ export function DiscordConnectionCard({ connection }: { connection: DiscordConne
       ? 'Checking connection availability…'
       : connection.status === 'unavailable'
         ? connection.reason
-        : connection.status === 'error'
-          ? connection.message
-          : connection.status === 'disconnecting'
-            ? 'Disconnecting and removing saved authorization…'
-            : connection.status === 'connecting'
-              ? 'Connecting to Discord…'
-              : connection.status === 'authorizing'
-                ? 'Waiting for you to approve the connection in Discord or your browser…'
-                : connection.status === 'reconnecting'
-                  ? 'Reconnecting to Discord… Your document stays open.'
-                  : connection.status === 'expired'
-                    ? 'Discord authorization expired or was revoked. Connect again to use direct invites.'
-                    : connection.status === 'connected'
-                      ? 'Connected on this device. Turn on Discord invites per document in Share › Privacy.'
-                      : 'Connect to invite your Discord friends. No Veil account needed.';
+        : connection.status === 'connected' && person
+          ? `@${person.username}`
+          : discordAccountMessage(connection);
   return (
-    <div className="settings-card discord-connection-card">
-      <div className="discord-card-heading">
+    <div className="settings-card">
+      <div className="setting-row discord-account-row">
         {person ? (
           <DiscordAvatar person={person} />
         ) : (
           <span className="discord-card-icon" aria-hidden="true">
-            <Link2 size={20} />
+            <Send size={18} />
           </span>
         )}
-        <div className="discord-card-copy">
-          <h4>{person ? person.displayName || person.username : 'Discord connection'}</h4>
-          <p>{person ? `@${person.username}` : 'Connecting never starts sharing a document.'}</p>
+        <div className="setting-row-text">
+          <span className="setting-row-label">
+            {person ? person.displayName || person.username : 'Not connected'}
+          </span>
+          <p id={statusId} role={connection.status === 'error' ? 'alert' : 'status'}>
+            {message}
+          </p>
         </div>
-      </div>
-      <div className="discord-card-footer">
-        <p id={availabilityId} role={connection.status === 'error' ? 'alert' : 'status'}>
-          {message}
-        </p>
-        {connection.status === 'authorizing' || connection.status === 'connecting' ? (
-          <Button onClick={connection.cancel}>Cancel connection</Button>
-        ) : connection.status === 'connected' || connection.status === 'reconnecting' ? (
-          <Button onClick={connection.disconnect}>Disconnect</Button>
-        ) : connection.status === 'expired' ? (
-          <>
-            <Button onClick={connection.reconnect}>Reconnect Discord</Button>
+        <div className="discord-account-actions">
+          {connection.status === 'authorizing' || connection.status === 'connecting' ? (
+            <Button onClick={connection.cancel}>Cancel</Button>
+          ) : connection.status === 'connected' || connection.status === 'reconnecting' ? (
             <Button variant="ghost" onClick={connection.disconnect}>
               Disconnect
             </Button>
-          </>
-        ) : connection.status === 'disconnecting' ? (
-          <Button disabled>Disconnecting…</Button>
-        ) : connection.status === 'error' ? (
-          <Button onClick={connection.retry}>Try again</Button>
-        ) : (
-          <Button
-            disabled={connection.status !== 'disconnected'}
-            aria-describedby={availabilityId}
-            onClick={connection.status === 'disconnected' ? connection.connect : undefined}
-          >
-            Connect Discord
-          </Button>
-        )}
+          ) : connection.status === 'expired' ? (
+            <>
+              <Button variant="ghost" onClick={connection.disconnect}>
+                Disconnect
+              </Button>
+              <Button variant="primary" onClick={connection.reconnect}>
+                Reconnect
+              </Button>
+            </>
+          ) : connection.status === 'disconnecting' ? (
+            <Button disabled>Disconnecting…</Button>
+          ) : connection.status === 'error' ? (
+            <Button onClick={connection.retry}>Try again</Button>
+          ) : (
+            <Button
+              variant="primary"
+              disabled={connection.status !== 'disconnected'}
+              aria-describedby={statusId}
+              onClick={connection.status === 'disconnected' ? connection.connect : undefined}
+            >
+              Connect Discord
+            </Button>
+          )}
+        </div>
       </div>
-      <p className="field-hint">Rich Presence below works separately from an account connection.</p>
     </div>
   );
 }

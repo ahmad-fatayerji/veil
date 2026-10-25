@@ -1141,15 +1141,26 @@
   }
 
   /* Discord -------------------------------------------------------------- */
-  .discord-connection-card {
-    display: flex;
-    flex-direction: column;
+  .discord-account-row {
+    justify-content: flex-start;
     gap: var(--space-3);
   }
-  .discord-card-heading {
+  .discord-account-row .setting-row-text {
+    flex: 1;
+  }
+  .discord-account-row .setting-row-text p {
+    overflow-wrap: anywhere;
+  }
+  .discord-account-actions {
     display: flex;
-    align-items: center;
-    gap: var(--space-3);
+    flex-shrink: 0;
+    gap: var(--space-2);
+  }
+  .settings-group-hint {
+    margin: 0;
+    color: var(--fg-muted);
+    font-size: var(--text-xs);
+    line-height: 1.5;
   }
   .discord-card-icon {
     display: grid;
@@ -1321,23 +1332,13 @@
     font-size: var(--text-md);
     font-weight: var(--weight-semibold);
   }
-  .discord-card-copy p,
-  .discord-card-footer p {
+  .discord-card-copy p {
     margin: 2px 0 0;
     color: var(--fg-muted);
     font-size: var(--text-sm);
   }
   .discord-friend-row .discord-card-copy p.discord-friend-error {
     color: var(--danger);
-  }
-  .discord-card-footer {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-  }
-  .discord-card-footer p {
-    flex: 1 1 240px;
   }
   .join-invited-by {
     margin: 0;

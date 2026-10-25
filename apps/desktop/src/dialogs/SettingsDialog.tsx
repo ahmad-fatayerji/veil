@@ -378,14 +378,20 @@ export function SettingsDialog({
               </form>
               <p>Changes apply when you start sharing a new document.</p>
             </SettingsGroup>
-            <SettingsGroup title="Discord">
+            <SettingsGroup title="Discord account">
               <DiscordConnectionCard connection={discord.connection} />
               {discord.social.warning && <Banner tone="warning">{discord.social.warning}</Banner>}
+              <p className="settings-group-hint">
+                Connecting never shares a document. You choose which document allows Discord invites
+                from its Share dialog.
+              </p>
+            </SettingsGroup>
+            <SettingsGroup title="Discord activity">
               <div className="settings-card">
                 <SettingRow
-                  label="Discord Rich Presence"
+                  label="Show Veil in my Discord status"
                   htmlFor="discord-enabled"
-                  description="Share your editing activity on Discord."
+                  description="Works with or without a connected account. Needed for Discord invites."
                 >
                   <Switch
                     id="discord-enabled"
@@ -397,7 +403,7 @@ export function SettingsDialog({
                 <SettingRow
                   label="Show document title"
                   htmlFor="discord-title"
-                  description="Include your current document title in your Discord activity."
+                  description="Friends see the title of the document you’re editing."
                 >
                   <Switch
                     id="discord-title"
@@ -411,7 +417,7 @@ export function SettingsDialog({
                 <SettingRow
                   label="Show participant count"
                   htmlFor="discord-count"
-                  description="Include how many other people are connected to your document."
+                  description="Friends see how many people are in the document. Needed for Discord invites."
                 >
                   <Switch
                     id="discord-count"
