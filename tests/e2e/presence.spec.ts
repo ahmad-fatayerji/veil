@@ -84,7 +84,10 @@ test('remote cursors, selections, and activity follow their author and clear on 
     await expect(sam.locator('.participant-activity')).toHaveText('In document');
     await secondEditor.press('Control+a');
     await expect(sam.locator('.participant-activity')).toHaveText('Selecting text');
-    await expect(a.locator('.collaboration-selection[data-selection-user="Sam"]')).toBeVisible();
+    const selections = a.locator('.collaboration-selection[data-selection-user="Sam"]');
+    await expect(selections).toHaveCount(2);
+    await expect(selections.nth(0)).toBeVisible();
+    await expect(selections.nth(1)).toBeVisible();
     await a.screenshot({
       path: test.info().outputPath('minimal-editor-presence.png'),
       fullPage: true,
