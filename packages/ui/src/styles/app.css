@@ -1114,9 +1114,40 @@
     border-top: 1px solid var(--border);
   }
   .share-subview {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: var(--space-4);
+    min-height: 0;
     animation: veil-fade var(--dur) var(--ease-out);
+  }
+  /* The friend view keeps a steady height and only its list scrolls, instead of
+     the dialog and the list scrolling separately. */
+  .app-dialog.share-dialog:has(.share-subview) {
+    height: min(680px, calc(100dvh - 48px));
+  }
+  .share-dialog:has(.share-subview) .dialog-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .share-dialog .share-subview {
+    flex: 1;
+  }
+  .share-subview > * {
+    flex-shrink: 0;
+  }
+  .share-subview > .discord-friend-picker {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .share-subview .discord-friends {
+    flex: 1;
+    min-height: 120px;
+    max-height: none;
   }
   .share-consent-card {
     display: flex;
@@ -1289,14 +1320,22 @@
     display: grid;
     gap: var(--space-2);
   }
+  .discord-friend-picker > :not(.discord-friends) {
+    flex-shrink: 0;
+  }
   .discord-friends {
+    /* Positioned so hidden row labels stay inside the scroll area instead of
+       stretching the dialog below it. */
+    position: relative;
     display: grid;
+    align-content: start;
     gap: 2px;
     list-style: none;
     margin: 0 calc(var(--space-2) * -1);
     padding: 0;
     max-height: 300px;
     overflow: auto;
+    overscroll-behavior: contain;
     scroll-padding: var(--space-2);
   }
   .discord-friend-row {
