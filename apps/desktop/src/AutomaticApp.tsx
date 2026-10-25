@@ -620,8 +620,8 @@ export function AutomaticApp({
   useEffect(() => {
     if (!discordInvitable || workspace.discordInvites.current) return;
     try {
-      workspace.useDiscordFor(tab);
-      if (pendingPublicJoin.current) workspace.setDiscordPublicJoin(tab, true);
+      workspace.useDiscordFor(tab, link);
+      if (pendingPublicJoin.current) workspace.setDiscordPublicJoin(tab, true, link);
       pendingPublicJoin.current = null;
     } catch {
       /* The Share dialog explains why this link cannot be used on Discord. */
@@ -1052,8 +1052,8 @@ export function AutomaticApp({
           openSettings('Sharing');
         }}
         onSelfHosting={() => void openUrl(SELF_HOSTING_URL).catch((e) => setError(errorMessage(e)))}
-        onStart={(view = 'main') => {
-          setShareView(view);
+        onStart={() => {
+          setShareView('main');
           pendingPublicJoin.current = startPublicJoin;
           void run(startSharing);
         }}
@@ -1071,8 +1071,9 @@ export function AutomaticApp({
         discordElsewhere={discordElsewhere}
         onDiscordUse={() => {
           try {
-            const moved = workspace.useDiscordFor(tab);
-            if (pendingPublicJoin.current) workspace.setDiscordPublicJoin(tab, true);
+            // The friend list can open in the same render that created the link.
+            const moved = workspace.useDiscordFor(tab, link);
+            if (pendingPublicJoin.current) workspace.setDiscordPublicJoin(tab, true, link);
             pendingPublicJoin.current = null;
             return moved;
           } catch (cause) {
@@ -1082,7 +1083,7 @@ export function AutomaticApp({
         }}
         onDiscordPublicJoin={(publicJoin) => {
           try {
-            workspace.setDiscordPublicJoin(tab, publicJoin);
+            workspace.setDiscordPublicJoin(tab, publicJoin, link);
           } catch (cause) {
             setError(errorMessage(cause));
           }

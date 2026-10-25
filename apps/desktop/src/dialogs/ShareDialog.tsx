@@ -69,8 +69,7 @@ export function ShareDialog({
   hostingSummary: string;
   onChangeHosting: () => void;
   onSelfHosting: () => void;
-  /** Creates the link; 'discord' opens the friend list right after. */
-  onStart: (view?: ShareView) => void;
+  onStart: () => void;
   /** Joining from Discord chosen before the link exists. */
   startPublicJoin: boolean;
   onStartPublicJoinChange: (publicJoin: boolean) => void;
@@ -203,15 +202,6 @@ export function ShareDialog({
           )}
           <div className="dialog-actions">
             <Button onClick={onClose}>Cancel</Button>
-            {startDiscord.kind === 'ready' && (
-              <Button
-                icon={<DiscordLogo size={16} />}
-                disabled={busy || !name.trim() || (chooseHosting && !hosting.server.trim())}
-                onClick={() => onStart('discord')}
-              >
-                Create &amp; invite on Discord
-              </Button>
-            )}
             <Button
               type="submit"
               variant="primary"
