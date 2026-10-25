@@ -137,6 +137,9 @@ export function AutomaticApp({
   const [section, setSection] = useState<Section>('General');
   const [shareOpen, setShareOpen] = useState(false);
   const [shareView, setShareView] = useState<ShareView>('main');
+  /** Joining from Discord chosen before the first link; applied once Discord points here. */
+  const [startPublicJoin, setStartPublicJoin] = useState(false);
+  const pendingPublicJoin = useRef<boolean | null>(null);
   // The Share dialog asks where to host on the first share, or after a server was full.
   const [hostingStep, setHostingStep] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -618,10 +621,21 @@ export function AutomaticApp({
     if (!discordInvitable || workspace.discordInvites.current) return;
     try {
       workspace.useDiscordFor(tab);
+      if (pendingPublicJoin.current) workspace.setDiscordPublicJoin(tab, true);
+      pendingPublicJoin.current = null;
     } catch {
       /* The Share dialog explains why this link cannot be used on Discord. */
     }
   }, [workspace, tab, discordInvitable, link]);
+  // An empty name on the first share or join uses the connected Discord name.
+  const discordName =
+    discord.connection.status === 'connected'
+      ? discord.connection.person.displayName || discord.connection.person.username
+      : '';
+  useEffect(() => {
+    if ((shareOpen || joinOpen) && !name.trim() && discordName)
+      saveDisplayName(discordName.slice(0, 40));
+  }, [shareOpen, joinOpen, name, discordName]);
   const settingsButton = (
     <IconButton
       label="Settings"
@@ -1038,7 +1052,13 @@ export function AutomaticApp({
           openSettings('Sharing');
         }}
         onSelfHosting={() => void openUrl(SELF_HOSTING_URL).catch((e) => setError(errorMessage(e)))}
-        onStart={() => void run(startSharing)}
+        onStart={(view = 'main') => {
+          setShareView(view);
+          pendingPublicJoin.current = startPublicJoin;
+          void run(startSharing);
+        }}
+        startPublicJoin={startPublicJoin}
+        onStartPublicJoinChange={setStartPublicJoin}
         onCopy={() =>
           void run(async () => {
             await navigator.clipboard.writeText(link);
@@ -1051,7 +1071,10 @@ export function AutomaticApp({
         discordElsewhere={discordElsewhere}
         onDiscordUse={() => {
           try {
-            return workspace.useDiscordFor(tab);
+            const moved = workspace.useDiscordFor(tab);
+            if (pendingPublicJoin.current) workspace.setDiscordPublicJoin(tab, true);
+            pendingPublicJoin.current = null;
+            return moved;
           } catch (cause) {
             setError(errorMessage(cause));
             return null;

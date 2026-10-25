@@ -21,12 +21,14 @@ export function discordShareState({
   available: boolean;
   connection: DiscordConnectionView;
   preferences: DiscordPreferences | null;
-  link: string;
+  /** Null before a link exists: only the account and activity sharing are checked. */
+  link: string | null;
 }): DiscordShareState {
   if (!available || connection.status === 'unavailable' || connection.status === 'loading')
     return { kind: 'hidden' };
   if (connection.status !== 'connected') return { kind: 'account', connection };
   if (!preferences?.enabled || !preferences.showParticipantCount) return { kind: 'needs-activity' };
+  if (link === null) return { kind: 'ready' };
   const payload = discordJoinPayload(link);
   if (!payload.ok) return { kind: 'link', message: payload.message };
   return { kind: 'ready' };

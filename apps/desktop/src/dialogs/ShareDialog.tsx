@@ -5,7 +5,10 @@ import { Button, Dialog, Field, Input } from '@veil/ui';
 import { HostingChoice, type HostingForm } from './HostingChoice';
 import { DiscordInviteRow } from './DiscordInviteRow';
 import { DiscordInviteView } from './DiscordInviteView';
-import { JoinModeControl, SharePrivacy } from './SharePrivacy';
+import { DiscordJoinControl, JoinModeControl, SharePrivacy } from './SharePrivacy';
+import { DiscordAccountAction } from './DiscordInviteRow';
+import { DiscordLogo } from './DiscordLogo';
+import { discordAccountMessage } from './discord-share-state';
 import { discordShareState } from './discord-share-state';
 import type { useDiscordPresence } from '../discord';
 import type { DiscordInvitationSelection } from '../discord-invitations';
@@ -31,6 +34,8 @@ export function ShareDialog({
   onChangeHosting,
   onSelfHosting,
   onStart,
+  startPublicJoin,
+  onStartPublicJoinChange,
   onCopy,
   discord,
   discordSelection,
@@ -64,7 +69,11 @@ export function ShareDialog({
   hostingSummary: string;
   onChangeHosting: () => void;
   onSelfHosting: () => void;
-  onStart: () => void;
+  /** Creates the link; 'discord' opens the friend list right after. */
+  onStart: (view?: ShareView) => void;
+  /** Joining from Discord chosen before the link exists. */
+  startPublicJoin: boolean;
+  onStartPublicJoinChange: (publicJoin: boolean) => void;
   onCopy: () => void;
   discord: ReturnType<typeof useDiscordPresence>;
   discordSelection: Readonly<DiscordInvitationSelection> | null;
@@ -86,6 +95,12 @@ export function ShareDialog({
     connection: discord.connection,
     preferences: discord.preferences,
     link,
+  });
+  const startDiscord = discordShareState({
+    available: discord.social.available,
+    connection: discord.connection,
+    preferences: discord.preferences,
+    link: null,
   });
   const discordEnabled = discordSelection?.documentId === discordDocumentId;
   const elsewhere = discordEnabled ? null : discordElsewhere;
@@ -130,6 +145,43 @@ export function ShareDialog({
             onChange={onJoinModeChange}
             started={false}
           />
+          {startDiscord.kind === 'ready' ? (
+            <DiscordJoinControl
+              publicJoin={startPublicJoin}
+              disabled={busy}
+              onChange={onStartPublicJoinChange}
+            />
+          ) : startDiscord.kind === 'account' ? (
+            <div className="discord-invite-row">
+              <span className="discord-card-icon" aria-hidden="true">
+                <DiscordLogo size={20} />
+              </span>
+              <div className="discord-card-copy">
+                <strong>Invite Discord friends</strong>
+                <p role={startDiscord.connection.status === 'error' ? 'alert' : 'status'}>
+                  {discordAccountMessage(startDiscord.connection)}
+                </p>
+              </div>
+              <DiscordAccountAction connection={startDiscord.connection} />
+            </div>
+          ) : startDiscord.kind === 'needs-activity' ? (
+            <div className="share-consent-card">
+              <div>
+                <strong>Discord invites need activity sharing</strong>
+                <p>Your Discord status will show you’re in a Veil document.</p>
+              </div>
+              <Button
+                size="sm"
+                loading={discord.saving}
+                disabled={!discord.preferences}
+                onClick={() =>
+                  void discord.configure({ enabled: true, showParticipantCount: true })
+                }
+              >
+                Turn on
+              </Button>
+            </div>
+          ) : null}
           {chooseHosting ? (
             <div className="field">
               <span className="field-label">Where to host</span>
@@ -151,6 +203,15 @@ export function ShareDialog({
           )}
           <div className="dialog-actions">
             <Button onClick={onClose}>Cancel</Button>
+            {startDiscord.kind === 'ready' && (
+              <Button
+                icon={<DiscordLogo size={16} />}
+                disabled={busy || !name.trim() || (chooseHosting && !hosting.server.trim())}
+                onClick={() => onStart('discord')}
+              >
+                Create &amp; invite on Discord
+              </Button>
+            )}
             <Button
               type="submit"
               variant="primary"

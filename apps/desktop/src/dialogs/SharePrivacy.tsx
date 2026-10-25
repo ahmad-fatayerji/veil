@@ -39,6 +39,40 @@ export function JoinModeControl({
 
 type DiscordJoin = 'invite' | 'public';
 
+export function DiscordJoinControl({
+  publicJoin,
+  disabled,
+  onChange,
+  hint,
+}: {
+  publicJoin: boolean;
+  disabled: boolean;
+  onChange: (publicJoin: boolean) => void;
+  hint?: string;
+}) {
+  return (
+    <div className="field">
+      <span className="field-label">Joining from Discord</span>
+      <SegmentedControl<DiscordJoin>
+        label="Joining from Discord"
+        value={publicJoin ? 'public' : 'invite'}
+        disabled={disabled}
+        onChange={(choice) => onChange(choice === 'public')}
+        options={[
+          { value: 'invite', label: 'Invite only' },
+          { value: 'public', label: 'Friends can join' },
+        ]}
+      />
+      <p className="field-hint">
+        {publicJoin
+          ? 'Friends can join from your Discord profile or from Join a session in Veil.'
+          : 'Friends you invite can join. Others can ask, and you choose who gets in.'}
+        {hint && ` ${hint}`}
+      </p>
+    </div>
+  );
+}
+
 export function SharePrivacy({
   joinMode,
   onJoinModeChange,
@@ -65,26 +99,16 @@ export function SharePrivacy({
       </h3>
       <JoinModeControl value={joinMode} disabled={busy} onChange={onJoinModeChange} started />
       {discord.kind === 'ready' && (
-        <div className="field">
-          <span className="field-label">Joining from Discord</span>
-          <SegmentedControl<DiscordJoin>
-            label="Joining from Discord"
-            value={publicJoin ? 'public' : 'invite'}
-            disabled={busy}
-            onChange={(choice) => onPublicJoinChange(choice === 'public')}
-            options={[
-              { value: 'invite', label: 'Invite only' },
-              { value: 'public', label: 'Friends can join' },
-            ]}
-          />
-          <p className="field-hint">
-            {publicJoin
-              ? 'Friends can join from your Discord profile, if your Discord privacy settings allow it. Who can join above still applies.'
-              : 'Only friends you invite from Veil get the link.'}
-            {discordElsewhere &&
-              ` Your Discord status points to “${discordElsewhere}”; changing this moves it here.`}
-          </p>
-        </div>
+        <DiscordJoinControl
+          publicJoin={publicJoin}
+          disabled={busy}
+          onChange={onPublicJoinChange}
+          hint={
+            discordElsewhere
+              ? `Your Discord status points to “${discordElsewhere}”; changing this moves it here.`
+              : undefined
+          }
+        />
       )}
     </section>
   );
